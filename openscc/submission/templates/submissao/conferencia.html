@@ -1,0 +1,33 @@
+{% extends "base_openscc.html" %}
+{% block title %}
+<title>{{conf.nome}}</title>
+{% endblock %}    
+
+{% block headerPage %}
+    <h1>{{ conf.nome }}</h1>
+{% endblock %}
+
+{% block mainContent %}
+<div class="container">    
+    <div class="row mx-2">
+        {% for day in daysQt %}
+            <a href="{% url 'submission:conferenciaWithDate' id=conf.id data=day.1|cut:'/' %}" class="col-lg btn btn-primary mx-2">
+                <div>{{ day.0 }}</div>
+                <div>{{ day.1 }}</div>
+            </a>
+        {% endfor %}
+    </div>    
+    {% for a in atividades %}
+        <div class="row mx-2">
+            <div class="card m-1" style="background-color: #{{a.tipo.cor}};">
+                <div class="card-body">                                        
+                    <h5 class="card-title">{{ a.nome }}</h5>
+                    <p class="card-text">{{ a.descricao }}</p>
+                    <a href="javascript:;" class="btn btn-primary">Faça sua inscrição</a>
+                </div>
+            </div>
+        </div>
+    {% endfor %}    
+</div>
+
+{% endblock %}
