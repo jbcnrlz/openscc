@@ -2,19 +2,25 @@
 {% load static %}
 {% block mainContent %}
 
-  {% if form.errors %}
-    <p>Sua senha ou usuário não foram encontradas no sistema.</p>
+  <div class="d-flex align-items-center py-4 bg-body-tertiary">    
+  <div class="form-signin m-auto align-items-center">
+    {% if form.errors %}
+    <div class="alert alert-danger" role="alert">
+      <p>Sua senha ou usuário não foram encontradas no sistema.</p>
+    </div>
   {% endif %}
 
   {% if next %}
       {% if user.is_authenticated %}
-      <p>Sua conta não possui permissão para visualizar essa página.</p>
+      <div class="alert alert-danger" role="alert">
+        <p>Sua conta não possui permissão para visualizar essa página.</p>
+      </div>
       {% else %}
-      <p>Por favor faça o login para visualizar essa página.</p>
+      <div class="alert alert-primary" role="alert">
+        <p>Por favor faça o login para visualizar essa página.</p>
+      </div>
       {% endif %}
   {% endif %}
-  <div class="d-flex align-items-center py-4 bg-body-tertiary">
-  <div class="form-signin m-auto align-items-center">
     <form method="post" action="{% url 'submission:login' %}">
       {% csrf_token %}
       <img class="mb-4" src="{% static 'media/images/logo_openscc.png' %}" alt="" width="72" height="57">

@@ -1,18 +1,22 @@
 {% extends "base_openscc.html" %}
 {% block mainContent %}
 
-<div class="container-fluid">    
+<div class="container">    
     <form action="{% url 'submission:createUser' %}" method="POST">
         {% csrf_token %}
         {% for field in form %}
             <div class="form-group">
-                {{ field.errors }}
-                {{ field.label_tag }} {{ field }}
-                {% if field.help_text %}
-                  <p class="help" id="{{ field.auto_id }}_helptext">
-                    {{ field.help_text|safe }}
-                  </p>
-                {% endif %}
+              {% if field.errors %}
+              <div class="alert alert-danger" role="alert">
+                  {{ field.errors }}
+              </div>
+              {% endif %}
+              {{ field.label_tag }} {{ field }}
+              {% if field.help_text %}
+                <p class="help" id="{{ field.auto_id }}_helptext">
+                  {{ field.help_text|safe }}
+                </p>
+              {% endif %}
             </div>
         {% endfor %}
         <br>

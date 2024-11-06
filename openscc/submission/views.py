@@ -29,6 +29,7 @@ def cadUser(request):
         form = UserForm(request.POST)
         if form.is_valid():
             form.save()
+            return redirect('submission:login')
     else:
         form = UserForm
     return render(request,"submissao/cadUser.html", {"form" : form})
