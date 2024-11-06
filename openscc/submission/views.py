@@ -49,12 +49,12 @@ def conferencia(request,slug,data=None):
 def inscricao(request,id):
     atv = Atividade.objects.get(pk=id)
     atv.participantes.add(request.user)
-    return redirect('submission:conferencia',id=atv.conferencia.id)
+    return redirect('submission:conferencia',slug=atv.conferencia.slug)
 
 def removerInscricao(request,idAtv):
     atv = Atividade.objects.get(pk=idAtv)
     atv.participantes.remove(request.user)
-    return redirect('submission:conferencia',id=atv.conferencia.id)
+    return redirect('submission:conferencia',slug=atv.conferencia.slug)
 
 def profile(request):
     atvs = Atividade.objects.filter(participantes__id=request.user.id).order_by('nome').select_related('conferencia')
