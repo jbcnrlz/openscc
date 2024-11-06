@@ -1,0 +1,21 @@
+{% extends "base_openscc.html" %}
+{% block mainContent %}
+
+<div class="container">    
+    <h2>Sua lista de eventos: </h2>
+    {% for c, atvs in conferencias.items %}
+        <h3>{{c}}</h3>
+        <div class="d-flex gap-3">
+            {% for a in atvs %}
+                <div class="card" style="width: 18rem;">
+                    <div class="card-body">
+                        <h5 class="card-title">{{a.nome}}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">{{ a.data }} - {{ a.local }}</h6>
+                        <p class="card-text">{{ a.descricao }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,17 +1,26 @@
 {% extends "base_openscc.html" %}
+
+{% load submission_extras %}
+
+{% block FooterbrandImage %}
+<a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
+    <img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">    
+</a>
+{% endblock %}
+
+{% block brandImage %}
+<img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">
+{% endblock %}
+
 {% block title %}
 <title>{{conf.nome}}</title>
-{% endblock %}    
-
-{% block headerPage %}
-    <h1>{{ conf.nome }}</h1>
 {% endblock %}
 
 {% block mainContent %}
 <div class="container">    
     <div class="row mx-2">
         {% for day in daysQt %}
-            <a href="{% url 'submission:conferenciaWithDate' id=conf.id data=day.1|cut:'/' %}" class="col-lg btn btn-primary mx-2">
+            <a href="{% url 'submission:conferenciaWithDate' slug=conf.slug data=day.1|cut:'/' %}" class="col-lg btn btn-primary mx-2 {% if day.2 == 1 %} active {% endif %}">
                 <div>{{ day.0 }}</div>
                 <div>{{ day.1 }}</div>
             </a>
@@ -23,11 +32,54 @@
                 <div class="card-body">                                        
                     <h5 class="card-title">{{ a.nome }}</h5>
                     <p class="card-text">{{ a.descricao }}</p>
-                    <a href="javascript:;" class="btn btn-primary">Faça sua inscrição</a>
+                    {%  if user.is_authenticated  %}
+                        {% if a|userRegistered:user.id %}
+                            <a href="{% url 'submission:removerInscricao' idAtv=a.id %}" class="btn btn-primary removerAjax" >Remover sua inscrição</a>
+                        {% else %}
+                            <a href="javascript:;" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#{{a.id}}">Faça sua inscrição</a>
+                        {% endif %}
+                    {% else %}
+                        <a href="{% url 'submission:login' %}" class="btn btn-primary" >Faça seu login!</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
+
+        <div class="modal fade" id={{a.id}} tabindex="-1" aria-labelledby="{{ a.nome }}">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title col-12 text-center">{{a.nome}}</h5>                  
+                </div>
+                <div class="modal-body">
+                  <p>{{ a.descricao }}</p>
+                  <p>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pin-map" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M3.1 11.2a.5.5 0 0 1 .4-.2H6a.5.5 0 0 1 0 1H3.75L1.5 15h13l-2.25-3H10a.5.5 0 0 1 0-1h2.5a.5.5 0 0 1 .4.2l3 4a.5.5 0 0 1-.4.8H.5a.5.5 0 0 1-.4-.8z"/>
+                        <path fill-rule="evenodd" d="M8 1a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 4a4 4 0 1 1 4.5 3.969V13.5a.5.5 0 0 1-1 0V7.97A4 4 0 0 1 4 3.999z"/>
+                    </svg>
+                    {{ a.local }}
+                  </p>
+                  <p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-flag" viewBox="0 0 16 16">
+                    <path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464-.003.001-.006.003-.023.009a12 12 0 0 1-.397.15c-.264.095-.631.223-1.047.35-.816.252-1.879.523-2.71.523-.847 0-1.548-.28-2.158-.525l-.028-.01C7.68 8.71 7.14 8.5 6.5 8.5c-.7 0-1.638.23-2.437.477A20 20 0 0 0 3 9.342V15.5a.5.5 0 0 1-1 0V.5a.5.5 0 0 1 1 0v.282c.226-.079.496-.17.79-.26C4.606.272 5.67 0 6.5 0c.84 0 1.524.277 2.121.519l.043.018C9.286.788 9.828 1 10.5 1c.7 0 1.638-.23 2.437-.477a20 20 0 0 0 1.349-.476l.019-.007.004-.002h.001M14 1.221c-.22.078-.48.167-.766.255-.81.252-1.872.523-2.734.523-.886 0-1.592-.286-2.203-.534l-.008-.003C7.662 1.21 7.139 1 6.5 1c-.669 0-1.606.229-2.415.478A21 21 0 0 0 3 1.845v6.433c.22-.078.48-.167.766-.255C4.576 7.77 5.638 7.5 6.5 7.5c.847 0 1.548.28 2.158.525l.028.01C9.32 8.29 9.86 8.5 10.5 8.5c.668 0 1.606-.229 2.415-.478A21 21 0 0 0 14 7.655V1.222z"/>
+                  </svg>
+                    {{ a.tipo }}</p>
+                  <p>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
+                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+                    </svg>
+                    {{ a.data }}
+                   </p>
+                </div>
+                <div class="modal-footer">
+                  <a href="{% url 'submission:inscricaoAtividade' id=a.id %}" class="btn btn-primary col-12">Me inscrever!</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+
     {% endfor %}    
 </div>
-
 {% endblock %}

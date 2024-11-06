@@ -9,18 +9,24 @@ class Conferencia(models.Model):
     submissaoClose = models.DateField()
     dataEventoInicio = models.DateField()
     dataEventoFim = models.DateField()
+    logo = models.FileField(upload_to='images/')
+    slug = models.SlugField(default="",null=False)
 
     def __str__(self):
         return self.sigla
     
-    def getListaDias(self):
+    def getListaDias(self,currSelDate):
         diasDaSemana = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 
                       'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
         qtDias = (self.dataEventoFim - self.dataEventoInicio).days    
         diasConf = []
         for i in range(qtDias + 1):
             dataEvent = self.dataEventoInicio + datetime.timedelta(days=i)
-            diasConf.append((diasDaSemana[dataEvent.weekday()],dataEvent.strftime("%d/%m/%Y")))
+            if type(currSelDate) is datetime.date:
+                currSelection = 0 if dataEvent != currSelDate else 1
+            else:
+                currSelection = 0 if dataEvent != currSelDate.date() else 1
+            diasConf.append((diasDaSemana[dataEvent.weekday()],dataEvent.strftime("%d/%m/%Y"),currSelection))
 
         return diasConf
 
@@ -77,7 +83,15 @@ class Atividade(models.Model):
     local = models.CharField(max_length=100)
     tipo = models.ForeignKey(TipoAtividade,on_delete=models.CASCADE)
     palestrante = models.ForeignKey(Palestrante,on_delete=models.CASCADE,null=True,blank=True)
-    conferencia = models.ForeignKey(Conferencia,on_delete=models.CASCADE)
+    conferencia = models.ForeignKey(Conferencia,on_delete=models.CASCADE,related_name='atividades')
+    participantes = models.ManyToManyField(User)
+
+    def isUserRegitered(self,userID):
+        for u in self.participantes.all():
+            if u.id == userID:
+                return True
+        
+        return False
 
     def __str__(self):
         return self.nome

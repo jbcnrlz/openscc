@@ -1,21 +1,42 @@
 {% extends "base_openscc.html" %}
+{% load static %}
 {% block mainContent %}
 
-<div class="container-fluid">
-    <div class="d-flex flex-column justify-content-center align-items-center ">
-        <form>
-            <div class="form-group">
-              <label for="exampleInputEmail1">Email</label>
-              <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">              
-            </div>
-            <div class="form-group">
-              <label for="exampleInputPassword1">Senha</label>
-              <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
-            </div>
-            <button type="submit" class="btn btn-primary">Realizar Login</button>            
-          </form>
-          <div class=""><a href="{% url 'createUser' %}">Não possui cadastro? Clique Aqui!</a></div>
-    </div>
+  {% if form.errors %}
+    <p>Sua senha ou usuário não foram encontradas no sistema.</p>
+  {% endif %}
+
+  {% if next %}
+      {% if user.is_authenticated %}
+      <p>Sua conta não possui permissão para visualizar essa página.</p>
+      {% else %}
+      <p>Por favor faça o login para visualizar essa página.</p>
+      {% endif %}
+  {% endif %}
+  <div class="d-flex align-items-center py-4 bg-body-tertiary">
+  <div class="form-signin m-auto align-items-center">
+    <form method="post" action="{% url 'submission:login' %}">
+      {% csrf_token %}
+      <img class="mb-4" src="{% static 'media/images/logo_openscc.png' %}" alt="" width="72" height="57">
+      <h1 class="h3 mb-3 font-weight-normal">Por favor faça o login</h1>
+      <div class="form-floating">        
+        <input type="text" id="{{form.username.id_for_label}}" name="{{form.username.html_name}}" type="text" class="form-control" placeholder="usuário">
+        <div style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;" data-lastpass-icon-root=""></div>
+        <label for="{{form.username.id_for_label}}">Usuário</label>
+      </div>
+      <div class="form-floating">        
+        <input id="{{form.password.id_for_label}}" name="{{form.password.html_name}}" type="password" class="form-control" placeholder="Senha">
+        <div style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;" data-lastpass-icon-root=""></div>
+        <label for="{{form.password.id_for_label}}">Senha</label>
+      </div>
+      <div class="form-check text-start my-3">
+        <span>Não se cadastrou ainda? <a href="{% url 'submission:createUser'%}">clique aqui</a></span>
+      </div>
+      <button class="btn btn-primary w-100 py-2" type="submit">Login</button>
+      <input type="hidden" name="next" value="{{ next }}">
+    </form>
+  </div>
 </div>
+  {# Assumes you set up the password_reset view in your URLconf #}  
 
 {% endblock %}

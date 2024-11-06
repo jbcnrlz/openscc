@@ -1,3 +1,15 @@
 #headerSystem{
-  background-color: rgb(203, 148, 255);
+  background-color: #CCC;
+}
+main{
+  margin: 10px 0;
+}
+footer{
+  background-color: whitesmoke !important;
+}
+.logoHeader{
+  width: 5rem;
+}
+body{
+  background-color: #CCC;
 }

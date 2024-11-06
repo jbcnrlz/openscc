@@ -2,7 +2,7 @@
 {% block mainContent %}
 
 <div class="container-fluid">    
-    <form action="{% url 'createUser' %}" method="POST">
+    <form action="{% url 'submission:createUser' %}" method="POST">
         {% csrf_token %}
         {% for field in form %}
             <div class="form-group">
@@ -15,6 +15,7 @@
                 {% endif %}
             </div>
         {% endfor %}
+        <br>
         <button type="submit" class="btn btn-primary">Salvar</button>
         </form>        
 </div>
