@@ -1,10 +1,6 @@
-from django.http import HttpResponse
 from django.shortcuts import render, redirect
-from django.template import loader
-from django.contrib.auth.models import User
-import datetime, json
 from django.contrib.auth import logout
-from django.urls import reverse
+from django.contrib.admin.views.decorators import staff_member_required
 # Create your views here.
 
 from .forms import UserForm
@@ -76,3 +72,10 @@ def getConferenciasAndAtividades(atividades):
 def conferencias(request):
     conferenciaList = Conferencia.objects.filter(submissaoClose__gte=datetime.date.today())
     return render(request,"submissao/conferencias.html",{"conferenciaList":conferenciaList})
+
+@staff_member_required
+def visualizeSubscription(request):
+    idsAtvs = request.GET.get('ids','').split(',')
+    atvs = Atividade.objects.filter(id__in=idsAtvs)
+    atvs.select_related('participantes').all() 
+    return render(request,"admin/subscriptions.html",{'atividades' : atvs})

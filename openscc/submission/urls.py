@@ -15,5 +15,6 @@ urlpatterns = [
     path("inscricao/<id>/",views.inscricao,name='inscricaoAtividade'),
     path("removerInscricao/<idAtv>/",views.removerInscricao,name='removerInscricao'),
     path("accounts/profile/",views.profile,name='perfil'),
-    path("conferencias/",views.conferencias,name='confList')
+    path("conferencias/",views.conferencias,name='confList'),
+    path("inscritos/",view=views.visualizeSubscription,name='inscritos')
 ]
