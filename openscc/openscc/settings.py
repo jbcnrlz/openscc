@@ -74,19 +74,18 @@ WSGI_APPLICATION = "openscc.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-'''
-Tire o comentário daqui para configurar o banco, por exemplo:
+
 DATABASES = {
     "default":{
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'nome do banco',
-        'USER': 'usuario',
-        'PASSWORD': 'senha',
-        'HOST': 'url do host',
-        'PORT': 'porta'
+        'NAME': 'openscc',
+        'USER': 'jbcnrlz',
+        'PASSWORD': 'a12b25c54',
+        'HOST': 'localhost',
+        'PORT': '3306'
     }
 }
-'''
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

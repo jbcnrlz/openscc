@@ -36,7 +36,13 @@
                         {% if a|userRegistered:user.id %}
                             <a href="{% url 'submission:removerInscricao' idAtv=a.id %}" class="btn btn-primary removerAjax" >Remover sua inscrição</a>
                         {% else %}
+                          {% if a|canSubscrive:user.id  %}
                             <a href="javascript:;" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#{{a.id}}">Faça sua inscrição</a>
+                          {% else %}
+                            <div class="alert alert-danger" role="alert">
+                              Você já está inscrito em outro evento no mesmo horário!
+                            </div>                          
+                          {% endif %}
                         {% endif %}
                     {% else %}
                         <a href="{% url 'submission:login' %}" class="btn btn-primary" >Faça seu login!</a>

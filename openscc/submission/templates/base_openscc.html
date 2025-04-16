@@ -38,6 +38,7 @@
                       </a>
                       <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                         <a class="dropdown-item" href="{% url 'submission:perfil' %}">Minhas inscrições</a>
+                        <a class="dropdown-item" href="{% url 'submission:artigos' %}">Meus artigos</a>
                         <a class="dropdown-item" href="{% url 'submission:logout' %}">Logout</a>
                       </div>
                     </li>
@@ -57,6 +58,13 @@
       </nav>
     </header>    
     <main>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-success" role="alert">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
       {% block mainContent %}
       {% endblock %}
     </main>

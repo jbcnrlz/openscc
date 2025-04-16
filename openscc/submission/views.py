@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 # Create your views here.
 
-from .forms import UserForm
+from .forms import UserForm, ArtigoForm
 from .models import *
 
 #def login(request):
@@ -25,6 +27,7 @@ def cadUser(request):
         form = UserForm(request.POST)
         if form.is_valid():
             form.save()
+            messages.success(request, 'Cadastro efetuado com sucesso!')
             return redirect('submission:login')
     else:
         form = UserForm
@@ -79,3 +82,42 @@ def visualizeSubscription(request):
     atvs = Atividade.objects.filter(id__in=idsAtvs)
     atvs.select_related('participantes').all() 
     return render(request,"admin/subscriptions.html",{'atividades' : atvs})
+
+def submissaoDesc(request,slug):
+    conf = Conferencia.objects.get(slug=slug)
+    return render(request,"submissao/subdesc.html",{"conf" : conf})
+
+@login_required(login_url='/login')
+def submissionForm(request,slug):
+    conf = Conferencia.objects.get(slug=slug)
+    if request.method == "POST":
+        form = ArtigoForm(request.POST,request.FILES)
+        if form.is_valid():
+            artigo = form.save(commit=False)
+            artigo.conferenciaAtual = conf
+            artigo.user = request.user
+            artigo.dataEnvio = datetime.date.today()
+            artigo.status = 0
+            artigo.save()
+            # Processar autores dinamicamente
+            autores = request.POST.getlist('autores_nome')
+            emails = request.POST.getlist('autores_email')
+            autores_filiacao = request.POST.getlist('autores_filiacao')
+
+            for nome, email, filiacao in zip(autores, emails, autores_filiacao):                
+                autor, created = Autores.objects.get_or_create(nome=nome, email=email, filiacao=filiacao, principal=0)
+                artigo.autores.add(autor)
+
+            messages.success(request, 'Submissão efetuada com sucesso!')
+            return redirect('submission:artigos')  # Redireciona após o cadastro
+    else:
+        form = ArtigoForm()    
+    return render(request,"submissao/subform.html",{"conf" : conf, "form" : form})
+
+def artigos(request):
+    atvs = Artigo.objects.filter(user__id=request.user.id).order_by('titulo').select_related('conferenciaAtual')
+    return render(request,"submissao/artigos.html",{"atvs":atvs})
+
+def detailsPaper(request,id):
+    artigo = Artigo.objects.get(pk=id)
+    return render(request,"submissao/detailsPaper.html",{"artigo":artigo})
