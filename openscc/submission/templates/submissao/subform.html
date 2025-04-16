@@ -1,0 +1,56 @@
+{% extends "base_openscc.html" %}
+
+{% block FooterbrandImage %}
+<a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
+    <img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">    
+</a>
+{% endblock %}
+
+{% block brandImage %}
+<img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">
+{% endblock %}
+
+{% block mainContent %}
+<div class="container">
+    <h1>Submissão de Trabalhos</h1>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form }}  <!-- Renderiza os campos do formulário -->
+        <div class="row mb-3 mt-3">
+            <div class="col-sm-2"><h2>Autores</h2></div>
+            <div class="col-sm-10 d-flex justify-content-end"><button type="button" class="btn btn-primary" id="adicionar-autor">Adicionar Autor</button></div>
+        </div>
+        <div id="autores-container">
+            <div class="input-group mb-3" >            
+                <input type="text" class="form-control" name="autores_nome" required="" placeholder="Nome do Autor" aria-label="Nome do autor">
+                <input type="email" class="form-control" name="autores_email" required="" placeholder="Email do Autor" aria-label="E-mail do autor">
+                <input type="text" class="form-control" name="autores_filiacao" required="" placeholder="Filiação do Autor" aria-label="Filiação do autor">
+            </div>
+        </div>        
+        <button class="btn btn-primary" type="submit">Submeter Artigo</button>
+    </form>
+
+    <script>
+        document.getElementById('adicionar-autor').addEventListener('click', function() {
+            const container = document.getElementById('autores-container');
+            const novoAutor = document.createElement('div');
+            novoAutor.classList.add('input-group');
+            novoAutor.classList.add('mb-3');
+            novoAutor.innerHTML = `
+                <input type="text" class="form-control" required="" name="autores_nome" placeholder="Nome do Autor" aria-label="Nome do autor">
+                <input type="email" class="form-control" required="" name="autores_email" placeholder="Email do Autor" aria-label="E-mail do autor">
+                <input type="text" class="form-control" required="" name="autores_filiacao" placeholder="Filiação do Autor" aria-label="Filiação do autor">
+                <button type="button" class="btn btn-danger" onclick="removerAutor(this);">Remover Autor</button>
+            `;
+            container.appendChild(novoAutor);
+        });
+
+        function removerAutor(button) {
+            const autorDiv = button.parentElement;
+            autorDiv.remove();
+        }
+
+    </script>          
+</div>
+{% endblock %}
