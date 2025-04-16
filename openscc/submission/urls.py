@@ -16,5 +16,9 @@ urlpatterns = [
     path("removerInscricao/<idAtv>/",views.removerInscricao,name='removerInscricao'),
     path("accounts/profile/",views.profile,name='perfil'),
     path("conferencias/",views.conferencias,name='confList'),
-    path("inscritos/",view=views.visualizeSubscription,name='inscritos')
+    path("inscritos/",view=views.visualizeSubscription,name='inscritos'),
+    path("submissaoPaper/<slug>/",view=views.submissaoDesc,name='paginaSubmissao'),
+    path("submissionForm/<slug>/",view=views.submissionForm,name='submissionForm'),
+    path("accounts/papers/",view=views.artigos,name='artigos'),
+    path("artigo/<id>/",view=views.detailsPaper,name='artigo')
 ]

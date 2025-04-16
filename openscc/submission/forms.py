@@ -1,6 +1,19 @@
 from django import forms
 from django.contrib.auth.models import User
+from .models import Artigo
 from django.core.exceptions import ValidationError
+
+class ArtigoForm(forms.ModelForm):
+    class Meta:
+        model = Artigo
+        fields = ['titulo','endereco']
+
+        labels = { "titulo" : "Título", "endereco" : "Artigo" }
+
+    def __init__(self, *args, **kwargs):
+        super(ArtigoForm, self).__init__(*args, **kwargs)
+        for visible in self.visible_fields():
+            visible.field.widget.attrs['class'] = 'form-control'
 
 class UserForm(forms.ModelForm):
     password1 = forms.CharField(label="Senha", widget=forms.PasswordInput)
