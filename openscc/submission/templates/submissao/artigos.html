@@ -1,0 +1,30 @@
+{% extends "base_openscc.html" %}
+
+{% load submission_extras %}
+
+{% block mainContent %}
+<div class="container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Nome do artigo</th>
+                <th scope="col">Conferência</th>
+                <th scope="col">Status</th>
+                <th scope="col">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in atvs %}
+                <tr>
+                    <td>{{ a.titulo }}</td>
+                    <td>{{ a.conferenciaAtual.nome }}</td>
+                    <td>{{ a|getStatusPaper }}</td>
+                    <td>
+                        <a href="{% url 'submission:artigo' a.id %}" class="btn btn-primary">Ver detalhes</a>
+                    </td>
+                </tr>
+            {% endfor %}        
+        </tbody>
+    </table>
+</div>
+{% endblock %}

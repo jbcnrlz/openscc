@@ -1,0 +1,29 @@
+{% extends "base_openscc.html" %}
+
+{% load submission_extras %}
+
+{% block mainContent %}
+<div class="container">
+    <h2>{{ artigo.titulo }}</h2>
+    <div class="row">
+        <div class="col-sm-12">
+            <strong>Conferência:</strong> {{ artigo.conferenciaAtual.nome }}
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-12">
+            <strong>Status:</strong> {{ artigo|getStatusPaper }}
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <Strong>Autores:</Strong>
+            {% for autor in artigo.autores.all %}
+                {{ autor.nome }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    <strong>Arquivo: </strong>
+    <a href="{{ artigo.endereco.url }}">{{ artigo.endereco.name }}</a><br>
+</div>
+{% endblock %}

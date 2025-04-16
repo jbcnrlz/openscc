@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-import datetime
+import datetime, uuid
 # Create your models here.
 class Conferencia(models.Model):
     nome = models.CharField(max_length=400)
@@ -11,6 +11,7 @@ class Conferencia(models.Model):
     dataEventoFim = models.DateField()
     logo = models.FileField(upload_to='images/')
     slug = models.SlugField(default="",null=False)
+    conteudoHtml = models.TextField(blank=True,null=True)
 
     def __str__(self):
         return self.sigla
@@ -37,13 +38,35 @@ class Autores(models.Model):
     filiacao = models.CharField(max_length=400)
     principal = models.IntegerField()
 
+    def __str__(self):
+        return self.nome + " - " + self.email
+
+def content_file_name(instance, filename):
+    newFilename = str(uuid.uuid4()) + filename[filename.rfind('.'):]
+    return f'artigos/{newFilename}'
 class Artigo(models.Model):
     titulo = models.CharField(max_length=400)
     status = models.IntegerField()
-    endereco = models.FileField()
+    endereco = models.FileField(upload_to=content_file_name)
     dataEnvio = models.DateField()
     autores = models.ManyToManyField(Autores)
-    conferenciaAtual = models.OneToOneField(Conferencia,default=None,on_delete=models.CASCADE)
+    conferenciaAtual = models.OneToOneField(Conferencia,default=None,on_delete=models.CASCADE, unique=False)
+    user = models.OneToOneField(User,on_delete=models.CASCADE, unique=False)
+
+    def getStatusPaper(self):
+        if self.status == 0:
+            return "Aguardando avaliação"
+        elif self.status == 1:
+            return "Aprovado"
+        elif self.status == 3:
+            return "Reprovado"
+        elif self.status == 2:
+            return "Aceito com modificações"
+        else:
+            return "Desconhecido"
+
+    def __str__(self):
+        return self.titulo + " - " + self.user.username
 
 class EnderecoInstituicao(models.Model):
     logradouro = models.CharField(max_length=200)
@@ -92,6 +115,14 @@ class Atividade(models.Model):
                 return True
         
         return False
+
+    def canUserRegister(self,userID):        
+        atvs = Atividade.objects.filter(data__exact=self.data,participantes__id=userID).all()
+        print(atvs)
+        if atvs.exists():
+            print("ja existe")
+            return False
+        return True
 
     def __str__(self):
         return self.nome

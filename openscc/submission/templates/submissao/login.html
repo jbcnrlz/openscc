@@ -36,7 +36,8 @@
         <label for="{{form.password.id_for_label}}">Senha</label>
       </div>
       <div class="form-check text-start my-3">
-        <span>Não se cadastrou ainda? <a href="{% url 'submission:createUser'%}">clique aqui</a></span>
+        <p class="mb-1">Não se cadastrou ainda? <a href="{% url 'submission:createUser'%}">Clique Aqui</a></p>
+        <p class="text-end"><a href="{% url 'password_reset' %}">Esqueceu a senha?</a></p>
       </div>
       <button class="btn btn-primary w-100 py-2" type="submit">Login</button>
       <input type="hidden" name="next" value="{{ next }}">

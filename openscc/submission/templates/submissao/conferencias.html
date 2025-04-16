@@ -3,6 +3,8 @@
 {% load submission_extras %}
 
 {% block mainContent %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <div class="container">
     <table class="table">
         <thead>
@@ -13,7 +15,8 @@
                 <th scope="col">Abertura das inscrições</th>
                 <th scope="col">Fechamento inscrições</th>
                 <th scope="col">Data do evento</th>
-                <th scope="col">Acessar</th>
+                <th scope="col">Inscrição</th>
+                <th scope="col">Submissão</th>
             </tr>
         </thead>
         <tbody>
@@ -25,7 +28,8 @@
                     <td>{{ c.submissaoOpen }}</td>
                     <td>{{ c.submissaoClose }}</td>
                     <td>De {{ c.dataEventoInicio }} até {{ c.dataEventoFim }}</td>
-                    <td><a href="{% url 'submission:conferencia' slug=c.slug %}" class="btn btn-primary">Acessar</a></td>
+                    <td><a href="{% url 'submission:conferencia' slug=c.slug %}" class="btn btn-primary"><i class="fas fa-calendar-check"></i></a></td>
+                    <td><a href="{% url 'submission:paginaSubmissao' slug=c.slug %}" class="btn btn-primary"><i class="fas fa-file-upload"></i></a></td>
                 </tr>
             {% endfor %}        
         </tbody>
