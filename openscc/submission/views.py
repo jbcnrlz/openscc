@@ -85,7 +85,7 @@ def visualizeSubscription(request):
 
 def submissaoDesc(request,slug):
     conf = Conferencia.objects.get(slug=slug)
-    return render(request,"submissao/subdesc.html",{"conf" : conf})
+    return render(request,"submissao/subdesc.html",{"conf" : conf,"hoje" : datetime.date.today()})
 
 @login_required(login_url='/login')
 def submissionForm(request,slug):
