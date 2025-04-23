@@ -15,7 +15,13 @@
     <h1>Submissão de Trabalhos</h1>
     
     <p>{{ conf.conteudoHtml|safe }}</p>
-
-    <a href="{% url 'submission:submissionForm' slug=conf.slug %}" class="btn btn-primary">Enviar artigo</a>
-</div>
+    {% if hoje >= conf.submissaoOpen and hoje <= conf.submissaoClose %}
+        <div class="row">
+            <div class="col-12">
+                <a href="{% url 'submission:submissionForm' slug=conf.slug %}" class="btn btn-primary w-100">Enviar artigo</a>
+        
+            </div>
+        </div>
+    {% endif %}
+    </div>
 {% endblock %}
