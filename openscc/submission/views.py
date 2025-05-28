@@ -42,7 +42,7 @@ def conferencia(request,slug,data=None):
         data__year=currData.year,
         data__month=currData.month,
         data__day=currData.day
-    )
+    ).order_by('-horaInicio')
     atvs.select_related('tipo').all()    
     return render(request,"submissao/conferencia.html",{"conf" : conf, "daysQt" : diasConf,'atividades' : atvs})
 
