@@ -139,6 +139,7 @@ class ParticipanteAtividade(models.Model):
     atividade = models.ForeignKey(Atividade,on_delete=models.CASCADE)
     user = models.ForeignKey(User,on_delete=models.CASCADE)
     presenca = models.BooleanField(default=False)
+    data_registro = models.DateTimeField()
 
     class Meta:
         db_table = 'submission_atividade_participantes'
