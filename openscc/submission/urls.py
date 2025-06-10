@@ -20,5 +20,9 @@ urlpatterns = [
     path("submissaoPaper/<slug>/",view=views.submissaoDesc,name='paginaSubmissao'),
     path("submissionForm/<slug>/",view=views.submissionForm,name='submissionForm'),
     path("accounts/papers/",view=views.artigos,name='artigos'),
-    path("artigo/<id>/",view=views.detailsPaper,name='artigo')
+    path("artigo/<id>/",view=views.detailsPaper,name='artigo'),
+    path('atividade/<int:atvId>/participante/<int:partId>/presenca/', 
+         views.generateQRCode, name='generateQRCode'),
+    path('presenca/<int:atvId>/<int:partId>/', 
+         views.contabilizarPresenca, name='presenca'),
 ]

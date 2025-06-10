@@ -1,4 +1,5 @@
 from django import template
+import base64
 
 register = template.Library()
 
@@ -13,3 +14,11 @@ def getStatusPaper(paper):
 @register.filter(name='canSubscrive')
 def canSubscrive(ativide,userID):
     return ativide.canUserRegister(userID)
+
+@register.filter(name='base64Encode')
+def base64Encode(value):    
+    return base64.b64encode(value).decode('utf-8')
+
+@register.filter(name='isPresent')
+def isPresent(ativide,userID):
+    return ativide.isAlreadyPresent(userID)

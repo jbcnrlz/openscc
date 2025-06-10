@@ -107,7 +107,14 @@ class Atividade(models.Model):
     tipo = models.ForeignKey(TipoAtividade,on_delete=models.CASCADE)
     palestrante = models.ForeignKey(Palestrante,on_delete=models.CASCADE,null=True,blank=True)
     conferencia = models.ForeignKey(Conferencia,on_delete=models.CASCADE,related_name='atividades')
-    participantes = models.ManyToManyField(User)
+    participantes = models.ManyToManyField(User,through='ParticipanteAtividade')
+
+    def isAlreadyPresent(self,userID):
+        ptav = ParticipanteAtividade.objects.filter(atividade=self,user__id=userID).first()
+        if ptav is not None:
+            return ptav.presenca
+        else:
+            return False
 
     def isUserRegitered(self,userID):
         for u in self.participantes.all():
@@ -126,3 +133,16 @@ class Atividade(models.Model):
 
     def __str__(self):
         return self.nome
+    
+
+class ParticipanteAtividade(models.Model):
+    atividade = models.ForeignKey(Atividade,on_delete=models.CASCADE)
+    user = models.ForeignKey(User,on_delete=models.CASCADE)
+    presenca = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'submission_atividade_participantes'
+        managed = False
+
+    def __str__(self):
+        return f"{self.participante.username} - {self.atividade.nome}"

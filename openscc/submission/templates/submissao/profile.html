@@ -1,5 +1,6 @@
 {% extends "base_openscc.html" %}
 {% block mainContent %}
+{% load submission_extras %}
 
 <div class="container">    
     <h2>Sua lista de eventos: </h2>
@@ -11,6 +12,11 @@
                     <div class="card-body">
                         <h5 class="card-title">{{a.nome}}</h5>
                         <h6 class="card-subtitle mb-2 text-muted">{{ a.data }} - {{ a.local }}</h6>
+                        {% if a|isPresent:usuario.id %}
+                            <p class="card-text alert alert-warning">Você já está com a presença registrada nesta atividade.</p>
+                        {% else %}
+                            <a href="{% url 'submission:generateQRCode' atvId=a.id partId=usuario.id %}" type="button" class="btn btn-primary">Gerar QR Code</a>
+                        {% endif %}                        
                     </div>
                 </div>
             {% endfor %}
