@@ -3,10 +3,14 @@ from django.contrib.auth import logout
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.urls import reverse
 # Create your views here.
 
 from .forms import UserForm, ArtigoForm
 from .models import *
+
+import qrcode
+from io import BytesIO
 
 #def login(request):
 #    if request.method == 'POST':
@@ -17,6 +21,45 @@ from .models import *
 #            print('deu erro')
 #    template = loader.get_template("submissao/login.html")
 #    return HttpResponse(template.render(request=request))
+@staff_member_required
+def contabilizarPresenca(request, atvId, partId):
+    patv = ParticipanteAtividade.objects.get(atividade__id=atvId, user__id=partId)
+    patv.presenca = True
+    try:
+        patv.save()
+        messages.success(request, 'Presença contabilizada com sucesso!')
+    except:            
+        messages.error(request, 'Erro ao contabilizar presença. Tente novamente.')
+    return render(request, 'submissao/contabilizarPresenca.html')
+
+def generateQRCode(request, atvId, partId):
+    atv = Atividade.objects.get(pk=atvId)
+    part = atv.participantes.get(pk=partId)
+    url_redirecionamento = reverse('submission:presenca', args=[atvId,partId])
+    url_redirecionamento = request.build_absolute_uri(url_redirecionamento)
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(url_redirecionamento)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    qr_code_image = buffer.getvalue()
+    buffer.close()
+
+    context = {
+        'atividade': atv,
+        'participante': part,
+        'qr_code_image': qr_code_image,
+        'url_redirecionamento': url_redirecionamento,
+    }
+
+    return render(request, 'submissao/qrcode.html', context)
 
 def logoutView(request):
     logout(request)
@@ -59,7 +102,10 @@ def removerInscricao(request,idAtv):
 def profile(request):
     atvs = Atividade.objects.filter(participantes__id=request.user.id).order_by('nome').select_related('conferencia')
     conferencias = getConferenciasAndAtividades(atvs)
-    return render(request,"submissao/profile.html",{"conferencias":conferencias})
+    return render(request,"submissao/profile.html",{
+        "conferencias":conferencias,
+        "usuario" : request.user
+    })
 
 def getConferenciasAndAtividades(atividades):
     returnDict = {}

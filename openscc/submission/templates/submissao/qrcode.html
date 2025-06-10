@@ -1,0 +1,8 @@
+{% extends "base_openscc.html" %}
+{% load submission_extras %}
+{% block mainContent %}
+
+<div class="container text-center">    
+    <img src="data:image/png;base64,{{ qr_code_image|base64Encode }}" alt="QR Code para atividade {{ atividade.nome }}">
+</div>
+{% endblock %}
