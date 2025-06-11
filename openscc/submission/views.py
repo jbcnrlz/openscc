@@ -4,6 +4,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
+import datetime
 # Create your views here.
 
 from .forms import UserForm, ArtigoForm
@@ -23,13 +24,19 @@ from io import BytesIO
 #    return HttpResponse(template.render(request=request))
 @staff_member_required
 def contabilizarPresenca(request, atvId, partId):
-    patv = ParticipanteAtividade.objects.get(atividade__id=atvId, user__id=partId)
-    patv.presenca = True
-    try:
-        patv.save()
-        messages.success(request, 'Presença contabilizada com sucesso!')
-    except:            
-        messages.error(request, 'Erro ao contabilizar presença. Tente novamente.')
+    atv = Atividade.objects.get(pk=atvId)
+    dataConf = datetime.datetime.fromtimestamp(atv.data.timestamp())
+    if dataConf > datetime.datetime.now():
+        messages.error(request, 'A atividade ainda não ocorreu. Presença não pode ser contabilizada.')
+    else:
+        patv = ParticipanteAtividade.objects.get(atividade__id=atvId, user__id=partId)        
+        try:
+            patv.presenca = True
+            patv.data_registro = datetime.datetime.now()
+            patv.save()
+            messages.success(request, 'Presença contabilizada com sucesso!')
+        except:            
+            messages.error(request, 'Erro ao contabilizar presença. Tente novamente.')
     return render(request, 'submissao/contabilizarPresenca.html')
 
 def generateQRCode(request, atvId, partId):

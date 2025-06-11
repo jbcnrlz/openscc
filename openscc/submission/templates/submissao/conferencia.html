@@ -30,8 +30,13 @@
         <div class="row mx-2">
             <div class="card m-1" style="background-color: #{{a.tipo.cor}};">
                 <div class="card-body">                                        
-                    <h5 class="card-title">{{ a.nome }}</h5>
-                    <p class="card-text">{{ a.descricao }}</p>
+                    <h5 class="card-title">{{ a.nome }} - {{ a.data|time:"H:i:s" }}</h5>                    
+                    <p class="card-text">                      
+                      {% if a.palestrante.nome %}
+                        <span class="textPal"></span>por {{a.palestrante.nome }}</span><br >
+                      {% endif %}
+                      {{ a.descricao }}
+                    </p>
                     {%  if user.is_authenticated  %}
                         {% if a|userRegistered:user.id %}
                             <a href="{% url 'submission:removerInscricao' idAtv=a.id %}" class="btn btn-primary removerAjax" >Remover sua inscrição</a>

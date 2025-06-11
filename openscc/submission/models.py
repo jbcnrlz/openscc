@@ -31,7 +31,6 @@ class Conferencia(models.Model):
 
         return diasConf
 
-
 class Autores(models.Model):
     nome = models.CharField(max_length=250)
     email = models.CharField(max_length=250)
@@ -134,11 +133,11 @@ class Atividade(models.Model):
     def __str__(self):
         return self.nome
     
-
 class ParticipanteAtividade(models.Model):
     atividade = models.ForeignKey(Atividade,on_delete=models.CASCADE)
     user = models.ForeignKey(User,on_delete=models.CASCADE)
     presenca = models.BooleanField(default=False)
+    data_registro = models.DateTimeField()
 
     class Meta:
         db_table = 'submission_atividade_participantes'
