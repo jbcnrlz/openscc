@@ -31,7 +31,6 @@ class Conferencia(models.Model):
 
         return diasConf
 
-
 class Autores(models.Model):
     nome = models.CharField(max_length=250)
     email = models.CharField(max_length=250)
@@ -134,7 +133,6 @@ class Atividade(models.Model):
     def __str__(self):
         return self.nome
     
-
 class ParticipanteAtividade(models.Model):
     atividade = models.ForeignKey(Atividade,on_delete=models.CASCADE)
     user = models.ForeignKey(User,on_delete=models.CASCADE)
