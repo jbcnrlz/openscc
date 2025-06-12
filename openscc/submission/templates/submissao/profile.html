@@ -6,7 +6,7 @@
     <h2>Sua lista de eventos: </h2>
     {% for c, atvs in conferencias.items %}
         <h3>{{c}}</h3>
-        <div class="d-flex gap-3">
+        <div class="d-flex flex-column flex-md-row gap-3">
             {% for a in atvs %}
                 <div class="card" style="width: 18rem;">
                     <div class="card-body">
