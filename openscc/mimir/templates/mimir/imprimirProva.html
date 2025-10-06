@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prova - {{ prova.titulo }}</title>
+    <style>
+        @media print {
+            @page {
+                margin: 2cm;
+                size: A4;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            .questao {
+                page-break-inside: avoid;
+            }
+            .imagem-pergunta {
+                page-break-inside: avoid;
+            }
+        }
+        
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #000;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .prova-titulo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .prova-descricao {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .prova-info {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .questao {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .questao-numero {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        
+        .questao-enunciado {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .imagens-container {
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+        
+        .imagem-pergunta {
+            margin: 10px 0;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+        
+        .imagem-pergunta img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px;
+        }
+        
+        .legenda-imagem {
+            font-size: 11px;
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        
+        .grid-imagens {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .espaco-resposta {
+            min-height: 100px;
+            border: 1px dashed #ccc;
+            margin-top: 10px;
+            padding: 10px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+        }
+        
+        .btn-print {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .btn-print:hover {
+            background: #0056b3;
+        }
+        
+        .info-imagens {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Estilos para diferentes tamanhos de imagem */
+        .imagem-pequena img {
+            max-width: 300px;
+        }
+        
+        .imagem-media img {
+            max-width: 400px;
+        }
+        
+        .imagem-grande img {
+            max-width: 500px;
+        }
+        
+        /* Evitar que imagens quebrem entre páginas */
+        .imagem-container {
+            break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+        <button onclick="window.print()" class="btn-print">🖨️ Imprimir Prova</button>
+        <a href="{% url 'mimir:opcoesImpressao' prova.id %}" style="margin-left: 10px;">← Voltar</a>
+    </div>
+
+    <div class="header">
+        <div class="prova-titulo">{{ prova.titulo }}</div>
+        <div class="prova-descricao">{{ prova.descricao }}</div>
+        <div class="prova-info">
+            Assunto: {{ prova.assunto }} | 
+            Data: {% now "d/m/Y" %} |
+            Professor: {{ prova.user.get_full_name|default:prova.user.username }}
+        </div>
+    </div>
+
+    <div class="instrucoes">
+        <p><strong>Instruções:</strong></p>
+        <ul>
+            <li>Preencha seu nome e turma no espaço indicado</li>
+            <li>Leia atentamente cada questão antes de responder</li>
+            {% if tem_imagens %}
+            <li>Observe atentamente as imagens associadas às questões</li>
+            {% endif %}
+        </ul>
+    </div>
+
+    {% for pergunta in perguntas %}
+    <div class="questao">
+        <div class="questao-numero">Questão {{ forloop.counter }}</div>
+        <div class="questao-enunciado">{{ pergunta.pergunta|linebreaksbr }}</div>
+        
+        <!-- Seção de Imagens da Pergunta -->
+        {% if pergunta.imagens.all %}
+        <div class="imagens-container">
+            {% if pergunta.imagens.count == 1 %}
+                <!-- Uma única imagem -->
+                {% with imagem=pergunta.imagens.first %}
+                <div class="imagem-pergunta {% if pergunta.imagens.first.imagem.width > 400 %}imagem-grande{% elif pergunta.imagens.first.imagem.width > 300 %}imagem-media{% else %}imagem-pequena{% endif %}">
+                    <img src="{{ imagem.imagem.url }}" 
+                         alt="Imagem da questão {{ forloop.counter }}"
+                         onload="this.classList.add('loaded')">
+                    <div class="legenda-imagem">Figura {{ forloop.counter }} - Imagem de referência</div>
+                </div>
+                {% endwith %}
+            {% else %}
+                <!-- Múltiplas imagens em grid -->
+                <div class="grid-imagens">
+                    {% for imagem in pergunta.imagens.all %}
+                    <div class="imagem-container">
+                        <div class="imagem-pergunta">
+                            <img src="{{ imagem.imagem.url }}" 
+                                 alt="Imagem {{ forloop.counter }} da questão {{ forloop.parentloop.counter }}"
+                                 onload="this.classList.add('loaded')">
+                            <div class="legenda-imagem">
+                                Figura {{ forloop.parentloop.counter }}.{{ forloop.counter }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="info-imagens">
+                {% if pergunta.imagens.count == 1 %}
+                    1 imagem de referência para esta questão
+                {% else %}
+                    {{ pergunta.imagens.count }} imagens de referência para esta questão
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+    </div>
+    
+    <!-- Quebra de página a cada 3 questões ou se a questão tiver muitas imagens -->
+    {% if forloop.counter|divisibleby:3 and not forloop.last %}
+    <div class="page-break"></div>
+    {% elif pergunta.imagens.count > 2 and not forloop.last %}
+    <div class="page-break"></div>
+    {% endif %}
+    {% endfor %}
+
+    <div class="footer">
+        Prova gerada em {% now "d/m/Y H:i" %} - Sistema de Provas
+        {% if total_imagens > 0 %}
+        <br>Total de {{ total_imagens }} imagem(ns) na prova
+        {% endif %}
+    </div>
+
+    <script>
+        // Auto-print se for PDF
+        if (window.location.search.includes('pdf')) {
+            window.print();
+        }
+        
+        // Otimização para impressão de imagens
+        document.addEventListener('DOMContentLoaded', function() {
+            // Garantir que todas as imagens sejam carregadas antes da impressão
+            const images = document.querySelectorAll('img');
+            let loadedCount = 0;
+            const totalImages = images.length;
+            
+            images.forEach(img => {
+                if (img.complete) {
+                    loadedCount++;
+                } else {
+                    img.addEventListener('load', function() {
+                        loadedCount++;
+                        if (loadedCount === totalImages) {
+                            console.log('Todas as imagens carregadas');
+                        }
+                    });
+                    
+                    img.addEventListener('error', function() {
+                        loadedCount++;
+                        console.warn('Erro ao carregar imagem:', img.src);
+                    });
+                }
+            });
+        });
+        
+        // Melhorar qualidade de impressão para imagens
+        window.onbeforeprint = function() {
+            document.querySelectorAll('img').forEach(img => {
+                // Remover limites de tamanho para impressão
+                img.style.maxWidth = 'none';
+                img.style.width = 'auto';
+            });
+        };
+    </script>
+</body>
+</html>

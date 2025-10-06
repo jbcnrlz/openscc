@@ -1,0 +1,252 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container-fluid mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Perguntas geradas</h2>
+    </div>
+    
+    <!-- Informações da Geração -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <strong>Assunto:</strong> {{ assunto.nome }}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <form method="post" id="formSelecaoPerguntas" action="{% url 'mimir:salvarPerguntasForm' %}">
+        {% csrf_token %}
+        
+        <!-- Controles de Ação -->
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll">
+                            <label class="form-check-label" for="selectAll">
+                                Selecionar todas as perguntas
+                            </label>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <span id="contador-selecionadas" class="badge bg-primary">0 selecionadas</span>
+                        <button type="submit" name="acao" value="salvar" class="btn btn-success btn-sm">
+                            <i class="bi bi-check-lg"></i> Salvar Selecionadas
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de Perguntas -->
+        <div class="row">
+            {% for pergunta in perguntas %}
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100 pergunta-card {% if pergunta.salva %}border-success{% endif %}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge {% if pergunta.salva %}bg-success{% else %}bg-primary{% endif %}">
+                                {{ pergunta.tipo }}
+                            </span>
+                            <span class="badge bg-secondary">#{{ forloop.counter }}</span>                            
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input pergunta-checkbox" 
+                                   type="checkbox" 
+                                   name="perguntas_selecionadas" 
+                                   value="{{ forloop.counter }}"
+                                   id="pergunta_{{ forloop.counter }}">
+                            <label class="form-check-label" for="pergunta_{{ forloop.counter }}">
+                                Salvar
+                            </label>
+                            <input type="hidden" name="pergunta_{{ forloop.counter }}_enunciado" value="{{ pergunta.enunciado }}">
+                            <input type="hidden" name="pergunta_{{ forloop.counter }}_resposta" value="{{ pergunta.resposta }}">
+                            {% if pergunta.alternativas %}
+                                {% for alternativa in pergunta.alternativas %}
+                                    <input type="hidden" name="pergunta_{{ forloop.parentloop.counter }}_alternativa_{{ forloop.counter }}" value="{{ alternativa }}">
+                                {% endfor %}
+                            {% endif %}
+                            <input type="hidden" name="pergunta_{{ forloop.counter }}_assunto" value="{{ assunto.id }}">
+                            <input type="hidden" name="pergunta_{{ forloop.counter }}_tipo_pergunta" value="{{ pergunta.tipo }}">
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Preview da Pergunta -->
+                        <div class="pergunta-preview">
+                            <div class="mb-3">
+                                <strong>Enunciado:</strong>
+                                <div class="mt-1 p-2 bg-light rounded">
+                                    {{ pergunta.enunciado|linebreaksbr }}
+                                </div>
+                            </div>
+                            
+                            {% if pergunta.alternativas %}
+                            <div class="mb-3">
+                                <strong>Alternativas:</strong>
+                                <div class="mt-1">
+                                    {% for alternativa in pergunta.alternativas %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" disabled>
+                                        <label class="form-check-label small">{{ alternativa }}</label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <strong>Resposta:</strong>
+                                <div class="mt-1 p-2 bg-info text-dark rounded">
+                                    {{ pergunta.resposta }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button type="button" 
+                                    class="btn btn-outline-primary btn-sm" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalPergunta{{ forloop.counter }}">
+                                <i class="bi bi-arrows-fullscreen"></i> Expandir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal para visualização expandida -->
+            <div class="modal fade" id="modalPergunta{{ forloop.counter }}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                Pergunta #{{ forloop.counter }} - {{ pergunta.tipo }}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <h6>Enunciado:</h6>
+                                <div class="p-3 bg-light rounded">
+                                    {{ pergunta.enunciado|linebreaks }}
+                                </div>
+                            </div>
+                            
+                            {% if pergunta.alternativas %}
+                            <div class="mb-3">
+                                <h6>Alternativas:</h6>
+                                {% for alternativa in pergunta.alternativas %}
+                                <div class="p-2 {% if forloop.counter0|divisibleby:2 %}bg-white{% else %}bg-light{% endif %}">
+                                    {{ alternativa }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <h6>Resposta Correta:</h6>
+                                <div class="p-3 bg-success text-white rounded">
+                                    {{ pergunta.resposta }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-warning text-center">
+                    <h5>Nenhuma pergunta foi gerada</h5>
+                    <p>Não foi possível gerar perguntas com os parâmetros fornecidos.</p>
+                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-primary">Tentar Novamente</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Controles inferiores -->
+        {% if perguntas %}
+        <div class="card mt-4">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center gap-3">
+                    <button type="submit" name="acao" value="salvar" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-lg"></i> Salvar Perguntas Selecionadas
+                    </button>
+                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-list"></i> Voltar para Lista
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </form>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Selecionar/Deselecionar todas
+    document.getElementById('selectAll').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.pergunta-checkbox:not(:disabled)');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        atualizarContador();
+    });
+    
+    // Atualizar contador de selecionadas
+    function atualizarContador() {
+        const selecionadas = document.querySelectorAll('.pergunta-checkbox:checked:not(:disabled)').length;
+        document.getElementById('contador-selecionadas').textContent = selecionadas + ' selecionadas';
+    }
+    
+    // Atualizar contador quando checkboxes mudarem
+    document.querySelectorAll('.pergunta-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', atualizarContador);
+    });
+    
+    atualizarContador(); // Inicializar contador
+    
+    // Validação antes de enviar
+    document.getElementById('formSelecaoPerguntas').addEventListener('submit', function(e) {
+        const selecionadas = document.querySelectorAll('.pergunta-checkbox:checked:not(:disabled)').length;
+        const acao = document.querySelector('button[type="submit"]:focus')?.value || 'salvar';
+        
+        if (acao === 'salvar' && selecionadas === 0) {
+            e.preventDefault();
+            alert('Selecione pelo menos uma pergunta para salvar.');
+            return false;
+        }
+    });
+});
+</script>
+
+<style>
+.pergunta-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.pergunta-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.pergunta-preview {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.modal-body .bg-light {
+    background-color: #f8f9fa !important;
+}
+</style>
+{% endblock %}

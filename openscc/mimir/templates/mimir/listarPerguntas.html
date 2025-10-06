@@ -1,0 +1,193 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">Perguntas</h3>
+                    <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Gerar perguntas
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if perguntas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pergunta</th>                                    
+                                    <th>Tipo de pergunta</th>
+                                    <th>Assunto</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for template in perguntas %}
+                                <tr>
+                                    <td>{{ template.pergunta|truncatewords:18 }}</td>
+                                    <td>{{ template.tipoDePergunta.descricao|truncatewords:18 }}</td>
+                                    <td>{{ template.assunto.nome }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{% url 'mimir:visualizarPergunta' template.id %}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'mimir:editarPergunta' template.id %}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="#" class="btn btn-sm btn-danger"
+                                               onclick="return deletarPergunta('{% url 'mimir:deletarPergunta' template.id %}', '{{ template.pergunta|escapejs }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if is_paginated %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                    Anterior
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                    Próxima
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                        
+                        <!-- Informações da página -->
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                - Total de {{ page_obj.paginator.count }} registros
+                            </small>
+                        </div>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Nenhuma pergunta encontrada</p>
+                        <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Gere suas primeiras perguntas
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Função para deletar pergunta via AJAX
+function deletarPergunta(urlExclusao, perguntaEnunciado) {
+    if (!confirm(`Tem certeza que deseja excluir a pergunta:\n"${perguntaEnunciado}"?`)) {
+        return false;
+    }
+    
+    // Mostrar loading
+    const btn = event.target;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-hourglass"></i> Excluindo...';
+    btn.disabled = true;
+    
+    // Fazer requisição AJAX
+    fetch(urlExclusao, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Feedback visual
+            showToast('success', data.message);
+            
+            // Remover a linha da tabela ou redirecionar
+            setTimeout(() => {
+                window.location.href = data.redirect_url || '{% url "mimir:visualizarPerguntas" %}';
+            }, 1000);
+        } else {
+            showToast('error', data.message);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showToast('error', 'Erro de conexão');
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
+    
+    return false;
+}
+
+// Função auxiliar para pegar o cookie CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Função para mostrar notificações toast
+function showToast(type, message) {
+    // Implementação simples de toast (pode usar Bootstrap Toast)
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    new bootstrap.Toast(toast, { delay: 3000 }).show();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Minhas Provas</h2>
+        <a href="{% url 'mimir:criarProva' %}" class="btn btn-primary">Nova Prova</a>
+    </div>
+    
+    {% if provas %}
+    <div class="row">
+        {% for prova in provas %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ prova.titulo }}</h5>
+                    <p class="card-text">{{ prova.descricao|truncatewords:20 }}</p>
+                    <p class="text-muted">
+                        <small>
+                            Assunto: {{ prova.assunto }}<br>
+                            Criada em: {{ prova.dataCriacao|date:"d/m/Y H:i" }}<br>
+                            Perguntas: {{ prova.perguntas.count }}
+                        </small>
+                    </p>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-sm btn-primary">Editar</a>
+                        <a href="{% url 'mimir:opcoesImpressao' prova.id %}" class="btn btn-sm btn-outline-secondary">Visualizar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <h4>Nenhuma prova encontrada</h4>
+        <p>Você ainda não criou nenhuma prova. Clique no botão "Nova Prova" para começar.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
