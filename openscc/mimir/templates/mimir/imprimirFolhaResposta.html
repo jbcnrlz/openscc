@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folha de Resposta - {{ prova.titulo }}</title>
+    <style>
+        @media print {
+            @page {
+                margin: 2cm;
+                size: A4;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            /* Garantir que as linhas sejam impressas */
+            .linhas-resposta {
+                min-height: calc({{ quantidade_linhas }} * 24px);
+                background: repeating-linear-gradient(
+                    transparent,
+                    transparent 22px,
+                    #000 22px,
+                    #000 24px
+                ) !important;
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #000;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 20px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .prova-titulo {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .prova-info {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .dados-aluno {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #000;
+            background: #f9f9f9;
+        }
+        
+        .questao-item {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .questao-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 5px;
+            background: #f0f0f0;
+            border-left: 4px solid #000;
+        }
+        
+        .linhas-resposta {
+            border: 1px solid #ccc;
+            min-height: calc({{ quantidade_linhas }} * 24px);
+            background: repeating-linear-gradient(
+                transparent,
+                transparent 22px,
+                #e0e0e0 22px,
+                #e0e0e0 24px
+            );
+            padding: 0 10px;
+            line-height: 24px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+                .controle-linhas {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        /* Remover a classe .linha individual e usar apenas o gradiente */
+        .linha-guia {
+            height: 24px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .multipla-escolha {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px dashed #ccc;
+        }
+        
+        .alternativas {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+        
+        .alternativa {
+            text-align: center;
+        }
+        
+        .caixa-marcacao {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #000;
+            display: inline-block;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        
+        /* Estilo específico para impressão das caixas */
+        @media print {
+            .caixa-marcacao {
+                border: 2px solid #000 !important;
+                background: white !important;
+            }
+            .multipla-escolha {
+                border: 1px dashed #000 !important;
+            }
+            .questao-header {
+                background: #f0f0f0 !important;
+                border-left: 4px solid #000 !important;
+            }
+            .dados-aluno {
+                background: #f9f9f9 !important;
+                border: 2px solid #000 !important;
+            }
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+        }
+        
+        .btn-print {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        /* Garantir que todos os elementos sejam visíveis na impressão */
+        * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+        <button onclick="window.print()" class="btn-print">🖨️ Imprimir Folha de Resposta</button>
+        <a href="{% url 'mimir:opcoesImpressao' prova.id %}" style="margin-left: 10px;">← Voltar</a>
+    </div>
+
+    <div class="header">
+        <div class="prova-titulo">FOLHA DE RESPOSTA</div>
+        <div class="prova-titulo">{{ prova.titulo }}</div>
+        <div class="prova-info">
+            Assunto: {{ prova.assunto }} | Data: {% now "d/m/Y" %}
+        </div>
+    </div>
+
+    <div class="dados-aluno">
+        <table width="100%" style="font-size: 14px;">
+            <tr>
+                <td width="60%"><strong>Nome: _________________________________________</strong></td>
+                <td><strong>Data: ____/____/________</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin: 15px 0; padding: 10px; background: #fffacd; border: 1px solid #ffd700;">
+        <strong>⚠️ ATENÇÃO:</strong> Preencha suas respostas apenas nesta folha.
+    </div>
+
+    {% for pergunta in perguntas %}
+    <div class="questao-item">
+        <div class="questao-header">
+            Questão {{ forloop.counter }}
+        </div>
+        
+        {% if pergunta.tipoDePergunta.descricao == 'Múltipla Escolha' or pergunta.tipoDePergunta.descricao == 'Verdadeiro ou Falso' %}
+        <div class="multipla-escolha">
+            <strong>Marque a alternativa correta:</strong>
+            <div class="alternativas">
+                <div class="alternativa">
+                    <div class="caixa-marcacao"></div> A
+                </div>
+                <div class="alternativa">
+                    <div class="caixa-marcacao"></div> B
+                </div>
+                <div class="alternativa">
+                    <div class="caixa-marcacao"></div> C
+                </div>
+                <div class="alternativa">
+                    <div class="caixa-marcacao"></div> D
+                </div>
+                <div class="alternativa">
+                    <div class="caixa-marcacao"></div> E
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Área para resposta dissertativa com linhas -->
+        <div class="linhas-resposta">
+            {% with ''|center:quantidade_linhas as range %}
+            {% for _ in range %}
+            <div class="linha-guia">&nbsp;</div>
+            {% endfor %}
+            {% endwith %}
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if forloop.counter|divisibleby:6 and not forloop.last %}
+    <div class="page-break"></div>
+    {% endif %}
+    {% endfor %}
+
+    <div class="footer">
+        Folha de resposta gerada em {% now "d/m/Y H:i" %} - {{ perguntas.count }} questões
+    </div>
+
+    <script>
+        // Forçar impressão das cores
+        document.addEventListener('DOMContentLoaded', function() {
+            // Adicionar estilo para forçar cores na impressão
+            var style = document.createElement('style');
+            style.innerHTML = `
+                @media print {
+                    .linhas-resposta {
+                        background: repeating-linear-gradient(transparent, transparent 22px, #000 22px, #000 24px) !important;
+                    }
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        });
+
+        if (window.location.search.includes('pdf')) {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        }
+    </script>
+</body>
+</html>

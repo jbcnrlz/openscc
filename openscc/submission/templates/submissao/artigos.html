@@ -3,28 +3,601 @@
 {% load submission_extras %}
 
 {% block mainContent %}
-<div class="container">
-    <table class="table">
-        <thead>
-            <tr>
-                <th scope="col">Nome do artigo</th>
-                <th scope="col">Conferência</th>
-                <th scope="col">Status</th>
-                <th scope="col">Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for a in atvs %}
-                <tr>
-                    <td>{{ a.titulo }}</td>
-                    <td>{{ a.conferenciaAtual.nome }}</td>
-                    <td>{{ a|getStatusPaper }}</td>
-                    <td>
-                        <a href="{% url 'submission:artigo' a.id %}" class="btn btn-primary">Ver detalhes</a>
-                    </td>
-                </tr>
-            {% endfor %}        
-        </tbody>
-    </table>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --success-color: #27ae60;
+        --warning-color: #f39c12;
+        --light-color: #f8f9fa;
+        --dark-color: #2c3e50;
+        --border-radius: 10px;
+        --box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        --transition: all 0.3s ease;
+    }
+
+    .articles-page {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 2.5rem 0;
+        text-align: center;
+        margin-bottom: 2rem;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+    }
+
+    .page-title {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        font-size: 1.1rem;
+        font-weight: 300;
+        opacity: 0.9;
+    }
+
+    .content-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+    }
+
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        text-align: center;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .filters-section {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .filter-title {
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-options {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        background: var(--light-color);
+        border: 1px solid #dee2e6;
+        color: var(--dark-color);
+        transition: var(--transition);
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .filter-btn.active {
+        background: var(--secondary-color);
+        color: white;
+        border-color: var(--secondary-color);
+    }
+
+    .articles-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .article-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        transition: var(--transition);
+        border-left: 4px solid var(--secondary-color);
+    }
+
+    .article-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .article-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+    }
+
+    .article-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+        flex: 1;
+        line-height: 1.4;
+    }
+
+    .article-conference {
+        background: var(--light-color);
+        padding: 0.4rem 0.8rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        color: #666;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .article-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .meta-item i {
+        color: var(--secondary-color);
+    }
+
+    .article-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #eee;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-0 { /* Aguardando avaliação */
+        background: rgba(243, 156, 18, 0.15);
+        color: var(--warning-color);
+    }
+
+    .status-1 { /* Aprovado */
+        background: rgba(39, 174, 96, 0.15);
+        color: var(--success-color);
+    }
+
+    .status-2 { /* Aceito com modificações */
+        background: rgba(52, 152, 219, 0.15);
+        color: var(--secondary-color);
+    }
+
+    .status-3 { /* Reprovado */
+        background: rgba(231, 76, 60, 0.15);
+        color: var(--accent-color);
+    }
+
+    .status-other { /* Desconhecido */
+        background: rgba(108, 117, 125, 0.15);
+        color: #6c757d;
+    }
+
+    .btn-details {
+        background: var(--secondary-color);
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+    }
+
+    .btn-details:hover {
+        background: #2980b9;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-submit {
+        background: var(--success-color);
+        color: white;
+        padding: 0.8rem 1.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        margin-top: 1rem;
+    }
+
+    .btn-submit:hover {
+        background: #219653;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #dee2e6;
+    }
+
+    .search-box {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 3rem;
+        border: 1px solid #dee2e6;
+        border-radius: 50px;
+        font-size: 1rem;
+        transition: var(--transition);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--secondary-color);
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 2rem 0;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+        }
+
+        .article-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .article-conference {
+            align-self: flex-start;
+        }
+
+        .article-footer {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .filter-options {
+            flex-direction: column;
+        }
+
+        .filter-btn {
+            text-align: center;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .content-container {
+            padding: 0 1rem;
+        }
+
+        .stats-cards {
+            grid-template-columns: 1fr;
+        }
+
+        .article-card {
+            padding: 1.25rem;
+        }
+
+        .article-meta {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+    }
+</style>
+
+<div class="articles-page">
+    <div class="page-header">
+        <div class="content-container">
+            <h1 class="page-title">Meus Artigos</h1>
+            <p class="page-subtitle">Gerencie e acompanhe o status de suas submissões</p>
+        </div>
+    </div>
+
+    <div class="content-container">
+        <!-- Cards de Estatísticas -->
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--secondary-color);">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="stat-number">{{ atvs|length }}</div>
+                <div class="stat-label">Total de Artigos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--success-color);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number">{{ atvs|length|default:0 }}</div>
+                <div class="stat-label">Aprovados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--warning-color);">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-number">{{ atvs|length|default:0 }}</div>
+                <div class="stat-label">Em Análise</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--accent-color);">
+                    <i class="fas fa-edit"></i>
+                </div>
+                <div class="stat-number">{{ atvs|length|default:0 }}</div>
+                <div class="stat-label">Revisão</div>
+            </div>
+        </div>
+
+        <!-- Filtros e Busca -->
+        <div class="filters-section">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" placeholder="Buscar artigos por título..." id="search-input">
+            </div>
+
+            <h3 class="filter-title">
+                <i class="fas fa-filter"></i>
+                Filtrar por Status
+            </h3>
+            <div class="filter-options">
+                <button class="filter-btn active" data-filter="all">Todos</button>
+                <button class="filter-btn" data-filter="0">Em Análise</button>
+                <button class="filter-btn" data-filter="1">Aprovados</button>
+                <button class="filter-btn" data-filter="2">Revisão</button>
+                <button class="filter-btn" data-filter="3">Rejeitados</button>
+            </div>
+        </div>
+
+        <!-- Lista de Artigos -->
+        {% if atvs %}
+            <div class="articles-grid" id="articles-container">
+                {% for a in atvs %}
+                    <div class="article-card" data-status="{{ a.status }}">
+                        <div class="article-header">
+                            <h3 class="article-title">{{ a.titulo }}</h3>
+                            <span class="article-conference">
+                                <i class="fas fa-calendar-alt"></i>
+                                {{ a.conferenciaAtual.nome }}
+                            </span>
+                        </div>
+                        
+                        <div class="article-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar"></i>
+                                Enviado em: {{ a.dataEnvio|date:"d/m/Y" }}
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-users"></i>
+                                Autores: {{ a.autores.count }}
+                            </div>
+                            {% if a.endereco %}
+                            <div class="meta-item">
+                                <i class="fas fa-file-pdf"></i>
+                                Arquivo enviado
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="article-footer">
+                            <div>
+                                <span class="status-badge status-{{ a.status }}">
+                                    <i class="fas 
+                                        {% if a.status == 0 %}fa-clock
+                                        {% elif a.status == 1 %}fa-check-circle
+                                        {% elif a.status == 2 %}fa-edit
+                                        {% elif a.status == 3 %}fa-times-circle
+                                        {% else %}fa-question-circle{% endif %}">
+                                    </i>
+                                    {{ a.getStatusPaper }}
+                                </span>
+                            </div>
+                            
+                            <a href="{% url 'submission:artigo' a.id %}" class="btn-details">
+                                <i class="fas fa-eye"></i>
+                                Ver Detalhes
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-export"></i>
+                <h3>Nenhum artigo encontrado</h3>
+                <p>Você ainda não submeteu nenhum artigo. Comece enviando seu primeiro trabalho!</p>
+                <!-- Altere a URL abaixo para a página de submissão correta -->
+                <a href="{% url 'submission:paginaSubmissao' %}" class="btn-submit">
+                    <i class="fas fa-plus"></i>
+                    Submeter Primeiro Artigo
+                </a>
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const searchInput = document.getElementById('search-input');
+        const articleCards = document.querySelectorAll('.article-card');
+        
+        // Atualizar estatísticas baseadas nos status reais
+        function updateStats() {
+            let approvedCount = 0;
+            let pendingCount = 0;
+            let revisionCount = 0;
+            let rejectedCount = 0;
+            
+            articleCards.forEach(card => {
+                const status = card.getAttribute('data-status');
+                if (status === '1') approvedCount++;
+                else if (status === '0') pendingCount++;
+                else if (status === '2') revisionCount++;
+                else if (status === '3') rejectedCount++;
+            });
+            
+            // Atualizar os cards de estatística
+            const statNumbers = document.querySelectorAll('.stat-number');
+            if (statNumbers.length >= 4) {
+                statNumbers[1].textContent = approvedCount; // Aprovados
+                statNumbers[2].textContent = pendingCount;  // Em Análise
+                statNumbers[3].textContent = revisionCount; // Revisão
+            }
+        }
+        
+        // Filtro por status
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove a classe active de todos os botões
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Adiciona a classe active ao botão clicado
+                this.classList.add('active');
+                
+                const filterValue = this.getAttribute('data-filter');
+                
+                articleCards.forEach(card => {
+                    const status = card.getAttribute('data-status');
+                    const title = card.querySelector('.article-title').textContent.toLowerCase();
+                    const searchTerm = searchInput.value.toLowerCase();
+                    
+                    const matchesSearch = title.includes(searchTerm);
+                    const matchesFilter = filterValue === 'all' || status === filterValue;
+                    
+                    if (matchesFilter && matchesSearch) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+        
+        // Busca em tempo real
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const activeFilter = document.querySelector('.filter-btn.active').getAttribute('data-filter');
+            
+            articleCards.forEach(card => {
+                const title = card.querySelector('.article-title').textContent.toLowerCase();
+                const status = card.getAttribute('data-status');
+                
+                const matchesSearch = title.includes(searchTerm);
+                const matchesFilter = activeFilter === 'all' || status === activeFilter;
+                
+                if (matchesSearch && matchesFilter) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+        
+        // Inicializar estatísticas
+        updateStats();
+        
+        // Adicionar animação de entrada para os cards
+        articleCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+
 {% endblock %}

@@ -25,12 +25,13 @@ SECRET_KEY = "django-insecure-fv_b&c#f*i!=cmnm6q88_wyr5*&6a$p8=@c*^e4g=n(l&29(vq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    "commons",
     "submission.apps.SubmissionConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -38,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "mimir"
 ]
 
 MIDDLEWARE = [
@@ -129,3 +131,4 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MEDIA_ROOT = os.path.join(str(Path(__file__).resolve().parent.parent.parent),"media")
+GEMINI_API_KEY = "GEMINI_API_KEY"

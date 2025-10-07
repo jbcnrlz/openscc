@@ -1,0 +1,424 @@
+{% extends "mimirBase.html" %}
+{% load static %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo }}</h2>
+        <div class="btn-group">
+            <a href="{% url 'mimir:visualizarPergunta' pergunta.id %}" class="btn btn-info">
+                <i class="bi bi-eye"></i> Ver Detalhes
+            </a>
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar para Lista
+            </a>
+        </div>
+    </div>
+
+    <!-- Informações da Pergunta -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="bi bi-info-circle"></i> Informações Atuais
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>ID:</strong> #{{ pergunta.id }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Palavras:</strong> {{ pergunta.pergunta|wordcount }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Imagens:</strong> {{ pergunta.imagens.count }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário de Edição -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-pencil"></i> Formulário de Edição
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="post" id="formEditarPergunta" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Assunto e Tipo -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="{{ form.assunto.id_for_label }}" class="form-label">
+                            <strong>{{ form.assunto.label }}</strong>
+                        </label>
+                        {{ form.assunto }}
+                        {% if form.assunto.errors %}
+                        <div class="text-danger small">{{ form.assunto.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Categoria principal da pergunta</div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="{{ form.tipoDePergunta.id_for_label }}" class="form-label">
+                            <strong>{{ form.tipoDePergunta.label }}</strong>
+                        </label>
+                        {{ form.tipoDePergunta }}
+                        {% if form.tipoDePergunta.errors %}
+                        <div class="text-danger small">{{ form.tipoDePergunta.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Tipo de resposta esperada</div>
+                    </div>
+                </div>
+
+                <!-- Enunciado -->
+                <div class="mb-4">
+                    <label for="{{ form.pergunta.id_for_label }}" class="form-label">
+                        <strong>{{ form.pergunta.label }}</strong>
+                        <span class="text-danger">*</span>
+                    </label>
+                    {{ form.pergunta }}
+                    {% if form.pergunta.errors %}
+                    <div class="text-danger small">{{ form.pergunta.errors }}</div>
+                    {% endif %}
+                    <div class="form-text">
+                        <span id="contador-enunciado">0</span> caracteres | 
+                        <span id="contador-palavras">0</span> palavras
+                    </div>
+                </div>
+
+                <!-- Upload de Imagens -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        <strong>Imagens da Pergunta</strong>
+                    </label>
+                    
+                    <!-- Área de Upload -->
+                    <div class="border rounded p-3 mb-3">
+                        <div class="mb-3">
+                            <label for="imagens" class="form-label">Adicionar novas imagens:</label>
+                            <input type="file" class="form-control" id="imagens" name="imagens" multiple 
+                                   accept="image/*" onchange="previewImages(this.files)">
+                            <div class="form-text">
+                                Selecione uma ou mais imagens (JPEG, PNG, GIF). Máx: 5MB por imagem.
+                            </div>
+                        </div>
+                        
+                        <!-- Preview das novas imagens -->
+                        <div id="preview-novas-imagens" class="row mt-3" style="display: none;">
+                            <div class="col-12">
+                                <h6>Preview das novas imagens:</h6>
+                                <div id="preview-container" class="row"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Imagens Existentes -->
+                    {% if pergunta.imagens.all %}
+                    <div class="border rounded p-3">
+                        <h6>Imagens existentes:</h6>
+                        <div class="row" id="imagens-existente">
+                            {% for imagem in pergunta.imagens.all %}
+                            <div class="col-md-3 mb-3 imagem-existente" data-id="{{ imagem.id }}">
+                                <div class="card">
+                                    <img src="{{ imagem.imagem.url }}" class="card-img-top" 
+                                        alt="Imagem da pergunta" style="height: 150px; object-fit: cover;">
+                                    <div class="card-body text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="removerImagemExistente({{ imagem.id }})">
+                                            <i class="bi bi-trash"></i> Remover
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Gabarito -->
+                <div class="mb-4">
+                    <label for="{{ form.gabarito.id_for_label }}" class="form-label">
+                        <strong>{{ form.gabarito.label }}</strong>
+                        <span class="text-danger">*</span>
+                    </label>
+                    {{ form.gabarito }}
+                    {% if form.gabarito.errors %}
+                    <div class="text-danger small">{{ form.gabarito.errors }}</div>
+                    {% endif %}
+                    <div class="form-text">
+                        <span id="contador-gabarito">0</span> caracteres
+                    </div>
+                </div>
+
+                <!-- Ações -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <button type="submit" name="salvar" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-lg"></i> Salvar Alterações
+                        </button>
+                        <button type="submit" name="salvar_e_continuar" class="btn btn-outline-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Salvar e Continuar Editando
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <button type="submit" name="salvar_e_ver" class="btn btn-primary btn-lg">
+                            <i class="bi bi-eye"></i> Salvar e Ver Detalhes
+                        </button>
+                        <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview em Tempo Real -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-eye"></i> Preview da Pergunta
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Enunciado:</h6>
+                    <div id="preview-enunciado" class="p-3 bg-light rounded" style="min-height: 100px;">
+                        {{ pergunta.pergunta|linebreaks }}
+                    </div>
+                    
+                    <!-- Preview de imagens no enunciado -->
+                    <div id="preview-imagens-pergunta" class="mt-3">
+                        {% if pergunta.imagens.all %}
+                        <h6>Imagens:</h6>
+                        <div class="row">
+                            {% for imagem in pergunta.imagens.all %}
+                            <div class="col-md-6 mb-2">
+                                <img src="{{ imagem.imagem.url }}" class="img-thumbnail" 
+                                     alt="Imagem da pergunta" style="max-height: 200px;">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>Resposta:</h6>
+                    <div id="preview-gabarito" class="p-3 bg-success text-white rounded" style="min-height: 100px;">
+                        {{ pergunta.gabarito|linebreaks }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos do DOM
+    const inputEnunciado = document.getElementById('{{ form.pergunta.id_for_label }}');
+    const inputGabarito = document.getElementById('{{ form.gabarito.id_for_label }}');
+    const previewEnunciado = document.getElementById('preview-enunciado');
+    const previewGabarito = document.getElementById('preview-gabarito');
+    const contadorEnunciado = document.getElementById('contador-enunciado');
+    const contadorPalavras = document.getElementById('contador-palavras');
+    const contadorGabarito = document.getElementById('contador-gabarito');
+    const imagensRemovidas = new Set();
+
+    // Atualizar contadores e preview
+    function atualizarContadores() {
+        // Enunciado
+        const textoEnunciado = inputEnunciado.value;
+        contadorEnunciado.textContent = textoEnunciado.length;
+        contadorPalavras.textContent = textoEnunciado.split(/\s+/).filter(word => word.length > 0).length;
+        previewEnunciado.innerHTML = textoEnunciado.replace(/\n/g, '<br>') || '<em class="text-muted">Digite o enunciado...</em>';
+
+        // Gabarito
+        const textoGabarito = inputGabarito.value;
+        contadorGabarito.textContent = textoGabarito.length;
+        previewGabarito.innerHTML = textoGabarito.replace(/\n/g, '<br>') || '<em class="text-muted">Digite o gabarito...</em>';
+    }
+
+    // Preview de novas imagens
+    window.previewImages = function(files) {
+        const previewContainer = document.getElementById('preview-container');
+        const previewNovas = document.getElementById('preview-novas-imagens');
+        
+        previewContainer.innerHTML = '';
+        
+        if (files.length > 0) {
+            previewNovas.style.display = 'block';
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-3 mb-3';
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="${e.target.result}" class="card-img-top" 
+                                     alt="Preview" style="height: 150px; object-fit: cover;">
+                                <div class="card-body text-center">
+                                    <small class="text-muted">${file.name}</small>
+                                </div>
+                            </div>
+                        `;
+                        previewContainer.appendChild(col);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        } else {
+            previewNovas.style.display = 'none';
+        }
+    };
+
+    // Remover imagem existente
+    // Substitua a função removerImagemExistente por esta versão corrigida:
+    window.removerImagemExistente = function(imagemId) {
+        if (confirm('Tem certeza que deseja remover esta imagem?')) {
+            const elemento = document.querySelector(`.imagem-existente[data-id="${imagemId}"]`);
+            if (elemento) {
+                elemento.style.opacity = '0.5';
+                elemento.style.pointerEvents = 'none';
+                
+                // CORREÇÃO: Criar um ID único para cada campo hidden
+                const inputHidden = document.createElement('input');
+                inputHidden.type = 'hidden';
+                inputHidden.name = 'imagens_removidas'; // Mesmo nome para todos
+                inputHidden.value = imagemId;
+                inputHidden.id = `imagem_removida_${imagemId}`;
+                document.getElementById('formEditarPergunta').appendChild(inputHidden);
+                
+                imagensRemovidas.add(imagemId);
+                
+                console.log(`Imagem ${imagemId} marcada para remoção`);
+            }
+        }
+    };
+
+    // Event listeners
+    inputEnunciado.addEventListener('input', atualizarContadores);
+    inputGabarito.addEventListener('input', atualizarContadores);
+
+    // Inicializar
+    atualizarContadores();
+
+    // Validação antes de enviar
+    document.getElementById('formEditarPergunta').addEventListener('submit', function(e) {
+        const enunciado = inputEnunciado.value.trim();
+        const gabarito = inputGabarito.value.trim();
+
+        if (!enunciado) {
+            e.preventDefault();
+            alert('O enunciado da pergunta é obrigatório.');
+            inputEnunciado.focus();
+            return false;
+        }
+
+        if (!gabarito) {
+            e.preventDefault();
+            alert('O gabarito é obrigatório.');
+            inputGabarito.focus();
+            return false;
+        }
+
+        // Validar tamanho das imagens
+        const inputImagens = document.getElementById('imagens');
+        for (let file of inputImagens.files) {
+            if (file.size > 5 * 1024 * 1024) { // 5MB
+                e.preventDefault();
+                alert(`A imagem "${file.name}" é muito grande. O tamanho máximo é 5MB.`);
+                return false;
+            }
+        }
+
+        // Confirmação para alterações grandes
+        if (enunciado !== '{{ pergunta.pergunta|escapejs }}' || 
+            gabarito !== '{{ pergunta.gabarito|escapejs }}' ||
+            inputImagens.files.length > 0 || 
+            imagensRemovidas.size > 0) {
+            return confirm('Tem certeza que deseja salvar as alterações?');
+        }
+
+        return true;
+    });
+
+    // Auto-expand textareas
+    function autoExpand(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    inputEnunciado.addEventListener('input', function() { autoExpand(this); });
+    inputGabarito.addEventListener('input', function() { autoExpand(this); });
+
+    // Inicializar altura
+    autoExpand(inputEnunciado);
+    autoExpand(inputGabarito);
+});
+</script>
+
+<style>
+/* Estilos para o formulário */
+.form-control, .form-select {
+    border-radius: 0.375rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Preview styling */
+#preview-enunciado, #preview-gabarito {
+    transition: all 0.3s ease;
+}
+
+/* Contadores */
+.form-text {
+    font-size: 0.875rem;
+}
+
+/* Botões com espaçamento */
+.btn-group .btn {
+    margin-right: 0.5rem;
+}
+
+/* Textareas auto-expansíveis */
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Estilos para as imagens */
+.imagem-existente {
+    transition: all 0.3s ease;
+}
+
+.card-img-top {
+    cursor: pointer;
+}
+
+.card-img-top:hover {
+    opacity: 0.8;
+}
+</style>
+{% endblock %}

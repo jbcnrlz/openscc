@@ -3,27 +3,616 @@
 {% load submission_extras %}
 
 {% block mainContent %}
-<div class="container">
-    <h2>{{ artigo.titulo }}</h2>
-    <div class="row">
-        <div class="col-sm-12">
-            <strong>Conferência:</strong> {{ artigo.conferenciaAtual.nome }}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --success-color: #27ae60;
+        --warning-color: #f39c12;
+        --light-color: #f8f9fa;
+        --dark-color: #2c3e50;
+        --border-radius: 10px;
+        --box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        --transition: all 0.3s ease;
+    }
+
+    .article-detail-page {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+    }
+
+    .page-title {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1.3;
+    }
+
+    .page-subtitle {
+        font-size: 1.1rem;
+        font-weight: 300;
+        opacity: 0.9;
+    }
+
+    .content-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+    }
+
+    .article-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        transition: var(--transition);
+    }
+
+    .article-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--light-color);
+    }
+
+    .card-title i {
+        color: var(--secondary-color);
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .info-card {
+        background: var(--light-color);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        border-left: 4px solid var(--secondary-color);
+    }
+
+    .info-label {
+        font-size: 0.9rem;
+        color: #666;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--dark-color);
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: 50px;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .status-0 { /* Aguardando avaliação */
+        background: rgba(243, 156, 18, 0.15);
+        color: var(--warning-color);
+        border: 1px solid rgba(243, 156, 18, 0.3);
+    }
+
+    .status-1 { /* Aprovado */
+        background: rgba(39, 174, 96, 0.15);
+        color: var(--success-color);
+        border: 1px solid rgba(39, 174, 96, 0.3);
+    }
+
+    .status-2 { /* Aceito com modificações */
+        background: rgba(52, 152, 219, 0.15);
+        color: var(--secondary-color);
+        border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+
+    .status-3 { /* Reprovado */
+        background: rgba(231, 76, 60, 0.15);
+        color: var(--accent-color);
+        border: 1px solid rgba(231, 76, 60, 0.3);
+    }
+
+    .status-other { /* Desconhecido */
+        background: rgba(108, 117, 125, 0.15);
+        color: #6c757d;
+        border: 1px solid rgba(108, 117, 125, 0.3);
+    }
+
+    .authors-section {
+        margin: 2rem 0;
+    }
+
+    .authors-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .author-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        text-align: center;
+        transition: var(--transition);
+    }
+
+    .author-card:hover {
+        border-color: var(--secondary-color);
+        transform: translateY(-2px);
+    }
+
+    .author-icon {
+        font-size: 2rem;
+        color: var(--secondary-color);
+        margin-bottom: 0.75rem;
+    }
+
+    .author-name {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+    }
+
+    .author-role {
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    .file-section {
+        background: var(--light-color);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .file-icon {
+        font-size: 2.5rem;
+        color: var(--accent-color);
+    }
+
+    .file-details {
+        flex: 1;
+    }
+
+    .file-name {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+        word-break: break-all;
+    }
+
+    .file-meta {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    .btn-download {
+        background: var(--secondary-color);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+    }
+
+    .btn-download:hover {
+        background: #2980b9;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+        background: transparent;
+        color: var(--secondary-color);
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 2px solid var(--secondary-color);
+        transition: var(--transition);
+        margin-left: 1rem;
+    }
+
+    .btn-secondary:hover {
+        background: var(--secondary-color);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .timeline {
+        margin: 2rem 0;
+    }
+
+    .timeline-item {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .timeline-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 1.5rem;
+        top: 3rem;
+        bottom: -1.5rem;
+        width: 2px;
+        background: #e0e0e0;
+    }
+
+    .timeline-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        background: var(--secondary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        z-index: 1;
+    }
+
+    .timeline-content {
+        flex: 1;
+        padding-top: 0.25rem;
+    }
+
+    .timeline-date {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+    }
+
+    .timeline-text {
+        color: #666;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 2rem 0;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .authors-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .file-info {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .btn-secondary {
+            margin-left: 0;
+            margin-top: 0.5rem;
+        }
+
+        .timeline-item::after {
+            left: 1.5rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .content-container {
+            padding: 0 1rem;
+        }
+
+        .article-card {
+            padding: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
+<div class="article-detail-page">
+    <div class="page-header">
+        <div class="content-container">
+            <h1 class="page-title">{{ artigo.titulo }}</h1>
+            <p class="page-subtitle">Detalhes completos do artigo submetido</p>
         </div>
     </div>
-    <div class="row">
-        <div class="col-sm-12">
-            <strong>Status:</strong> {{ artigo|getStatusPaper }}
+
+    <div class="content-container">
+        <!-- Card Principal do Artigo -->
+        <div class="article-card">
+            <h2 class="card-title">
+                <i class="fas fa-file-alt"></i>
+                Informações do Artigo
+            </h2>
+
+            <!-- Grid de Informações -->
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-label">
+                        <i class="fas fa-calendar-alt"></i>
+                        Conferência
+                    </div>
+                    <div class="info-value">{{ artigo.conferenciaAtual.nome }}</div>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-label">
+                        <i class="fas fa-calendar"></i>
+                        Data de Envio
+                    </div>
+                    <div class="info-value">{{ artigo.dataEnvio|date:"d/m/Y" }}</div>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-label">
+                        <i class="fas fa-tag"></i>
+                        Status
+                    </div>
+                    <div>
+                        <span class="status-badge status-{{ artigo.status }}">
+                            <i class="fas 
+                                {% if artigo.status == 0 %}fa-clock
+                                {% elif artigo.status == 1 %}fa-check-circle
+                                {% elif artigo.status == 2 %}fa-edit
+                                {% elif artigo.status == 3 %}fa-times-circle
+                                {% else %}fa-question-circle{% endif %}">
+                            </i>
+                            {{ artigo|getStatusPaper }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Autores -->
+            <div class="authors-section">
+                <h3 class="card-title">
+                    <i class="fas fa-users"></i>
+                    Autores
+                </h3>
+                
+                {% if artigo.autores.all %}
+                    <div class="authors-grid">
+                        {% for autor in artigo.autores.all %}
+                            <div class="author-card">
+                                <div class="author-icon">
+                                    <i class="fas fa-user-graduate"></i>
+                                </div>
+                                <div class="author-name">{{ autor.nome }}</div>
+                                <div class="author-role">
+                                    {% if forloop.first %}Autor Principal{% else %}Co-autor{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Nenhum autor cadastrado para este artigo</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Seção do Arquivo -->
+            <div class="file-section">
+                <h3 class="card-title">
+                    <i class="fas fa-file-pdf"></i>
+                    Arquivo Submetido
+                </h3>
+                
+                {% if artigo.endereco %}
+                    <div class="file-info">
+                        <div class="file-icon">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="file-details">
+                            <div class="file-name">{{ artigo.endereco.name|cut:"artigos/" }}</div>
+                            <div class="file-meta">
+                                <i class="fas fa-database"></i>
+                                Arquivo enviado em {{ artigo.dataEnvio|date:"d/m/Y" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <a href="{{ artigo.endereco.url }}" class="btn-download" target="_blank">
+                            <i class="fas fa-download"></i>
+                            Baixar Arquivo
+                        </a>
+                        <a href="{{ artigo.endereco.url }}" class="btn-secondary" target="_blank">
+                            <i class="fas fa-eye"></i>
+                            Visualizar Online
+                        </a>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <i class="fas fa-file-excel" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Nenhum arquivo enviado para este artigo</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Timeline do Artigo -->
+            <div class="timeline">
+                <h3 class="card-title">
+                    <i class="fas fa-history"></i>
+                    Histórico do Artigo
+                </h3>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">{{ artigo.dataEnvio|date:"d/m/Y" }}</div>
+                        <div class="timeline-text">Artigo submetido para avaliação</div>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-icon">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">
+                            {% if artigo.status == 1 or artigo.status == 2 or artigo.status == 3 %}
+                                {{ artigo.dataEnvio|date:"d/m/Y" }}
+                            {% else %}
+                                Em breve
+                            {% endif %}
+                        </div>
+                        <div class="timeline-text">
+                            {% if artigo.status == 0 %}
+                                Aguardando avaliação pelos revisores
+                            {% elif artigo.status == 1 %}
+                                Artigo aprovado para publicação
+                            {% elif artigo.status == 2 %}
+                                Artigo aceito com modificações
+                            {% elif artigo.status == 3 %}
+                                Artigo não aceito para publicação
+                            {% else %}
+                                Status desconhecido
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if artigo.status == 1 %}
+                <div class="timeline-item">
+                    <div class="timeline-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">A definir</div>
+                        <div class="timeline-text">Apresentação na conferência</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Ações -->
+            <div class="action-buttons">
+                <a href="{% url 'submission:artigos' %}" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar para Meus Artigos
+                </a>
+            </div>
         </div>
     </div>
-    <div class="row">
-        <div class="col-md-12">
-            <Strong>Autores:</Strong>
-            {% for autor in artigo.autores.all %}
-                {{ autor.nome }}{% if not forloop.last %}, {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-    <strong>Arquivo: </strong>
-    <a href="{{ artigo.endereco.url }}">{{ artigo.endereco.name }}</a><br>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Adicionar animação de entrada suave
+        const elements = document.querySelectorAll('.article-card, .info-card, .author-card, .timeline-item');
+        
+        elements.forEach((element, index) => {
+            element.style.opacity = '0';
+            element.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                element.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                element.style.opacity = '1';
+                element.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+
+        // Adicionar tooltip para o status
+        const statusBadge = document.querySelector('.status-badge');
+        if (statusBadge) {
+            let tooltipText = '';
+            const status = {{ artigo.status }};
+            
+            switch(status) {
+                case 0:
+                    tooltipText = 'Seu artigo está aguardando avaliação pela comissão científica.';
+                    break;
+                case 1:
+                    tooltipText = 'Parabéns! Seu artigo foi aprovado para publicação.';
+                    break;
+                case 2:
+                    tooltipText = 'Seu artigo foi aceito com modificações. Verifique os comentários dos revisores.';
+                    break;
+                case 3:
+                    tooltipText = 'Seu artigo não foi aceito para publicação. Consulte os comentários para melhorias futuras.';
+                    break;
+                default:
+                    tooltipText = 'Status do artigo não identificado.';
+            }
+            
+            statusBadge.title = tooltipText;
+        }
+    });
+</script>
+
 {% endblock %}
