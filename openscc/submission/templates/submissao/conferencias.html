@@ -5,34 +5,586 @@
 {% block mainContent %}
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --primary-color: #3498db;
+        --secondary-color: #2c3e50;
+        --accent-color: #e74c3c;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --success-color: #28a745;
+        --warning-color: #ffc107;
+        --border-radius: 8px;
+        --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+    }
+
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f5f7fa;
+        color: #333;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+        box-shadow: var(--box-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+        opacity: 0.1;
+    }
+
+    .page-title {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        position: relative;
+    }
+
+    .page-subtitle {
+        font-weight: 300;
+        opacity: 0.9;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        text-align: center;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .conference-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        margin-bottom: 1.5rem;
+        transition: var(--transition);
+        overflow: hidden;
+        border: none;
+    }
+
+    .conference-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .conference-header {
+        background: var(--secondary-color);
+        color: white;
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .conference-logo {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        border-radius: 50%;
+        background: white;
+        padding: 5px;
+    }
+
+    .conference-sigla {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .conference-body {
+        padding: 1.5rem;
+    }
+
+    .conference-name {
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: var(--secondary-color);
+        margin-bottom: 1rem;
+    }
+
+    .date-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .date-item {
+        padding: 1rem;
+        background: var(--light-color);
+        border-radius: var(--border-radius);
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .date-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .date-value {
+        font-weight: 500;
+        color: var(--dark-color);
+    }
+
+    .conference-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-action {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        font-weight: 500;
+        transition: var(--transition);
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-inscricao {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .btn-inscricao:hover {
+        background: #2980b9;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-submissao {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .btn-submissao:hover {
+        background: #c0392b;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-disabled {
+        background: #6c757d;
+        color: white;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .btn-disabled:hover {
+        transform: none;
+        background: #6c757d;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-open {
+        background: rgba(40, 167, 69, 0.15);
+        color: var(--success-color);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .status-closed {
+        background: rgba(108, 117, 125, 0.15);
+        color: #6c757d;
+        border: 1px solid rgba(108, 117, 125, 0.3);
+    }
+
+    .status-soon {
+        background: rgba(255, 193, 7, 0.15);
+        color: var(--warning-color);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .countdown {
+        background: rgba(52, 152, 219, 0.1);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #dee2e6;
+    }
+
+    .filter-container {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .filter-title {
+        font-weight: 500;
+        margin-bottom: 1rem;
+        color: var(--secondary-color);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-options {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        background: var(--light-color);
+        border: 1px solid #dee2e6;
+        color: var(--dark-color);
+        transition: var(--transition);
+        cursor: pointer;
+    }
+
+    .filter-btn.active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .conference-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .date-info {
+            grid-template-columns: 1fr;
+        }
+
+        .conference-actions {
+            flex-direction: column;
+        }
+
+        .btn-action {
+            justify-content: center;
+        }
+
+        .stats-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 576px) {
+        .page-header {
+            padding: 2rem 0;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+        }
+
+        .conference-body {
+            padding: 1rem;
+        }
+
+        .stats-container {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-options {
+            flex-direction: column;
+        }
+
+        .filter-btn {
+            text-align: center;
+        }
+    }
+</style>
+
 <div class="container">
-    <table class="table">
-        <thead>
-            <tr>
-                <th scope="col">Logo</th>
-                <th scope="col">Sigla</th>
-                <th scope="col">Nome</th>
-                <th scope="col">Abertura das inscrições</th>
-                <th scope="col">Fechamento inscrições</th>
-                <th scope="col">Data do evento</th>
-                <th scope="col">Inscrição</th>
-                <th scope="col">Submissão</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in conferenciaList %}
-                <tr>
-                    <td><img src="{{ c.logo.url}}" alt="Conference logo" class="logoHeader"></td>
-                    <td>{{ c.sigla }}</td>
-                    <td>{{ c.nome }}</td>
-                    <td>{{ c.submissaoOpen }}</td>
-                    <td>{{ c.submissaoClose }}</td>
-                    <td>De {{ c.dataEventoInicio }} até {{ c.dataEventoFim }}</td>
-                    <td><a href="{% url 'submission:conferencia' slug=c.slug %}" class="btn btn-primary"><i class="fas fa-calendar-check"></i></a></td>
-                    <td><a href="{% url 'submission:paginaSubmissao' slug=c.slug %}" class="btn btn-primary"><i class="fas fa-file-upload"></i></a></td>
-                </tr>
-            {% endfor %}        
-        </tbody>
-    </table>
+    <div class="page-header">
+        <div class="container">
+            <h1 class="page-title">Conferências Disponíveis</h1>
+            <p class="page-subtitle">Encontre e participe das principais conferências acadêmicas</p>
+            <small>Data de hoje: {{ estatisticas.hoje }}</small>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Cards de Estatísticas -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--primary-color);">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.total }}</div>
+                <div class="stat-label">Total de Conferências</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--success-color);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.abertas }}</div>
+                <div class="stat-label">Inscrições Abertas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--warning-color);">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.em_breve }}</div>
+                <div class="stat-label">Em Breve</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--secondary-color);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.total }}</div>
+                <div class="stat-label">Oportunidades</div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filter-container">
+            <h3 class="filter-title">
+                <i class="fas fa-filter"></i>
+                Filtrar por status:
+            </h3>
+            <div class="filter-options">
+                <button class="filter-btn active" data-filter="all">Todas</button>
+                <button class="filter-btn" data-filter="open">Inscrições Abertas</button>
+                <button class="filter-btn" data-filter="soon">Em Breve</button>
+            </div>
+        </div>
+
+        <!-- Lista de Conferências -->
+        {% if conferenciaList %}
+            <div class="conference-list">
+                {% for c in conferenciaList %}
+                    <div class="conference-card" data-status="{{ c.status }}">
+                        <div class="conference-header">
+                            <div class="d-flex align-items-center">
+                                <img src="{{ c.logo.url }}" alt="Logo {{ c.sigla }}" class="conference-logo me-3">
+                                <h2 class="conference-sigla">{{ c.sigla }}</h2>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if c.status == "open" and c.dias_restantes > 0 %}
+                                    <div class="countdown">
+                                        <i class="fas fa-clock"></i>
+                                        {{ c.dias_restantes }} dia{{ c.dias_restantes|pluralize }} restante{{ c.dias_restantes|pluralize }}
+                                    </div>
+                                {% endif %}
+                                <span class="status-badge {{ c.status_class }}">
+                                    <i class="fas 
+                                        {% if c.status == 'open' %}fa-check-circle
+                                        {% elif c.status == 'soon' %}fa-hourglass-start
+                                        {% else %}fa-times-circle{% endif %}">
+                                    </i>
+                                    {{ c.status_text }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="conference-body">
+                            <h3 class="conference-name">{{ c.nome }}</h3>
+                            
+                            <div class="date-info">
+                                <div class="date-item">
+                                    <div class="date-label">
+                                        <i class="fas fa-door-open"></i>
+                                        Abertura das Inscrições
+                                    </div>
+                                    <div class="date-value">{{ c.submissaoOpen|date:"d/m/Y" }}</div>
+                                </div>
+                                <div class="date-item">
+                                    <div class="date-label">
+                                        <i class="fas fa-door-closed"></i>
+                                        Fechamento das Inscrições
+                                    </div>
+                                    <div class="date-value">{{ c.submissaoClose|date:"d/m/Y" }}</div>
+                                </div>
+                                <div class="date-item">
+                                    <div class="date-label">
+                                        <i class="fas fa-calendar-week"></i>
+                                        Período do Evento
+                                    </div>
+                                    <div class="date-value">{{ c.dataEventoInicio|date:"d/m/Y" }} - {{ c.dataEventoFim|date:"d/m/Y" }}</div>
+                                </div>
+                                <div class="date-item">
+                                    <div class="date-label">
+                                        <i class="fas fa-clock"></i>
+                                        Status Atual
+                                    </div>
+                                    <div class="date-value">
+                                        <strong>{{ c.status_text }}</strong>
+                                        {% if c.status == "open" %}
+                                            <br><small>Inscrições abertas até {{ c.submissaoClose|date:"d/m/Y" }}</small>
+                                        {% elif c.status == "soon" %}
+                                            <br><small>Inscrições abrem em {{ c.submissaoOpen|date:"d/m/Y" }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="conference-actions">
+                                {% if c.status == "open" %}
+                                    <a href="{% url 'submission:conferencia' slug=c.slug %}" class="btn-action btn-inscricao">
+                                        <i class="fas fa-calendar-check"></i>
+                                        Fazer Inscrição
+                                    </a>
+                                    <a href="{% url 'submission:paginaSubmissao' slug=c.slug %}" class="btn-action btn-submissao">
+                                        <i class="fas fa-file-upload"></i>
+                                        Submeter Trabalho
+                                    </a>
+                                {% elif c.status == "soon" %}
+                                    <button class="btn-action btn-inscricao btn-disabled" disabled>
+                                        <i class="fas fa-calendar-check"></i>
+                                        Inscrições em Breve
+                                    </button>
+                                    <button class="btn-action btn-submissao btn-disabled" disabled>
+                                        <i class="fas fa-file-upload"></i>
+                                        Submissões em Breve
+                                    </button>
+                                {% else %}
+                                    <button class="btn-action btn-inscricao btn-disabled" disabled>
+                                        <i class="fas fa-calendar-check"></i>
+                                        Inscrições Encerradas
+                                    </button>
+                                    <button class="btn-action btn-submissao btn-disabled" disabled>
+                                        <i class="fas fa-file-upload"></i>
+                                        Submissões Encerradas
+                                    </button>
+                                {% endif %}
+                                <a href="{% url 'submission:conferencia' slug=c.slug %}" class="btn-action" style="background: var(--secondary-color); color: white;">
+                                    <i class="fas fa-info-circle"></i>
+                                    Mais Informações
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <h3>Nenhuma conferência disponível no momento</h3>
+                <p>Volte em breve para conferir as próximas conferências.</p>
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const conferenceCards = document.querySelectorAll('.conference-card');
+        
+        // Filtro de conferências por status
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove a classe active de todos os botões
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Adiciona a classe active ao botão clicado
+                this.classList.add('active');
+                
+                const filterValue = this.getAttribute('data-filter');
+                
+                conferenceCards.forEach(card => {
+                    if (filterValue === 'all') {
+                        card.style.display = 'block';
+                    } else {
+                        if (card.getAttribute('data-status') === filterValue) {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    }
+                });
+            });
+        });
+
+        // Adicionar animações de entrada
+        conferenceCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+
 {% endblock %}

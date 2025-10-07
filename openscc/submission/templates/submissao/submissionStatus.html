@@ -1,0 +1,103 @@
+{% extends "base_openscc.html" %}
+{% load static %}
+
+{% block titlePage %}
+<title>Status de Submissão - {{ conf.nome }}</title>
+{% endblock %}
+
+{% block mainContent %}
+
+<style>
+    .status-page {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .status-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        text-align: center;
+    }
+
+    .status-icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .status-open { color: #27ae60; }
+    .status-closed { color: #e74c3c; }
+    .status-warning { color: #f39c12; }
+
+    .btn-submit {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s ease;
+        margin: 1rem 0;
+    }
+
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        color: white;
+    }
+</style>
+
+<div class="status-page">
+    <div class="container">
+        <div class="status-card">
+            {% if submissao_aberta %}
+                {% if artigo_existente %}
+                    <div class="status-icon status-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h2>Submissão em Andamento</h2>
+                    <p>Você já possui um artigo submetido para esta conferência.</p>
+                    <p>Deseja submeter outro trabalho?</p>
+                    <a href="{% url 'submission:submissionForm' slug=conf.slug %}" class="btn-submit">
+                        <i class="fas fa-plus"></i>
+                        Nova Submissão
+                    </a>
+                {% else %}
+                    <div class="status-icon status-open">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h2>Submissões Abertas</h2>
+                    <p>As submissões para <strong>{{ conf.nome }}</strong> estão abertas!</p>
+                    <p><strong>{{ dias_restantes }} dias</strong> restantes para enviar seu trabalho.</p>
+                    <a href="{% url 'submission:submissionForm' slug=conf.slug %}" class="btn-submit">
+                        <i class="fas fa-paper-plane"></i>
+                        Submeter Trabalho
+                    </a>
+                {% endif %}
+            {% else %}
+                <div class="status-icon status-closed">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <h2>Submissões Encerradas</h2>
+                <p>O período de submissão para esta conferência já encerrou.</p>
+                <p>Período: {{ conf.submissaoOpen|date:"d/m/Y" }} - {{ conf.submissaoClose|date:"d/m/Y" }}</p>
+            {% endif %}
+            
+            <div class="mt-4">
+                <a href="{% url 'submission:conferencia' slug=conf.slug %}" class="btn-submit" style="background: #6c757d;">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar para a Conferência
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

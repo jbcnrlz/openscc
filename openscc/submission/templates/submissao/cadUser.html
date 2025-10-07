@@ -1,26 +1,484 @@
 {% extends "base_openscc.html" %}
+{% load static %}
+
+{% block titlePage %}
+<title>Cadastro - OpenSCC</title>
+{% endblock %}
+
 {% block mainContent %}
 
-<div class="container">    
-    <form action="{% url 'submission:createUser' %}" method="POST">
-        {% csrf_token %}
-        {% for field in form %}
-            <div class="form-group">
-              {% if field.errors %}
-              <div class="alert alert-danger" role="alert">
-                  {{ field.errors }}
-              </div>
-              {% endif %}
-              {{ field.label_tag }} {{ field }}
-              {% if field.help_text %}
-                <p class="help" id="{{ field.auto_id }}_helptext">
-                  {{ field.help_text|safe }}
-                </p>
-              {% endif %}
+<style>
+    .register-page {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    .register-container {
+        max-width: 500px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .register-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 3rem 2.5rem;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .register-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    .register-logo {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        background: linear-gradient(135deg, #3498db, #2c3e50);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .register-logo img {
+        width: 100%;
+        height: auto;
+        filter: brightness(0) invert(1);
+    }
+
+    .register-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+
+    .register-subtitle {
+        color: #6c757d;
+        margin-bottom: 2.5rem;
+        font-size: 1rem;
+        text-align: center;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+        display: block;
+        font-size: 0.95rem;
+    }
+
+    .form-control {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        width: 100%;
+    }
+
+    .form-control:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        background: white;
+    }
+
+    .form-control::placeholder {
+        color: #6c757d;
+    }
+
+    .btn-register {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        margin-top: 1rem;
+    }
+
+    .btn-register:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+    }
+
+    .btn-register:active {
+        transform: translateY(0);
+    }
+
+    .alert {
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        font-weight: 500;
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+    }
+
+    .alert-success {
+        background: linear-gradient(135deg, #27ae60, #219653);
+        color: white;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 3px solid #3498db;
+    }
+
+    .login-prompt {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .login-link {
+        color: #3498db;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .login-link:hover {
+        color: #2980b9;
+        transform: translateX(5px);
+    }
+
+    .password-strength {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+        background: #f8f9fa;
+        display: none;
+    }
+
+    .password-strength.visible {
+        display: block;
+    }
+
+    .strength-meter {
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+    }
+
+    .strength-fill {
+        height: 100%;
+        width: 0%;
+        transition: all 0.3s ease;
+        border-radius: 2px;
+    }
+
+    .strength-weak { background: #e74c3c; width: 25%; }
+    .strength-fair { background: #f39c12; width: 50%; }
+    .strength-good { background: #3498db; width: 75%; }
+    .strength-strong { background: #27ae60; width: 100%; }
+
+    .strength-text {
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .register-card {
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    .form-group {
+        animation: fadeInUp 0.6s ease-out;
+        animation-fill-mode: both;
+    }
+
+    .form-group:nth-child(1) { animation-delay: 0.1s; }
+    .form-group:nth-child(2) { animation-delay: 0.2s; }
+    .form-group:nth-child(3) { animation-delay: 0.3s; }
+    .form-group:nth-child(4) { animation-delay: 0.4s; }
+    .form-group:nth-child(5) { animation-delay: 0.5s; }
+
+    /* Loading state */
+    .btn-loading {
+        position: relative;
+        color: transparent;
+    }
+
+    .btn-loading::after {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        top: 50%;
+        left: 50%;
+        margin-left: -10px;
+        margin-top: -10px;
+        border: 2px solid transparent;
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive design */
+    @media (max-width: 576px) {
+        .register-page {
+            padding: 1rem;
+        }
+
+        .register-card {
+            padding: 2rem 1.5rem;
+        }
+
+        .register-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+
+<div class="register-page">
+    <div class="register-container">
+        <div class="register-card">
+            <!-- Logo -->
+            <div class="register-logo">
+                <img src="{% static 'media/images/logo_openscc.png' %}" alt="OpenSCC Logo">
             </div>
-        {% endfor %}
-        <br>
-        <button type="submit" class="btn btn-primary">Salvar</button>
-        </form>        
+
+            <!-- Título -->
+            <h1 class="register-title">Criar Nova Conta</h1>
+            <p class="register-subtitle">Junte-se à nossa comunidade de conferências</p>
+
+            <!-- Formulário de Cadastro -->
+            <form action="{% url 'submission:createUser' %}" method="POST" id="registerForm">
+                {% csrf_token %}
+                
+                {% for field in form %}
+                    <div class="form-group">
+                        <!-- Label -->
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            <i class="fas 
+                                {% if field.name == 'username' %}fa-user
+                                {% elif field.name == 'email' %}fa-envelope
+                                {% elif field.name == 'password1' or field.name == 'password2' %}fa-lock
+                                {% else %}fa-user-circle{% endif %} 
+                                me-2">
+                            </i>
+                            {{ field.label }}
+                        </label>
+
+                        <!-- Campo -->
+                        {{ field }}
+
+                        <!-- Erros -->
+                        {% if field.errors %}
+                        <div class="alert alert-danger mt-2" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            {% for error in field.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Texto de ajuda -->
+                        {% if field.help_text %}
+                        <div class="help-text" id="{{ field.auto_id }}_helptext">
+                            <i class="fas fa-info-circle me-2"></i>
+                            {{ field.help_text|safe }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Indicador de força da senha -->
+                        {% if field.name == 'password1' %}
+                        <div class="password-strength" id="passwordStrength">
+                            <div class="strength-meter">
+                                <div class="strength-fill" id="strengthFill"></div>
+                            </div>
+                            <div class="strength-text" id="strengthText">Força da senha</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <!-- Botão de Cadastro -->
+                <button type="submit" class="btn-register" id="registerButton">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Criar Minha Conta
+                </button>
+            </form>
+
+            <!-- Link para Login -->
+            <div class="login-prompt">
+                <p class="mb-2">Já possui uma conta?</p>
+                <a href="{% url 'submission:login' %}" class="login-link">
+                    <i class="fas fa-sign-in-alt me-1"></i>
+                    Fazer Login
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const registerForm = document.getElementById('registerForm');
+        const registerButton = document.getElementById('registerButton');
+        const passwordField = document.querySelector('input[type="password"]');
+        const passwordStrength = document.getElementById('passwordStrength');
+        const strengthFill = document.getElementById('strengthFill');
+        const strengthText = document.getElementById('strengthText');
+
+        // Aplicar classes CSS aos campos do formulário
+        const formInputs = document.querySelectorAll('input, select, textarea');
+        formInputs.forEach(input => {
+            input.classList.add('form-control');
+            
+            // Animações de entrada
+            input.style.opacity = '0';
+            input.style.transform = 'translateY(10px)';
+            
+            setTimeout(() => {
+                input.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                input.style.opacity = '1';
+                input.style.transform = 'translateY(0)';
+            }, 300);
+        });
+
+        // Indicador de força da senha
+        if (passwordField) {
+            passwordField.addEventListener('input', function() {
+                const password = this.value;
+                let strength = 0;
+                let text = '';
+                let className = '';
+
+                if (password.length > 0) {
+                    passwordStrength.classList.add('visible');
+                    
+                    // Critérios de força
+                    if (password.length >= 8) strength++;
+                    if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+                    if (password.match(/\d/)) strength++;
+                    if (password.match(/[^a-zA-Z\d]/)) strength++;
+
+                    // Definir texto e classe baseado na força
+                    switch(strength) {
+                        case 0:
+                        case 1:
+                            text = 'Senha fraca';
+                            className = 'strength-weak';
+                            break;
+                        case 2:
+                            text = 'Senha razoável';
+                            className = 'strength-fair';
+                            break;
+                        case 3:
+                            text = 'Senha boa';
+                            className = 'strength-good';
+                            break;
+                        case 4:
+                            text = 'Senha forte';
+                            className = 'strength-strong';
+                            break;
+                    }
+                } else {
+                    passwordStrength.classList.remove('visible');
+                    text = 'Força da senha';
+                    className = '';
+                }
+
+                strengthFill.className = 'strength-fill ' + className;
+                strengthText.textContent = text;
+            });
+        }
+
+        // Animação de loading no submit
+        registerForm.addEventListener('submit', function() {
+            registerButton.classList.add('btn-loading');
+            registerButton.disabled = true;
+        });
+
+        // Validação em tempo real
+        registerForm.addEventListener('input', function() {
+            const inputs = registerForm.querySelectorAll('input[required]');
+            let allFilled = true;
+            
+            inputs.forEach(input => {
+                if (!input.value.trim()) {
+                    allFilled = false;
+                }
+            });
+
+            // Habilitar/desabilitar botão baseado na validação
+            registerButton.disabled = !allFilled;
+        });
+
+        // Efeito de foco nos inputs
+        formInputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.classList.add('focused');
+            });
+
+            input.addEventListener('blur', function() {
+                if (!this.value) {
+                    this.parentElement.classList.remove('focused');
+                }
+            });
+        });
+
+        // Prevenir múltiplos cliques
+        let isSubmitting = false;
+        registerForm.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return;
+            }
+            isSubmitting = true;
+        });
+    });
+</script>
+
 {% endblock %}

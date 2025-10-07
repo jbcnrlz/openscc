@@ -3,94 +3,609 @@
 {% load submission_extras %}
 
 {% block FooterbrandImage %}
-<a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
-    <img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">    
-</a>
+<div class="col-lg-4 text-center my-3 my-lg-0">
+    <a href="/" class="text-decoration-none">
+        <div class="d-flex align-items-center justify-content-center">
+            <img src="{{ conf.logo.url }}" alt="{{ conf.nome }} Logo" height="40" class="me-2">
+            <span class="fw-bold text-white">{{ conf.sigla }}</span>
+        </div>
+    </a>
+</div>
 {% endblock %}
 
 {% block brandImage %}
-<img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">
+<img src="{{ conf.logo.url }}" alt="{{ conf.nome }} Logo" class="logoHeader">
+<span>{{ conf.sigla }}</span>
 {% endblock %}
 
-{% block title %}
-<title>{{conf.nome}}</title>
+{% block titlePage %}
+<title>{{ conf.nome }} - OpenSCC</title>
 {% endblock %}
 
 {% block mainContent %}
-<div class="container">    
-    <div class="row mx-2">
-        {% for day in daysQt %}
-            <a href="{% url 'submission:conferenciaWithDate' slug=conf.slug data=day.1|cut:'/' %}" class="col-lg btn btn-primary mx-2 {% if day.2 == 1 %} active {% endif %}">
-                <div>{{ day.0 }}</div>
-                <div>{{ day.1 }}</div>
-            </a>
-        {% endfor %}
-    </div>    
-    {% for a in atividades %}
-        <div class="row mx-2">
-            <div class="card m-1" style="background-color: #{{a.tipo.cor}};">
-                <div class="card-body">                                        
-                    <h5 class="card-title">{{ a.nome }} - {{ a.data|time:"H:i:s" }}</h5>                    
-                    <p class="card-text">                      
-                      {% if a.palestrante.nome %}
-                        <span class="textPal"></span>por {{a.palestrante.nome }}</span><br >
-                      {% endif %}
-                      {{ a.descricao }}
+
+<style>
+    .conference-page {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4efe9 100%);
+        min-height: 100vh;
+    }
+
+    .conference-header {
+        background: linear-gradient(135deg, #2c3e50, #3498db);
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .conference-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+        opacity: 0.1;
+    }
+
+    .conference-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .conference-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        font-weight: 300;
+    }
+
+    .days-navigation {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        overflow-x: auto;
+    }
+
+    .days-scroll {
+        display: flex;
+        gap: 0.75rem;
+        min-width: max-content;
+    }
+
+    .day-button {
+        flex: 0 0 auto;
+        min-width: 120px;
+        padding: 1rem;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        background: white;
+        color: #6c757d;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .day-button:hover {
+        border-color: #3498db;
+        color: #3498db;
+        transform: translateY(-2px);
+    }
+
+    .day-button.active {
+        background: #3498db;
+        border-color: #3498db;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+
+    .day-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: block;
+    }
+
+    .day-date {
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+
+    .activities-container {
+        display: grid;
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .time-slot {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .time-header {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .time-label {
+        font-weight: 600;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .activities-grid {
+        padding: 1.5rem;
+        display: grid;
+        gap: 1rem;
+    }
+
+    .activity-card {
+        border-radius: 10px;
+        padding: 1.5rem;
+        border-left: 4px solid;
+        transition: all 0.3s ease;
+        background: white;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .activity-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .activity-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+    }
+
+    .activity-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .activity-type {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .activity-details {
+        margin-bottom: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .detail-item i {
+        width: 16px;
+        color: #3498db;
+    }
+
+    .activity-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-primary {
+        background: #3498db;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+        background: #2980b9;
+        transform: translateY(-1px);
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 2px solid #3498db;
+        color: #3498db;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-outline:hover {
+        background: #3498db;
+        color: white;
+        transform: translateY(-1px);
+    }
+
+    .btn-danger {
+        background: #e74c3c;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-danger:hover {
+        background: #c0392b;
+        transform: translateY(-1px);
+    }
+
+    .btn-disabled {
+        background: #6c757d;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 500;
+        opacity: 0.6;
+        cursor: not-allowed;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .conflict-warning {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #856404;
+    }
+
+    .conflict-warning i {
+        color: #f39c12;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #dee2e6;
+    }
+
+    .login-prompt {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        margin: 2rem 0;
+    }
+
+    /* Modal styles */
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 1.5rem;
+    }
+
+    .modal-title {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 1.5rem;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .conference-title {
+            font-size: 2rem;
+        }
+
+        .days-scroll {
+            gap: 0.5rem;
+        }
+
+        .day-button {
+            min-width: 100px;
+            padding: 0.75rem;
+        }
+
+        .activity-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .activity-type {
+            align-self: flex-start;
+        }
+
+        .activities-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .conference-header {
+            padding: 2rem 0;
+        }
+
+        .activity-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary, .btn-outline, .btn-danger, .btn-disabled {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="conference-page">
+    <!-- Header da Conferência -->
+    <div class="conference-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-2 text-center text-md-start">
+                    <img src="{{ conf.logo.url }}" alt="{{ conf.nome }}" class="img-fluid" style="max-height: 100px;">
+                </div>
+                <div class="col-md-10 text-center text-md-start">
+                    <h1 class="conference-title">{{ conf.nome }}</h1>
+                    <p class="conference-subtitle">
+                        {{ conf.dataEventoInicio|date:"d/m/Y" }} - {{ conf.dataEventoFim|date:"d/m/Y" }}
                     </p>
-                    {%  if user.is_authenticated  %}
-                        {% if a|userRegistered:user.id %}
-                            <a href="{% url 'submission:removerInscricao' idAtv=a.id %}" class="btn btn-primary removerAjax" >Remover sua inscrição</a>
-                        {% else %}
-                          {% if a|canSubscrive:user.id  %}
-                            <a href="javascript:;" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#{{a.id}}">Faça sua inscrição</a>
-                          {% else %}
-                            <div class="alert alert-danger" role="alert">
-                              Você já está inscrito em outro evento no mesmo horário!
-                            </div>                          
-                          {% endif %}
-                        {% endif %}
-                    {% else %}
-                        <a href="{% url 'submission:login' %}" class="btn btn-primary" >Faça seu login!</a>
-                    {% endif %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="modal fade" id={{a.id}} tabindex="-1" aria-labelledby="{{ a.nome }}">
-            <div class="modal-dialog modal-dialog-centered">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title col-12 text-center">{{a.nome}}</h5>                  
-                </div>
-                <div class="modal-body">
-                  <p>{{ a.descricao }}</p>
-                  <p>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pin-map" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M3.1 11.2a.5.5 0 0 1 .4-.2H6a.5.5 0 0 1 0 1H3.75L1.5 15h13l-2.25-3H10a.5.5 0 0 1 0-1h2.5a.5.5 0 0 1 .4.2l3 4a.5.5 0 0 1-.4.8H.5a.5.5 0 0 1-.4-.8z"/>
-                        <path fill-rule="evenodd" d="M8 1a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 4a4 4 0 1 1 4.5 3.969V13.5a.5.5 0 0 1-1 0V7.97A4 4 0 0 1 4 3.999z"/>
-                    </svg>
-                    {{ a.local }}
-                  </p>
-                  <p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-flag" viewBox="0 0 16 16">
-                    <path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464-.003.001-.006.003-.023.009a12 12 0 0 1-.397.15c-.264.095-.631.223-1.047.35-.816.252-1.879.523-2.71.523-.847 0-1.548-.28-2.158-.525l-.028-.01C7.68 8.71 7.14 8.5 6.5 8.5c-.7 0-1.638.23-2.437.477A20 20 0 0 0 3 9.342V15.5a.5.5 0 0 1-1 0V.5a.5.5 0 0 1 1 0v.282c.226-.079.496-.17.79-.26C4.606.272 5.67 0 6.5 0c.84 0 1.524.277 2.121.519l.043.018C9.286.788 9.828 1 10.5 1c.7 0 1.638-.23 2.437-.477a20 20 0 0 0 1.349-.476l.019-.007.004-.002h.001M14 1.221c-.22.078-.48.167-.766.255-.81.252-1.872.523-2.734.523-.886 0-1.592-.286-2.203-.534l-.008-.003C7.662 1.21 7.139 1 6.5 1c-.669 0-1.606.229-2.415.478A21 21 0 0 0 3 1.845v6.433c.22-.078.48-.167.766-.255C4.576 7.77 5.638 7.5 6.5 7.5c.847 0 1.548.28 2.158.525l.028.01C9.32 8.29 9.86 8.5 10.5 8.5c.668 0 1.606-.229 2.415-.478A21 21 0 0 0 14 7.655V1.222z"/>
-                  </svg>
-                    {{ a.tipo }}</p>
-                  <p>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
-                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
-                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
-                    </svg>
-                    {{ a.data }}
-                   </p>
-                </div>
-                <div class="modal-footer">
-                  <a href="{% url 'submission:inscricaoAtividade' id=a.id %}" class="btn btn-primary col-12">Me inscrever!</a>
-                </div>
-              </div>
+    <div class="container">
+        <!-- Navegação por Dias -->
+        <div class="days-navigation">
+            <div class="days-scroll">
+                {% for day in daysQt %}
+                    <a href="{% url 'submission:conferenciaWithDate' slug=conf.slug data=day.1|cut:'/' %}" 
+                       class="day-button {% if day.2 == 1 %}active{% endif %}">
+                        <span class="day-name">{{ day.0|slice:":3" }}</span>
+                        <span class="day-date">{{ day.1 }}</span>
+                    </a>
+                {% endfor %}
             </div>
-          </div>
-          
+        </div>
 
-    {% endfor %}    
+        <!-- Lista de Atividades -->
+        {% if atividades %}
+            <div class="activities-container">
+                {% for a in atividades %}
+                    <div class="time-slot">
+                        <div class="time-header">
+                            <h3 class="time-label">
+                                <i class="fas fa-clock"></i>
+                                {{ a.data|time:"H:i" }}
+                            </h3>
+                        </div>
+                        <div class="activities-grid">
+                            <div class="activity-card" style="border-left-color: #{{ a.tipo.cor }};">
+                                <div class="activity-header">
+                                    <h3 class="activity-title">{{ a.nome }}</h3>
+                                    <span class="activity-type" style="background: #{{ a.tipo.cor }}20; color: #{{ a.tipo.cor }};">
+                                        {{ a.tipo.nome }}
+                                    </span>
+                                </div>
+                                
+                                <div class="activity-details">
+                                    {% if a.palestrante.nome %}
+                                    <div class="detail-item">
+                                        <i class="fas fa-user-tie"></i>
+                                        <span><strong>Palestrante:</strong> {{ a.palestrante.nome }}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="detail-item">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <span><strong>Local:</strong> {{ a.local }}</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <i class="fas fa-align-left"></i>
+                                        <span>{{ a.descricao|truncatewords:30 }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="activity-actions">
+                                  {% if user.is_authenticated %}
+                                      {% if a|userRegistered:user.id %}
+                                          <a href="{% url 'submission:removerInscricao' idAtv=a.id %}?date={{ selected_date|date:'dmY' }}" class="btn-danger">
+                                              <i class="fas fa-times"></i>
+                                              Cancelar Inscrição
+                                          </a>
+                                      {% else %}
+                                          {% if a|canSubscrive:user.id %}
+                                              <button class="btn-primary" data-bs-toggle="modal" data-bs-target="#modal{{ a.id }}">
+                                                  <i class="fas fa-calendar-plus"></i>
+                                                  Fazer Inscrição
+                                              </button>
+                                          {% else %}
+                                              <div class="conflict-warning">
+                                                  <i class="fas fa-exclamation-triangle"></i>
+                                                  <span>Você já está inscrito em outra atividade neste horário</span>
+                                              </div>
+                                          {% endif %}
+                                      {% endif %}
+                                  {% else %}
+                                      <a href="{% url 'submission:login' %}?next={{ request.path }}" class="btn-outline">
+                                          <i class="fas fa-sign-in-alt"></i>
+                                          Fazer Login para Inscrever-se
+                                      </a>
+                                  {% endif %}
+                                  
+                                  <button class="btn-outline" data-bs-toggle="modal" data-bs-target="#modal{{ a.id }}">
+                                      <i class="fas fa-info-circle"></i>
+                                      Ver Detalhes
+                                  </button>
+                              </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal de Detalhes -->
+                    <div class="modal fade" id="modal{{ a.id }}" tabindex="-1" aria-labelledby="modalLabel{{ a.id }}">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalLabel{{ a.id }}">{{ a.nome }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="detail-item">
+                                        <i class="fas fa-clock"></i>
+                                        <span><strong>Horário:</strong> {{ a.data|date:"d/m/Y H:i" }}</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <span><strong>Local:</strong> {{ a.local }}</span>
+                                    </div>
+                                    
+                                    {% if a.palestrante.nome %}
+                                    <div class="detail-item">
+                                        <i class="fas fa-user-tie"></i>
+                                        <span><strong>Palestrante:</strong> {{ a.palestrante.nome }}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="detail-item">
+                                        <i class="fas fa-tag"></i>
+                                        <span><strong>Tipo:</strong> {{ a.tipo.nome }}</span>
+                                    </div>
+                                    
+                                    <div class="mt-3">
+                                        <h6>Descrição:</h6>
+                                        <p>{{ a.descricao }}</p>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                  {% if user.is_authenticated and not a|userRegistered:user.id and a|canSubscrive:user.id %}
+                                      <a href="{% url 'submission:inscricaoAtividade' id=a.id %}?date={{ selected_date|date:'dmY' }}" class="btn-primary">
+                                          <i class="fas fa-calendar-plus"></i>
+                                          Confirmar Inscrição
+                                      </a>
+                                  {% endif %}
+                                  <button type="button" class="btn-outline" data-bs-dismiss="modal">
+                                      <i class="fas fa-times"></i>
+                                      Fechar
+                                  </button>
+                              </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <h3>Nenhuma atividade para esta data</h3>
+                <p>Selecione outra data para visualizar as atividades disponíveis.</p>
+            </div>
+        {% endif %}
+
+        <!-- Prompt de Login para usuários não autenticados -->
+        {% if not user.is_authenticated %}
+            <div class="login-prompt">
+                <h4><i class="fas fa-star me-2"></i>Participe das Atividades!</h4>
+                <p class="mb-3">Faça login para se inscrever nas atividades e criar sua agenda personalizada.</p>
+                <a href="{% url 'submission:login' %}?next={{ request.path }}" class="btn btn-light">
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    Fazer Login
+                </a>
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Smooth scrolling para navegação entre dias
+        const dayButtons = document.querySelectorAll('.day-button');
+        dayButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                dayButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Animações de entrada para os cards
+        const activityCards = document.querySelectorAll('.activity-card');
+        activityCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+
+        // Feedback visual para botões de ação
+        const actionButtons = document.querySelectorAll('.btn-primary, .btn-outline, .btn-danger');
+        actionButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (!this.classList.contains('btn-disabled')) {
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<span class="loading-spinner me-2"></span>Processando...';
+                    this.disabled = true;
+                    
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.disabled = false;
+                    }, 1500);
+                }
+            });
+        });
+    });
+</script>
+
 {% endblock %}
