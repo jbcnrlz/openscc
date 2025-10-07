@@ -1,56 +1,590 @@
 {% extends "base_openscc.html" %}
+{% load static %}
 
 {% block FooterbrandImage %}
-<a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
-    <img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">    
-</a>
+<div class="col-lg-4 text-center my-3 my-lg-0">
+    <a href="/" class="text-decoration-none">
+        <div class="d-flex align-items-center justify-content-center">
+            <img src="{{ conf.logo.url }}" alt="{{ conf.nome }} Logo" height="40" class="me-2">
+            <span class="fw-bold text-white">{{ conf.sigla }}</span>
+        </div>
+    </a>
+</div>
 {% endblock %}
 
 {% block brandImage %}
-<img src="{{ conf.logo.url}}" alt="Conference logo" class="logoHeader">
+<img src="{{ conf.logo.url }}" alt="{{ conf.nome }} Logo" class="logoHeader">
+<span>{{ conf.sigla }}</span>
+{% endblock %}
+
+{% block titlePage %}
+<title>Submissão de Trabalho - {{ conf.nome }}</title>
 {% endblock %}
 
 {% block mainContent %}
-<div class="container">
-    <h1>Submissão de Trabalhos</h1>
-    
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form }}  <!-- Renderiza os campos do formulário -->
-        <div class="row mb-3 mt-3">
-            <div class="col-sm-2"><h2>Autores</h2></div>
-            <div class="col-sm-10 d-flex justify-content-end"><button type="button" class="btn btn-primary" id="adicionar-autor">Adicionar Autor</button></div>
-        </div>
-        <div id="autores-container">
-            <div class="input-group mb-3" >            
-                <input type="text" class="form-control" name="autores_nome" required="" placeholder="Nome do Autor" aria-label="Nome do autor">
-                <input type="email" class="form-control" name="autores_email" required="" placeholder="Email do Autor" aria-label="E-mail do autor">
-                <input type="text" class="form-control" name="autores_filiacao" required="" placeholder="Filiação do Autor" aria-label="Filiação do autor">
-            </div>
-        </div>        
-        <button class="btn btn-primary" type="submit">Submeter Artigo</button>
-    </form>
 
-    <script>
-        document.getElementById('adicionar-autor').addEventListener('click', function() {
-            const container = document.getElementById('autores-container');
-            const novoAutor = document.createElement('div');
-            novoAutor.classList.add('input-group');
-            novoAutor.classList.add('mb-3');
-            novoAutor.innerHTML = `
-                <input type="text" class="form-control" required="" name="autores_nome" placeholder="Nome do Autor" aria-label="Nome do autor">
-                <input type="email" class="form-control" required="" name="autores_email" placeholder="Email do Autor" aria-label="E-mail do autor">
-                <input type="text" class="form-control" required="" name="autores_filiacao" placeholder="Filiação do Autor" aria-label="Filiação do autor">
-                <button type="button" class="btn btn-danger" onclick="removerAutor(this);">Remover Autor</button>
-            `;
-            container.appendChild(novoAutor);
-        });
+<style>
+    .submission-page {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
 
-        function removerAutor(button) {
-            const autorDiv = button.parentElement;
-            autorDiv.remove();
+    .page-header {
+        background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 20px 20px;
+    }
+
+    .page-title {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        font-weight: 300;
+    }
+
+    .submission-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--secondary-color);
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--light-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+        display: block;
+        font-size: 0.95rem;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        width: 100%;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        background: white;
+        outline: none;
+    }
+
+    .file-upload {
+        border: 2px dashed #dee2e6;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .file-upload:hover {
+        border-color: var(--primary-color);
+        background: #e3f2fd;
+    }
+
+    .file-upload i {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+    }
+
+    .file-input {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 10;
+    }
+
+    .author-card {
+        background: var(--light-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--primary-color);
+        transition: all 0.3s ease;
+    }
+
+    .author-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .author-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .author-number {
+        background: var(--primary-color);
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .btn-add-author {
+        background: linear-gradient(135deg, var(--success-color), #219653);
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-add-author:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(39, 174, 96, 0.3);
+    }
+
+    .btn-remove-author {
+        background: var(--accent-color);
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-remove-author:hover {
+        background: #c0392b;
+        transform: translateY(-1px);
+    }
+
+    .btn-submit {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        margin-top: 2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+    }
+
+    .btn-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .authors-grid {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .required-field::after {
+        content: " *";
+        color: var(--accent-color);
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+
+    .file-name {
+        font-weight: 500;
+        color: var(--primary-color);
+        margin-top: 1rem;
+    }
+
+    .error-message {
+        color: var(--accent-color);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .submission-card {
+            padding: 1.5rem;
         }
 
-    </script>          
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .author-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .btn-remove-author {
+            align-self: flex-end;
+        }
+    }
+</style>
+
+<div class="submission-page">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container">
+            <h1 class="page-title">Submissão de Trabalho</h1>
+            <p class="page-subtitle">{{ conf.nome }} - {{ conf.sigla }}</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="submission-card">
+            <!-- Informações do Artigo -->
+            <div class="mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-file-alt"></i>
+                    Informações do Artigo
+                </h2>
+                
+                <form method="post" enctype="multipart/form-data" id="submissionForm">
+                    {% csrf_token %}
+                    
+                    <!-- Campo Título -->
+                    <div class="form-group">
+                        <label for="id_titulo" class="form-label required-field">
+                            Título do Artigo
+                        </label>
+                        <input type="text" 
+                               name="titulo" 
+                               id="id_titulo" 
+                               class="form-control" 
+                               placeholder="Digite o título do artigo"
+                               maxlength="400"
+                               required
+                               value="{{ form.titulo.value|default:'' }}">
+                        {% if form.titulo.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.titulo.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Upload de Arquivo Customizado -->
+                    <div class="form-group">
+                        <label class="form-label required-field">Arquivo do Artigo</label>
+                        
+                        <!-- Área de Upload Customizada -->
+                        <div class="file-upload" id="fileUploadArea">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h4>Clique para fazer upload do arquivo</h4>
+                            <p class="text-muted">Formatos aceitos: PDF, DOC, DOCX (Máx: 10MB)</p>
+                            <div class="file-name" id="fileName"></div>
+                            
+                            <!-- Campo de arquivo do Django já estilizado -->
+                            {{ form.endereco }}
+                        </div>
+                        
+                        {% if form.endereco.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.endereco.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Seção de Autores -->
+                    <div class="mt-5">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2 class="section-title mb-0">
+                                <i class="fas fa-users"></i>
+                                Autores do Trabalho
+                            </h2>
+                            <button type="button" class="btn-add-author" id="adicionar-autor">
+                                <i class="fas fa-plus"></i>
+                                Adicionar Autor
+                            </button>
+                        </div>
+
+                        <div class="authors-grid" id="autores-container">
+                            <!-- Autor Principal (fixo) -->
+                            <div class="author-card">
+                                <div class="author-header">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="author-number">1</div>
+                                        <h5 class="mb-0">Autor Principal</h5>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label required-field">Nome Completo</label>
+                                        <input type="text" class="form-control" name="autores_nome" required 
+                                               placeholder="Digite o nome completo do autor"
+                                               value="{{ request.POST.autores_nome.0|default:'' }}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label required-field">E-mail</label>
+                                        <input type="email" class="form-control" name="autores_email" required 
+                                               placeholder="exemplo@email.com"
+                                               value="{{ request.POST.autores_email.0|default:'' }}">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label required-field">Filiação</label>
+                                    <input type="text" class="form-control" name="autores_filiacao" required 
+                                           placeholder="Instituição/Universidade/Empresa"
+                                           value="{{ request.POST.autores_filiacao.0|default:'' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão de Submissão -->
+                    <button class="btn-submit" type="submit" id="submitButton">
+                        <i class="fas fa-paper-plane"></i>
+                        Submeter Artigo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let authorCount = 1;
+        const form = document.getElementById('submissionForm');
+        const submitButton = document.getElementById('submitButton');
+        const fileInput = document.getElementById('id_endereco');
+        const fileUploadArea = document.getElementById('fileUploadArea');
+        const fileNameDisplay = document.getElementById('fileName');
+
+        // Configurar o campo de arquivo apenas uma vez
+        if (fileInput) {
+            // Aplicar estilos ao campo do Django
+            fileInput.classList.add('file-input');
+            
+            // REMOVER o event listener de clique na área de upload
+            // O campo de arquivo já está sobrepondo toda a área, então não precisa
+            // fileUploadArea.addEventListener('click', function() {
+            //     fileInput.click();
+            // });
+
+            // Apenas monitorar mudanças no campo de arquivo
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validar tamanho do arquivo (10MB)
+                    const maxSize = 10 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                        fileNameDisplay.innerHTML = '<span style="color: #e74c3c;">Arquivo muito grande (máx. 10MB)</span>';
+                        fileInput.value = '';
+                        return;
+                    }
+
+                    // Validar tipo de arquivo
+                    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                    const fileExtension = file.name.split('.').pop().toLowerCase();
+                    const allowedExtensions = ['pdf', 'doc', 'docx'];
+                    
+                    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+                        fileNameDisplay.innerHTML = '<span style="color: #e74c3c;">Formato não permitido. Use PDF, DOC ou DOCX</span>';
+                        fileInput.value = '';
+                        return;
+                    }
+
+                    fileNameDisplay.textContent = `Arquivo selecionado: ${file.name}`;
+                    fileUploadArea.style.borderColor = '#27ae60';
+                    fileUploadArea.style.background = '#e8f5e8';
+                }
+            });
+
+            // Mostrar nome do arquivo se já houver um selecionado
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.textContent = `Arquivo selecionado: ${fileInput.files[0].name}`;
+                fileUploadArea.style.borderColor = '#27ae60';
+                fileUploadArea.style.background = '#e8f5e8';
+            }
+        }
+
+        // Adicionar autor
+        document.getElementById('adicionar-autor').addEventListener('click', function() {
+            authorCount++;
+            const container = document.getElementById('autores-container');
+            const newAuthor = document.createElement('div');
+            newAuthor.className = 'author-card';
+            newAuthor.innerHTML = `
+                <div class="author-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="author-number">${authorCount}</div>
+                        <h5 class="mb-0">Co-autor</h5>
+                    </div>
+                    <button type="button" class="btn-remove-author" onclick="removerAutor(this)">
+                        <i class="fas fa-times"></i>
+                        Remover
+                    </button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label required-field">Nome Completo</label>
+                        <input type="text" class="form-control" name="autores_nome" required 
+                               placeholder="Digite o nome completo do autor">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required-field">E-mail</label>
+                        <input type="email" class="form-control" name="autores_email" required 
+                               placeholder="exemplo@email.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required-field">Filiação</label>
+                    <input type="text" class="form-control" name="autores_filiacao" required 
+                           placeholder="Instituição/Universidade/Empresa">
+                </div>
+            `;
+            container.appendChild(newAuthor);
+
+            // Animação de entrada
+            newAuthor.style.opacity = '0';
+            newAuthor.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                newAuthor.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                newAuthor.style.opacity = '1';
+                newAuthor.style.transform = 'translateY(0)';
+            }, 10);
+        });
+
+        // Validação do formulário antes do envio
+        form.addEventListener('submit', function(e) {
+            // Validar arquivo
+            if (!fileInput || !fileInput.files[0]) {
+                e.preventDefault();
+                fileNameDisplay.innerHTML = '<span style="color: #e74c3c;">Por favor, selecione um arquivo</span>';
+                fileUploadArea.style.borderColor = '#e74c3c';
+                fileUploadArea.style.background = '#fde8e8';
+                return;
+            }
+
+            // Validar autores
+            const autorInputs = document.querySelectorAll('input[name="autores_nome"]');
+            let autoresValidos = true;
+            
+            autorInputs.forEach(input => {
+                if (!input.value.trim()) {
+                    autoresValidos = false;
+                    input.style.borderColor = '#e74c3c';
+                } else {
+                    input.style.borderColor = '';
+                }
+            });
+
+            if (!autoresValidos) {
+                e.preventDefault();
+                alert('Por favor, preencha o nome de todos os autores.');
+                return;
+            }
+
+            // Se tudo estiver válido, mostrar loading
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
+            submitButton.disabled = true;
+        });
+
+        // Prevenir múltiplos envios
+        let isSubmitting = false;
+        form.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return;
+            }
+            isSubmitting = true;
+        });
+    });
+
+    function removerAutor(button) {
+        const authorCard = button.closest('.author-card');
+        if (document.querySelectorAll('.author-card').length > 1) {
+            authorCard.style.opacity = '0';
+            authorCard.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                authorCard.remove();
+                // Renumerar autores
+                const authors = document.querySelectorAll('.author-card');
+                authors.forEach((author, index) => {
+                    author.querySelector('.author-number').textContent = index + 1;
+                    const title = index === 0 ? 'Autor Principal' : 'Co-autor';
+                    author.querySelector('h5').textContent = title;
+                });
+            }, 300);
+        }
+    }
+</script>
+
 {% endblock %}

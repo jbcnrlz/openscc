@@ -5,93 +5,455 @@
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link rel="shortcut icon" type="image/svg" href="{% static 'assets/icon/favicon.svg' %}"/>      
-      <link href="{% static 'assets/css/style.css' %}" rel="stylesheet" >
+      <link href="{% static 'assets/css/style.css' %}" rel="stylesheet">
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+      
+      <style>
+        :root {
+          --primary-color: #3498db;
+          --secondary-color: #2c3e50;
+          --accent-color: #e74c3c;
+          --success-color: #27ae60;
+          --warning-color: #f39c12;
+          --light-color: #f8f9fa;
+          --dark-color: #2c3e50;
+          --gradient-primary: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+          --gradient-accent: linear-gradient(135deg, var(--accent-color), #c0392b);
+          --border-radius: 12px;
+          --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+          background: linear-gradient(135deg, #f5f7fa 0%, #e4efe9 100%);
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .navbar {
+          background: var(--gradient-primary) !important;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+          padding: 1rem 0;
+          transition: var(--transition);
+          position: relative;
+          z-index: 1030; /* Bootstrap default navbar z-index */
+        }
+
+        .navbar-brand {
+          font-weight: 700;
+          font-size: 1.5rem;
+          color: white !important;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .logoHeader {
+          height: 40px;
+          width: auto;
+          filter: brightness(0) invert(1);
+          transition: var(--transition);
+        }
+
+        .navbar-brand:hover .logoHeader {
+          transform: scale(1.05);
+        }
+
+        .nav-link {
+          color: rgba(255, 255, 255, 0.9) !important;
+          font-weight: 500;
+          padding: 0.5rem 1rem !important;
+          border-radius: 8px;
+          transition: var(--transition);
+          margin: 0 0.25rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .nav-link:hover, .nav-link.active {
+          color: white !important;
+          background: rgba(255, 255, 255, 0.15);
+          transform: translateY(-1px);
+        }
+
+        .dropdown-menu {
+          background: white;
+          border: none;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 0.5rem;
+          margin-top: 0.5rem;
+        }
+
+        .dropdown-item {
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          font-weight: 500;
+          transition: var(--transition);
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .dropdown-item:hover {
+          background: var(--primary-color);
+          color: white;
+          transform: translateX(5px);
+        }
+
+        .navbar-toggler {
+          border: none;
+          padding: 0.25rem;
+        }
+
+        .navbar-toggler:focus {
+          box-shadow: none;
+        }
+
+        .navbar-toggler-icon {
+          background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        main {
+          flex: 1;
+          padding-bottom: 2rem;
+        }
+
+        .alert {
+          border: none;
+          border-radius: var(--border-radius);
+          padding: 1rem 1.5rem;
+          margin-bottom: 0;
+          box-shadow: var(--box-shadow);
+          font-weight: 500;
+        }
+
+        .alert-success {
+          background: linear-gradient(135deg, var(--success-color), #219653);
+          color: white;
+        }
+
+        .footer {
+          background: var(--secondary-color) !important;
+          color: white;
+          margin-top: auto;
+          padding: 2rem 0 !important;
+        }
+
+        .footer a {
+          color: rgba(255, 255, 255, 0.8);
+          text-decoration: none;
+          transition: var(--transition);
+        }
+
+        .footer a:hover {
+          color: white;
+          transform: translateY(-1px);
+        }
+
+        .footer .nav-link {
+          color: rgba(255, 255, 255, 0.8) !important;
+          padding: 0.25rem 0.5rem !important;
+        }
+
+        .footer .nav-link:hover {
+          color: white !important;
+          background: none;
+          transform: none;
+        }
+
+        /* Floating action button for mobile */
+        .fab-mobile {
+          position: fixed;
+          bottom: 2rem;
+          right: 2rem;
+          background: var(--gradient-primary);
+          color: white;
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          box-shadow: var(--box-shadow);
+          z-index: 1000;
+          transition: var(--transition);
+        }
+
+        .fab-mobile:hover {
+          transform: scale(1.1);
+        }
+
+        /* Smooth scroll behavior */
+        html {
+          scroll-behavior: smooth;
+        }
+
+        /* Loading animation */
+        .loading-spinner {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 3px solid rgba(255,255,255,.3);
+          border-radius: 50%;
+          border-top-color: #fff;
+          animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+          .navbar-brand {
+            font-size: 1.25rem;
+          }
+          
+          .nav-link {
+            padding: 0.75rem 1rem !important;
+            margin: 0.25rem 0;
+          }
+          
+          .dropdown-menu {
+            border-radius: 12px;
+            margin: 0.5rem 0;
+          }
+
+          .fab-mobile {
+            display: flex;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+          }
+          
+          .footer {
+            text-align: center;
+          }
+          
+          .footer .row {
+            flex-direction: column;
+            gap: 1rem;
+          }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: var(--primary-color);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: var(--secondary-color);
+        }
+      </style>
+
       {% block titlePage %}
-        <title>Open Conference Control System</title>
+        <title>OpenSCC - Sistema de Controle de Conferências</title>
       {% endblock %}
   </head>
-  <body class="h-100">    
+  <body>    
     <header id="headerSystem">
-      <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-          <a class="navbar-brand" href="#">
+          <a class="navbar-brand" href="{% url 'submission:confList' %}">
             {% block brandImage %}
-            <a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
-              <img src="{% static 'media/images/logo_openscc.png' %}" alt="Conference logo" class="logoHeader">    
-            </a>
+            <img src="{% static 'media/images/logo_openscc.png' %}" alt="OpenSCC Logo" class="logoHeader">
+            <span>OpenSCC</span>
             {% endblock %}
           </a>
+          
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
+          
           {% block headerPage %}
-            <div class="collapse navbar-collapse d-flex flex-row-reverse" id="navbarNav">
-              <ul class="navbar-nav">
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                  <a class="nav-link active" aria-current="page" href="{% url 'submission:confList' %}">Eventos</a>
+                  <a class="nav-link" href="{% url 'submission:confList' %}">
+                    <i class="fas fa-calendar-alt"></i>
+                    Eventos
+                  </a>
                 </li>
-                  {% if user.is_authenticated %}
-                    <li class="nav-item dropdown">
-                      <a class="nav-link dropdown-toggle" href="javascript:;" role="button" id="navbarDropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ user.username }}
+                  
+                {% if user.is_authenticated %}
+                  <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="javascript:;" role="button" id="navbarDropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
+                      <i class="fas fa-user-circle"></i>
+                      {{ user.username }}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                      <a class="dropdown-item" href="{% url 'submission:perfil' %}">
+                        <i class="fas fa-calendar-check"></i>
+                        Minhas Inscrições
                       </a>
-                      <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-                        <a class="dropdown-item" href="{% url 'submission:perfil' %}">Minhas inscrições</a>
-                        <a class="dropdown-item" href="{% url 'submission:artigos' %}">Meus artigos</a>
-                        <a class="dropdown-item" href="{% url 'submission:logout' %}">Logout</a>
-                      </div>
-                    </li>
-                  {% else %}
-                    <li class="nav-item">
-                      <a class="nav-link" href="{% url 'submission:login' %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person" viewBox="0 0 16 16">
-                          <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
-                        </svg>
+                      <a class="dropdown-item" href="{% url 'submission:artigos' %}">
+                        <i class="fas fa-file-alt"></i>
+                        Meus Artigos
                       </a>
-                    </li>
-                  {% endif %}                
+                      <div class="dropdown-divider"></div>
+                      <a class="dropdown-item" href="{% url 'submission:logout' %}">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Sair
+                      </a>
+                    </div>
+                  </li>
+                {% else %}
+                  <li class="nav-item">
+                    <a class="nav-link" href="{% url 'submission:login' %}">
+                      <i class="fas fa-sign-in-alt"></i>
+                      Entrar
+                    </a>
+                  </li>
+                {% endif %}                
               </ul>
             </div>
           {% endblock %}
         </div>
       </nav>
     </header>    
+
     <main>
       {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-success" role="alert">
-            {{ message }}
-          </div>
-        {% endfor %}
+        <div class="container mt-3">
+          {% for message in messages %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <i class="fas fa-check-circle me-2"></i>
+              {{ message }}
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
       {% endif %}
+      
       {% block mainContent %}
       {% endblock %}
     </main>
-    
-    <footer class="footer mt-auto py-3 bg-light">
-      <div class="container">
-        <div class="row">
-          <p class="col-md-4 mb-0 text-body-secondary">
-            &copy; {% now "Y" %} <a href="http://www.fatecmarilia.edu.br">FATEC Marília</a>
-          </p>
 
+    <!-- Floating Action Button for Mobile -->
+    <a href="{% url 'submission:confList' %}" class="fab-mobile">
+      <i class="fas fa-calendar-alt"></i>
+    </a>
+    
+    <footer class="footer py-4">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-lg-4 text-lg-start">
+            <p class="mb-0">
+              &copy; {% now "Y" %} <a href="http://www.fatecmarilia.edu.br" class="fw-bold">FATEC Marília</a>
+            </p>
+          </div>
+          
           {% block FooterbrandImage %}
-          <a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
-            <svg class="bi me-2" width="40" height="32"><use xlink:href="#bootstrap"></use></svg>
-          </a>
+          <div class="col-lg-4 text-center my-3 my-lg-0">
+            <a href="/" class="text-decoration-none">
+              <div class="d-flex align-items-center justify-content-center">
+                <img src="{% static 'media/images/logo_openscc.png' %}" alt="OpenSCC Logo" height="30" class="me-2">
+                <span class="fw-bold text-white">OpenSCC</span>
+              </div>
+            </a>
+          </div>
           {% endblock %}
       
-          <ul class="nav col-md-4 justify-content-end">
-            <li class="nav-item"><a href="{% url 'submission:confList' %}" class="nav-link px-2 text-body-secondary">Eventos</a></li>
-          </ul>
+          <div class="col-lg-4 text-lg-end">
+            <ul class="nav justify-content-center justify-content-lg-end">
+              <li class="nav-item">
+                <a href="{% url 'submission:confList' %}" class="nav-link">
+                  <i class="fas fa-calendar-alt me-1"></i>
+                  Eventos
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="{% static 'js/script.js' %}"></script>
-  </body>
 
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                navbar.style.padding = '0.5rem 0';
+                navbar.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.15)';
+            } else {
+                navbar.style.padding = '1rem 0';
+                navbar.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.1)';
+            }
+        });
+
+        // Loading states for buttons - VERSÃO CORRIGIDA
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('a.btn, .nav-link[href]');
+            buttons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    // Apenas para links, não para botões de submit
+                    if (this.getAttribute('href') && !this.classList.contains('btn-login')) {
+                        const spinner = document.createElement('span');
+                        spinner.className = 'loading-spinner me-2';
+                        this.prepend(spinner);
+                        this.disabled = true;
+                        
+                        setTimeout(() => {
+                            spinner.remove();
+                            this.disabled = false;
+                        }, 2000);
+                    }
+                });
+            });
+        });
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000);
+            });
+        });
+    </script>
+  </body>
 </html>

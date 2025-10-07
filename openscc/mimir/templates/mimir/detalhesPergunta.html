@@ -1,0 +1,398 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo }}</h2>
+        <div class="btn-group">
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar para Lista
+            </a>
+            <a href="{% url 'mimir:editarPergunta' pergunta.id %}" class="btn btn-warning">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            <a href="#" class="btn btn-danger"
+               onclick="return confirm('Tem certeza que deseja excluir esta pergunta?')">
+                <i class="bi bi-trash"></i> Excluir
+            </a>
+        </div>
+    </div>
+
+    <!-- Cartão Principal -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-info-circle"></i> Informações da Pergunta
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Metadados -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <table class="table table-bordered">
+                        <tr>
+                            <th width="30%">Assunto:</th>
+                            <td>
+                                <span class="badge bg-info">{{ pergunta.assunto.nome }}</span>
+                                <small class="text-muted d-block mt-1">
+                                    Total neste assunto: {{ total_perguntas_assunto }} perguntas
+                                </small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Tipo:</th>
+                            <td>
+                                <span class="badge bg-secondary">{{ pergunta.tipoDePergunta.descricao }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Imagens:</th>
+                            <td>
+                                <span class="badge bg-warning">{{ pergunta.imagens.count }}</span>
+                                <small class="text-muted d-block mt-1">
+                                    {{ pergunta.imagens.count }} imagem(ns) anexada(s)
+                                </small>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-light">
+                        <h6><i class="bi bi-lightbulb"></i> Dicas:</h6>
+                        <ul class="small mb-0">
+                            <li>Use esta visualização para revisar a pergunta antes de aplicar</li>
+                            <li>Verifique se o gabarito está correto e completo</li>
+                            <li>Considere adicionar feedback adicional para os alunos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enunciado -->
+            <div class="mb-4">
+                <h5 class="text-primary">
+                    <i class="bi bi-chat-square-text"></i> Enunciado da Pergunta
+                </h5>
+                <div class="p-3 bg-light rounded border">
+                    {{ pergunta.pergunta|linebreaks }}
+                </div>
+            </div>
+
+            <!-- Imagens da Pergunta -->
+            {% if pergunta.imagens.all %}
+            <div class="mb-4">
+                <h5 class="text-info">
+                    <i class="bi bi-images"></i> Imagens da Pergunta
+                    <span class="badge bg-info ms-2">{{ pergunta.imagens.count }}</span>
+                </h5>
+                <div class="row">
+                    {% for imagem in pergunta.imagens.all %}
+                    <div class="col-md-4 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <img src="{{ imagem.imagem.url }}" 
+                                 class="card-img-top" 
+                                 alt="Imagem da pergunta {{ forloop.counter }}"
+                                 style="height: 200px; object-fit: contain; background-color: #f8f9fa;"
+                                 data-bs-toggle="modal" 
+                                 data-bs-target="#imageModal{{ forloop.counter }}"
+                                 onclick="openImageModal('{{ imagem.imagem.url }}')">
+                            <div class="card-body text-center">
+                                <small class="text-muted">Imagem {{ forloop.counter }}</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal para visualização em tela cheia -->
+                    <div class="modal fade" id="imageModal{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Imagem {{ forloop.counter }} - Pergunta #{{ pergunta.id }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body text-center">
+                                    <img src="{{ imagem.imagem.url }}" 
+                                         class="img-fluid" 
+                                         alt="Imagem da pergunta {{ forloop.counter }}"
+                                         style="max-height: 70vh;">
+                                </div>
+                                <div class="modal-footer">
+                                    <small class="text-muted me-auto">
+                                        Adicionada em: {{ imagem.criado_em|date:"d/m/Y H:i" }}
+                                    </small>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Gabarito/Resposta -->
+            <div class="mb-4">
+                <h5 class="text-success">
+                    <i class="bi bi-check-circle"></i> Gabarito/Resposta Correta
+                </h5>
+                <div class="p-3 bg-success text-white rounded">
+                    {{ pergunta.gabarito|linebreaks }}
+                </div>
+            </div>
+
+            <!-- Análise da Pergunta -->
+            <div class="mb-4">
+                <h5 class="text-info">
+                    <i class="bi bi-graph-up"></i> Análise da Pergunta
+                </h5>
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>Complexidade</h6>
+                                <span class="h4 text-primary">{% if pergunta.pergunta|length > 200 %}Alta{% else %}Média{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>Caracteres</h6>
+                                <span class="h4 text-info">{{ pergunta.pergunta|length }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>Palavras</h6>
+                                <span class="h4 text-warning">{{ pergunta.pergunta|wordcount }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>Imagens</h6>
+                                <span class="h4 text-success">{{ pergunta.imagens.count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="card mt-4">
+        <div class="card-body text-center">
+            <h5 class="mb-3">Ações Rápidas</h5>
+            <div class="btn-group" role="group">
+                <a href="{% url 'mimir:editarPergunta' pergunta.id %}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i> Editar Esta Pergunta
+                </a>
+                {% if pergunta.imagens.all %}
+                <button type="button" class="btn btn-info" onclick="openAllImages()">
+                    <i class="bi bi-images"></i> Ver Todas as Imagens
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Perguntas Relacionadas -->
+    {% if perguntas_mesmo_tipo %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-link"></i> Perguntas do Mesmo Tipo
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for pergunta_rel in perguntas_mesmo_tipo %}
+                <div class="col-md-6 mb-2">
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                        <div>
+                            <small class="text-muted">#{{ pergunta_rel.id }}</small>
+                            <div class="small">{{ pergunta_rel.pergunta|truncatewords:10 }}</div>
+                            {% if pergunta_rel.imagens.count > 0 %}
+                            <small class="text-info">
+                                <i class="bi bi-image"></i> {{ pergunta_rel.imagens.count }} imagem(ns)
+                            </small>
+                            {% endif %}
+                        </div>
+                        <a href="{% url 'mimir:visualizarPergunta' pergunta_rel.id %}" 
+                           class="btn btn-sm btn-outline-primary">Ver</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal único para visualização de imagens -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalTitle">Visualização de Imagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid" alt="Imagem da pergunta" style="max-height: 80vh;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Destacar seções ao passar o mouse
+document.addEventListener('DOMContentLoaded', function() {
+    const sections = document.querySelectorAll('.card');
+    sections.forEach(section => {
+        section.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.transition = 'transform 0.2s';
+        });
+        section.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+
+// Função para abrir modal de imagem
+function openImageModal(imageUrl) {
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    document.getElementById('modalImage').src = imageUrl;
+    modal.show();
+}
+
+// Função para abrir todas as imagens em sequência
+function openAllImages() {
+    const images = document.querySelectorAll('.card-img-top');
+    if (images.length > 0) {
+        let currentIndex = 0;
+        
+        function showNextImage() {
+            if (currentIndex < images.length) {
+                images[currentIndex].click();
+                currentIndex++;
+                // Fechar modal automaticamente após 5 segundos e mostrar próxima
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('imageModal'));
+                    if (modal) {
+                        modal.hide();
+                        setTimeout(showNextImage, 500);
+                    }
+                }, 5000);
+            }
+        }
+        
+        showNextImage();
+    }
+}
+
+// Zoom na imagem ao passar o mouse (para as miniaturas)
+document.querySelectorAll('.card-img-top').forEach(img => {
+    img.addEventListener('mouseenter', function() {
+        this.style.transform = 'scale(1.05)';
+        this.style.transition = 'transform 0.3s ease';
+    });
+    
+    img.addEventListener('mouseleave', function() {
+        this.style.transform = 'scale(1)';
+    });
+});
+
+// Teclas de navegação no modal de imagem
+document.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('imageModal');
+    if (modal.classList.contains('show')) {
+        const images = document.querySelectorAll('.card-img-top');
+        const currentSrc = document.getElementById('modalImage').src;
+        let currentIndex = -1;
+        
+        // Encontrar índice da imagem atual
+        images.forEach((img, index) => {
+            if (img.src === currentSrc) {
+                currentIndex = index;
+            }
+        });
+        
+        if (e.key === 'ArrowRight' && currentIndex < images.length - 1) {
+            images[currentIndex + 1].click();
+        } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+            images[currentIndex - 1].click();
+        } else if (e.key === 'Escape') {
+            bootstrap.Modal.getInstance(modal).hide();
+        }
+    }
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+/* Estilo para as imagens */
+.card-img-top {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.card-img-top:hover {
+    transform: scale(1.02);
+}
+
+/* Modal personalizado */
+.modal-content {
+    border-radius: 10px;
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+/* Responsividade para imagens */
+@media (max-width: 768px) {
+    .col-md-4 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+@media (max-width: 576px) {
+    .col-md-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+</style>
+{% endblock %}

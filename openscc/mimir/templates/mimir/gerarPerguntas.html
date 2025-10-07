@@ -1,0 +1,253 @@
+{% extends 'mimirBase.html' %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <h2>{{ titulo }}</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" id="formGeracao">
+        {% csrf_token %}
+        
+        <!-- Seção Fontes -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>1. Selecione as Fontes</h5>
+            </div>
+            <div class="card-body">
+                {% if form.fontes_selecionadas.errors %}
+                    <div class="alert alert-danger">
+                        {{ form.fontes_selecionadas.errors }}
+                    </div>
+                {% endif %}
+                
+                <div class="row">
+                    {% for fonte in form.fontes_selecionadas %}
+                    <div class="col-md-6 mb-2">
+                        <div class="form-check">
+                            {{ fonte.tag }}
+                            <label class="form-check-label" for="{{ fonte.id_for_label }}">
+                                {{ fonte.choice_label }}
+                            </label>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            Nenhuma fonte cadastrada. <a href="{% url 'adicionar_fonte' %}">Cadastre uma fonte primeiro</a>.
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Seção Quantidades -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>2. Quantidade de Perguntas por Tipo</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for tipo in tipos_pergunta %}
+                    <div class="col-md-4 mb-3">
+                        <label for="id_tipo_{{ tipo.id }}" class="form-label">
+                            {{ tipo.descricao }}
+                        </label>
+                        <input type="number" 
+                               name="tipo_{{ tipo.id }}" 
+                               id="id_tipo_{{ tipo.id }}"
+                               class="form-control quantidade-input" 
+                               min="0" max="50" value="0"
+                               onchange="calcularTotal()">
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            Nenhum tipo de pergunta cadastrado.
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3">
+                    <strong>Total: </strong>
+                    <span id="total-perguntas" class="badge bg-primary">0</span> perguntas
+                </div>
+                <div class="form-text">Defina pelo menos uma quantidade maior que zero</div>
+            </div>
+        </div>
+        
+        <!-- Seção Configurações -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>3. Configurações Adicionais</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.assunto.id_for_label }}" class="form-label">
+                            {{ form.assunto.label }} *
+                        </label>
+                        {{ form.assunto }}
+                        {% if form.assunto.errors %}
+                            <div class="text-danger">{{ form.assunto.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.nivel_dificuldade.id_for_label }}" class="form-label">
+                            Nível de Dificuldade *
+                        </label>
+                        {{ form.nivel_dificuldade }}
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.prompt_personalizado.id_for_label }}" class="form-label">
+                        {{ form.prompt_personalizado.label }}
+                    </label>
+                    {{ form.prompt_personalizado }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button type="submit" class="btn btn-primary btn-lg" id="submitButton">
+                <i class="bi bi-magic"></i> Gerar Perguntas
+            </button>
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary btn-lg">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Modal de Carregamento -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">Processando...</h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Processando...</span>
+                </div>
+                <div class="mt-3">
+                    <h6>Gerando perguntas com IA</h6>
+                    <p class="text-muted">Isso pode levar alguns instantes. Por favor, aguarde.</p>
+                </div>
+                <div class="progress mt-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    calcularTotal();
+    
+    // Interceptar o envio do formulário
+    document.getElementById('formGeracao').addEventListener('submit', function(e) {
+        e.preventDefault(); // Impedir envio imediato
+        
+        const total = calcularTotal();
+        const fontesSelecionadas = document.querySelectorAll('input[name="fontes_selecionadas"]:checked');
+        const assunto = document.getElementById('{{ form.assunto.id_for_label }}');
+        
+        // Validações
+        if (total === 0) {
+            alert('Selecione pelo menos uma quantidade de perguntas maior que zero.');
+            return false;
+        }
+        
+        if (fontesSelecionadas.length === 0) {
+            alert('Selecione pelo menos uma fonte.');
+            return false;
+        }
+        
+        if (!assunto.value) {
+            alert('Selecione um assunto.');
+            return false;
+        }
+        
+        // Mostrar modal de carregamento
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        loadingModal.show();
+        
+        // Desabilitar botão de submit
+        document.getElementById('submitButton').disabled = true;
+        document.getElementById('submitButton').innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
+        
+        // Enviar formulário após um pequeno delay para o modal aparecer
+        setTimeout(() => {
+            // Reativar o formulário e enviar
+            this.submit();
+        }, 1000);
+    });
+});
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.quantidade-input').forEach(input => {
+        total += parseInt(input.value) || 0;
+    });
+    
+    const totalElement = document.getElementById('total-perguntas');
+    totalElement.textContent = total;
+    
+    if (total === 0) {
+        totalElement.className = 'badge bg-danger';
+    } else {
+        totalElement.className = 'badge bg-primary';
+    }
+    
+    return total;
+}
+
+// Atualizar total quando os inputs mudarem
+document.querySelectorAll('.quantidade-input').forEach(input => {
+    input.addEventListener('change', calcularTotal);
+    input.addEventListener('input', calcularTotal);
+});
+</script>
+
+<style>
+/* Estilos para o modal de carregamento */
+#loadingModal .modal-content {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+#loadingModal .spinner-border {
+    border-width: 0.3em;
+}
+
+#loadingModal .progress {
+    height: 6px;
+    border-radius: 3px;
+}
+
+/* Desabilitar interação com o conteúdo de fundo */
+.modal-backdrop {
+    opacity: 0.8 !important;
+}
+
+/* Estilo para botão desabilitado */
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
+{% endblock %}

@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 import datetime, uuid
+from django.utils import timezone
+from django.core.exceptions import ValidationError
 # Create your models here.
 class Conferencia(models.Model):
     nome = models.CharField(max_length=400)
@@ -39,6 +41,16 @@ class Autores(models.Model):
 
     def __str__(self):
         return self.nome + " - " + self.email
+    
+    class Meta:
+        verbose_name = "Autor"
+        verbose_name_plural = "Autores"
+        ordering = ['-principal', 'nome']
+    
+    def clean(self):
+        """Validações do autor"""
+        if self.email and not '@' in self.email:
+            raise ValidationError({'email': 'E-mail inválido.'})
 
 def content_file_name(instance, filename):
     newFilename = str(uuid.uuid4()) + filename[filename.rfind('.'):]
@@ -66,6 +78,27 @@ class Artigo(models.Model):
 
     def __str__(self):
         return self.titulo + " - " + self.user.username
+    
+    class Meta:
+        verbose_name = "Artigo"
+        verbose_name_plural = "Artigos"
+        ordering = ['-dataEnvio']
+    
+    def clean(self):
+        """Validações adicionais do modelo"""
+        if self.dataEnvio and self.dataEnvio > timezone.now().date():
+            raise ValidationError({'dataEnvio': 'A data de envio não pode ser no futuro.'})
+    
+    def pode_editar(self, user):
+        """Verifica se o usuário pode editar o artigo"""
+        return self.user == user and self.status == 0  # Apenas se estiver aguardando avaliação
+    
+    def get_prazo_avaliacao(self):
+        """Calcula prazo estimado para avaliação"""
+        if self.status == 0:  # Aguardando avaliação
+            dias_decorridos = (timezone.now().date() - self.dataEnvio).days
+            return max(0, 30 - dias_decorridos)  # Prazo de 30 dias
+        return None
 
 class EnderecoInstituicao(models.Model):
     logradouro = models.CharField(max_length=200)
@@ -132,6 +165,25 @@ class Atividade(models.Model):
 
     def __str__(self):
         return self.nome
+
+    def get_conflicting_activities(self, user_id):
+        """Retorna atividades conflitantes para o usuário"""
+        from django.db.models import Q
+        return Atividade.objects.filter(
+            Q(data__date=self.data.date()),
+            Q(data__time=self.data.time()),
+            participantes__id=user_id
+        ).exclude(id=self.id)
+    
+    def get_user_participation(self, user_id):
+        """Retorna o objeto de participação do usuário"""
+        try:
+            return ParticipanteAtividade.objects.get(
+                atividade=self,
+                user__id=user_id
+            )
+        except ParticipanteAtividade.DoesNotExist:
+            return None
     
 class ParticipanteAtividade(models.Model):
     atividade = models.ForeignKey(Atividade,on_delete=models.CASCADE)

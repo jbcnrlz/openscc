@@ -1,0 +1,54 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <h2>Dashboard do professor</h2>
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Fontes</h5>
+                    <p class="card-text">Gerencie suas fontes. Faça upload e remova fontes desnecessárias. Elas podem ser usadas para geração de problemas e para geração de questões</p>
+                    <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-primary">Gerenciar fontes</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Templates</h5>
+                    <p class="card-text">Crie e gerencie templates de problemas.</p>
+                    <a href="#" class="btn btn-primary">Gerenciar templates</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Perguntas</h5>
+                    <p class="card-text">Gerencie seu banco de questões. Gere novas questões, remova questões antigas</p>
+                    <a href="{% url 'mimir:visualizarPerguntas'%}" class="btn btn-primary">Gerenciar Questões</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Problemas</h5>
+                    <p class="card-text">Gerencie e gere novos problemas</p>
+                    <a href="#" class="btn btn-primary">Gerenciar problemas</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Provas</h5>
+                    <p class="card-text">Crie e imprima provas, gabaritos e folhas de resposta</p>
+                    <a href="{% url 'mimir:listarProvas' %}" class="btn btn-primary">Gerenciar provas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

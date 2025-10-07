@@ -1,26 +1,636 @@
 {% extends "base_openscc.html" %}
-{% block mainContent %}
+
 {% load submission_extras %}
 
-<div class="container">    
-    <h2>Sua lista de eventos: </h2>
-    {% for c, atvs in conferencias.items %}
-        <h3>{{c}}</h3>
-        <div class="d-flex flex-column flex-md-row gap-3">
-            {% for a in atvs %}
-                <div class="card" style="width: 18rem;">
-                    <div class="card-body">
-                        <h5 class="card-title">{{a.nome}}</h5>
-                        <h6 class="card-subtitle mb-2 text-muted">{{ a.data }} - {{ a.local }}</h6>
-                        {% if a|isPresent:usuario.id %}
-                            <p class="card-text alert alert-warning">Você já está com a presença registrada nesta atividade.</p>
-                        {% else %}
-                            <a href="{% url 'submission:generateQRCode' atvId=a.id partId=usuario.id %}" type="button" class="btn btn-primary">Gerar QR Code</a>
-                        {% endif %}                        
+{% block mainContent %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --primary-color: #3498db;
+        --secondary-color: #2c3e50;
+        --accent-color: #e74c3c;
+        --success-color: #28a745;
+        --warning-color: #ffc107;
+        --info-color: #17a2b8;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --border-radius: 10px;
+        --box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        --transition: all 0.3s ease;
+    }
+
+    .activities-page {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+        box-shadow: var(--box-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+        opacity: 0.1;
+    }
+
+    .page-title {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        position: relative;
+    }
+
+    .page-subtitle {
+        font-size: 1.1rem;
+        font-weight: 300;
+        opacity: 0.9;
+    }
+
+    .content-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        text-align: center;
+        transition: var(--transition);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .conference-section {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        transition: var(--transition);
+    }
+
+    .conference-section:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    }
+
+    .conference-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--secondary-color);
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--light-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .conference-title i {
+        color: var(--primary-color);
+    }
+
+    .activities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .activity-card {
+        background: var(--light-color);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        border-left: 4px solid var(--primary-color);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .activity-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .activity-card.today {
+        border-left-color: var(--warning-color);
+        background: linear-gradient(135deg, #fff8e1, #fff);
+    }
+
+    .activity-card.completed {
+        border-left-color: var(--success-color);
+        background: linear-gradient(135deg, #e8f5e8, #fff);
+    }
+
+    .activity-card.upcoming {
+        border-left-color: var(--info-color);
+        background: linear-gradient(135deg, #e3f2fd, #fff);
+    }
+
+    .activity-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+    }
+
+    .activity-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--dark-color);
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .status-today {
+        background: rgba(255, 193, 7, 0.15);
+        color: var(--warning-color);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .status-upcoming {
+        background: rgba(23, 162, 184, 0.15);
+        color: var(--info-color);
+        border: 1px solid rgba(23, 162, 184, 0.3);
+    }
+
+    .status-completed {
+        background: rgba(40, 167, 69, 0.15);
+        color: var(--success-color);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .activity-details {
+        margin-bottom: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .detail-item i {
+        color: var(--primary-color);
+        width: 16px;
+    }
+
+    .activity-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-primary {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        font-size: 0.9rem;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary:hover {
+        background: #2980b9;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-success {
+        background: var(--success-color);
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: var(--transition);
+        font-size: 0.9rem;
+    }
+
+    .btn-success:hover {
+        background: #218838;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-disabled {
+        background: #6c757d;
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .presence-badge {
+        background: rgba(40, 167, 69, 0.1);
+        color: var(--success-color);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #dee2e6;
+    }
+
+    .filter-container {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .filter-title {
+        font-weight: 500;
+        margin-bottom: 1rem;
+        color: var(--secondary-color);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-options {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        background: var(--light-color);
+        border: 1px solid #dee2e6;
+        color: var(--dark-color);
+        transition: var(--transition);
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .filter-btn.active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 2rem 0;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+        }
+
+        .activities-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .activity-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .stats-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filter-options {
+            flex-direction: column;
+        }
+
+        .filter-btn {
+            text-align: center;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .content-container {
+            padding: 0 1rem;
+        }
+
+        .conference-section {
+            padding: 1.5rem;
+        }
+
+        .activity-card {
+            padding: 1.25rem;
+        }
+
+        .stats-container {
+            grid-template-columns: 1fr;
+        }
+
+        .activity-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary, .btn-success, .btn-disabled {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="activities-page">
+    <div class="page-header">
+        <div class="content-container">
+            <h1 class="page-title">Minhas Atividades</h1>
+            <p class="page-subtitle">Acompanhe suas atividades e gere QR Codes para presença</p>
+            <small>Data de hoje: {{ data_hoje }}</small>
+        </div>
+    </div>
+
+    <div class="content-container">
+        <!-- Cards de Estatísticas -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--primary-color);">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.total }}</div>
+                <div class="stat-label">Total de Atividades</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--warning-color);">
+                    <i class="fas fa-sun"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.hoje }}</div>
+                <div class="stat-label">Para Hoje</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--info-color);">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.futuras }}</div>
+                <div class="stat-label">Próximas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--success-color);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number">{{ estatisticas.passadas }}</div>
+                <div class="stat-label">Realizadas</div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filter-container">
+            <h3 class="filter-title">
+                <i class="fas fa-filter"></i>
+                Filtrar atividades:
+            </h3>
+            <div class="filter-options">
+                <button class="filter-btn active" data-filter="all">Todas</button>
+                <button class="filter-btn" data-filter="today">Para Hoje</button>
+                <button class="filter-btn" data-filter="upcoming">Próximas</button>
+                <button class="filter-btn" data-filter="completed">Realizadas</button>
+            </div>
+        </div>
+
+        <!-- Lista de Conferências e Atividades -->
+        {% if conferencias %}
+            {% for conferencia_nome, atividades in conferencias.items %}
+                <div class="conference-section" data-conference="{{ conferencia_nome }}">
+                    <h2 class="conference-title">
+                        <i class="fas fa-university"></i>
+                        {{ conferencia_nome }}
+                    </h2>
+                    
+                    <div class="activities-grid">
+                        {% for atividade in atividades %}
+                            <div class="activity-card {{ atividade.status }}" data-status="{{ atividade.status }}">
+                                <div class="activity-header">
+                                    <h3 class="activity-name">{{ atividade.nome }}</h3>
+                                    <span class="status-badge {{ atividade.status_class }}">
+                                        <i class="fas 
+                                            {% if atividade.status == 'today' %}fa-sun
+                                            {% elif atividade.status == 'upcoming' %}fa-clock
+                                            {% else %}fa-check-circle{% endif %}">
+                                        </i>
+                                        {{ atividade.status_text }}
+                                    </span>
+                                </div>
+                                
+                                <div class="activity-details">
+                                    <div class="detail-item">
+                                        <i class="fas fa-calendar"></i>
+                                        <strong>Data:</strong> {{ atividade.data_display }}
+                                    </div>
+                                    <div class="detail-item">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <strong>Local:</strong> {{ atividade.local }}
+                                    </div>
+                                    {% if atividade.horario %}
+                                    <div class="detail-item">
+                                        <i class="fas fa-clock"></i>
+                                        <strong>Horário:</strong> {{ atividade.horario }}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Informações de Presença -->
+                                    {% if atividade.ja_presente %}
+                                    <div class="detail-item" style="color: var(--success-color);">
+                                        <i class="fas fa-check-circle"></i>
+                                        <strong>Presença registrada em:</strong> 
+                                        {{ atividade.data_registro_presenca|date:"d/m/Y H:i" }}
+                                    </div>
+                                    {% elif atividade.status == "completed" and not atividade.ja_presente %}
+                                    <div class="detail-item" style="color: var(--accent-color);">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>Presença não registrada</strong>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="activity-actions">
+                                    {% if atividade.ja_presente %}
+                                        <span class="presence-badge">
+                                            <i class="fas fa-check-circle"></i>
+                                            Presença Confirmada
+                                        </span>
+                                    {% else %}
+                                        {% if atividade.status == "completed" %}
+                                            <span class="btn-disabled">
+                                                <i class="fas fa-qrcode"></i>
+                                                Período Encerrado
+                                            </span>
+                                        {% else %}
+                                            <a href="{% url 'submission:generateQRCode' atvId=atividade.id partId=usuario.id %}" class="btn-primary">
+                                                <i class="fas fa-qrcode"></i>
+                                                Gerar QR Code
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                    {% if atividade.descricao %}
+                                    <button class="btn-primary" style="background: var(--secondary-color);" onclick="alert('{{ atividade.descricao|escapejs }}')">
+                                        <i class="fas fa-info-circle"></i>
+                                        Detalhes
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
                 </div>
             {% endfor %}
-        </div>
-    {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <h3>Nenhuma atividade encontrada</h3>
+                <p>Você não está inscrito em nenhuma atividade no momento.</p>
+                <a href="{% url 'submission:conferencias' %}" class="btn-primary" style="margin-top: 1rem;">
+                    <i class="fas fa-search"></i>
+                    Explorar Conferências
+                </a>
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const activityCards = document.querySelectorAll('.activity-card');
+        const conferenceSections = document.querySelectorAll('.conference-section');
+        
+        // Filtro de atividades por status
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove a classe active de todos os botões
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Adiciona a classe active ao botão clicado
+                this.classList.add('active');
+                
+                const filterValue = this.getAttribute('data-filter');
+                
+                conferenceSections.forEach(section => {
+                    let hasVisibleActivities = false;
+                    const activitiesInSection = section.querySelectorAll('.activity-card');
+                    
+                    activitiesInSection.forEach(card => {
+                        const status = card.getAttribute('data-status');
+                        
+                        if (filterValue === 'all' || status === filterValue) {
+                            card.style.display = 'block';
+                            hasVisibleActivities = true;
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                    
+                    // Mostra/oculta a seção da conferência baseado nas atividades visíveis
+                    section.style.display = hasVisibleActivities ? 'block' : 'none';
+                });
+            });
+        });
+
+        // Adicionar animações de entrada
+        activityCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+
 {% endblock %}

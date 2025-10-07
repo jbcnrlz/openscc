@@ -1,0 +1,114 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <h2>Editar Prova: {{ prova.titulo }}</h2>
+    
+    <!-- Formulário de edição da prova -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Informações da Prova</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="{{ form.titulo.id_for_label }}">Título</label>
+                            {{ form.titulo }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="{{ form.descricao.id_for_label }}">Descrição</label>
+                            {{ form.descricao }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="{{ form.assunto.id_for_label }}">Assunto</label>
+                            {{ form.assunto }}
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" name="editar_prova" class="btn btn-primary">Atualizar Prova</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Perguntas existentes no mesmo assunto -->
+    {% if perguntas_disponiveis %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Perguntas Disponíveis (Mesmo Assunto)</h5>
+        </div>
+        <div class="card-body">
+            {% for pergunta in perguntas_disponiveis %}
+            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                <div>
+                    <h6>{{ pergunta.pergunta|truncatewords:10 }}</h6>
+                    <small class="text-muted">Tipo: {{ pergunta.tipoDePergunta }}</small>
+                </div>
+                <form method="post" action="{% url 'mimir:adicionarPerguntaExistente' prova.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="pergunta_id" value="{{ pergunta.id }}">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Adicionar</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Perguntas da prova -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Perguntas da Prova ({{ perguntas_prova.count }})</h5>
+        </div>
+        <div class="card-body">
+            {% if perguntas_prova %}
+                {% for pergunta in perguntas_prova %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6>Pergunta {{ forloop.counter }}</h6>
+                                <p><strong>Pergunta:</strong> {{ pergunta.pergunta }}</p>
+                                <p><strong>Gabarito:</strong> {{ pergunta.gabarito }}</p>
+                                <p><strong>Tipo:</strong> {{ pergunta.tipoDePergunta }}</p>
+                            </div>
+                            <div>
+                                <form method="post" action="{% url 'mimir:removerPerguntaProva' prova.id pergunta.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Remover</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">Nenhuma pergunta adicionada à prova ainda.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- No template editar_prova.html, após o formulário de edição -->
+    <div class="card">
+        <div class="card-header">
+            <h5>Impressão</h5>
+        </div>
+        <div class="card-body">
+            <p>Gere a prova, folha de resposta e gabarito para impressão.</p>
+            <a href="{% url 'mimir:opcoesImpressao' prova.id %}" class="btn btn-primary">
+                <i class="fas fa-print"></i> Opções de Impressão
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

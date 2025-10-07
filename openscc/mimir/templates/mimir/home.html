@@ -1,0 +1,237 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<p>{{ resposta }}</p>
+<div class="container">
+    <h1 class="mb-4">Geração de perguntas</h1>
+    <div class="row">
+        <!-- Fontes Submetidas -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Fontes submetidas</h5>
+                    <div id="messageArea"></div>
+                    <div id="fontList" class="mb-3">
+                    </div>
+                    <form method="post" enctype="multipart/form-data" id="uploadForm">
+                        {% csrf_token %}
+                        {{ form }}
+                        <button class="btn btn-primary w-100" type="submit">Submeter Artigo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tipos de Pergunta -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Tipos de Pergunta</h5>
+                    <form action="" method="post" id="questionForm">
+                        {% csrf_token %}
+                        <div class="list-group mb-3">
+                            {% for tipo in tiposDePergunta %}
+                                <label class="list-group-item d-flex align-items-center">
+                                    <input class="form-text me-2" type="text" name="qtd_{{ tipo.descricao }}" id="qtd_{{ tipo.descricao }}">
+                                    {{ tipo.descricao }}
+                                    <input type="hidden" name="extra_{{ tipo.descricao }}" id="extra_{{ tipo.descricao }}" value="{{ tipo.textoParaLLM }}">
+                                </label>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Gerar Perguntas</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Perguntas Geradas -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Perguntas Geradas</h5>
+                    <div id="generatedQuestions" class="text-muted text-center p-5">
+                        <p>As perguntas geradas aparecerão aqui.<br>Selecione uma fonte e os tipos de pergunta para começar.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block ScriptCode %}
+<script>
+    function addValidation(){
+        $(".saveQuestionForm").on("submit",function(e){                        
+            e.preventDefault();
+            $.ajax({
+                url: '{% url "mimir:salvarPerguntas" %}',
+                type: 'POST',
+                contentType: 'application/json',
+                data : JSON.stringify(
+                    {
+                        pergunta: $(this).find('[name="pergunta"]').val(),
+                        assunto: $(this).find('[name="assunto"]').val()
+                    }
+                ),
+                success: function(response) {
+                    alert('oi');
+                },
+                error: function(xhr, status, error) {
+                    alert('nao');
+                }
+            });
+        });
+    }
+    $(document).ready(function() {
+        $("#questionForm").on("submit", function(e) {
+            e.preventDefault();
+            // Aqui você pode adicionar a lógica para gerar perguntas
+            $('#generatedQuestions').html('<div class="spinner-border text-primary" role="status"></div>');
+            let formData = $(this).serialize();
+            console.log(formData);
+            $.ajax({
+                url: '{% url "mimir:gerarPerguntas" %}',
+                type: 'GET',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    $('#generatedQuestions').html('');
+                    if (response.status === 'success') {
+                        jsonParseado = parsearJSONRobusto(response.perguntas);
+                        console.log(response.assuntos);
+                        console.log(jsonParseado)
+                        for (let i = 0;i < jsonParseado.perguntas.length;i++) {                            
+                            let pergunta = jsonParseado.perguntas[i];
+                            let cardHolder = $('<div class="card mb-3"></div>');
+                            cardHolder.append('<div class="card-header">' + pergunta.tipo + '</div>');
+                            let cardBody = $('<div class="card-body"></div>');
+                            cardBody.append('<h5 class="card-title">' + escapeHTMLRapido(pergunta.enunciado).replace(/\n/g, '<br>') + '</h5>');
+                            let textoPerguntas = '';
+                            if (pergunta.alternativas){                                
+                                for (let j = 0;j < pergunta.alternativas.length;j++) {
+                                    cardBody.append('<p class="card-text">' + escapeHTMLRapido(pergunta.alternativas[j].replace(/\n/g, '<br>')) + '</p>');
+                                    textoPerguntas += escapeHTMLRapido(pergunta.alternativas[j]) + '\n';
+                                }
+                            }
+                            cardBody.append('<p class="card-text"><strong>Resposta:</strong><br>' + escapeHTMLRapido(pergunta.resposta.replace(/\n/g, '<br>')) + '</p>');
+                            cardHolder.append(cardBody);
+                            let selectAssunto = '<select name="assunto" class="form-select mb-2">';
+                            for (const [key, value] of Object.entries(response.assuntos)) {
+                                selectAssunto += '<option value="' + key + '">' + escapeHTMLRapido(value) + '</option>';
+                            }
+                            selectAssunto += '</select>';
+                            let hiddenForm = $('<form method="POST" class="saveQuestionForm"><input type="hidden" name="pergunta" value=\'' + JSON.stringify(pergunta).replace(/'/g, "&apos;") + '\'>'+selectAssunto+'<button type="submit" class="btn btn-success">Salvar Pergunta</button></form>');
+                            cardBody.append(hiddenForm);
+                            $('#generatedQuestions').append(cardHolder);
+                        }                        
+                        addValidation();                     
+                    } else {
+                        $('#fontList').html('<p style="color: red;">Erro: ' + response.message + '</p>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#generatedQuestions').html('');
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        $('#fontList').html('<p style="color: red;">Erro: ' + response.message + '</p>');
+                    } catch (e) {
+                        $('#fontList').html('<p style="color: red;">Erro desconhecido: ' + error + '</p>');
+                    }
+                }
+            });
+        });
+
+        $('#uploadForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            var formData = new FormData();
+            var fileInput = $('#id_fonte')[0];
+            
+            if (fileInput.files.length === 0) {
+                $('#messageArea').html('<p style="color: red;">Selecione um arquivo</p>');
+                return;
+            }
+            
+            // Adiciona o arquivo e o CSRF token ao FormData
+            formData.append('file', fileInput.files[0]);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            // Mostra loading
+            $('#messageArea').html('<p>Enviando arquivo...</p>');
+            
+            $.ajax({
+                url: '{% url "mimir:uploadFile" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $("#questionForm").append('<input type="hidden" name="urlFonte[]" value="' + response.file_url + '">');
+                        $("#messageArea").html('<p style="color: green;">Arquivo enviado com sucesso!</p>');
+
+                        let cardHolderFile = $('<div class="card mb-3"></div>');
+                        cardHolderFile.attr('id', 'file-card-' + response.file_id);
+
+                        cardHolderFile.append('<div class="card-header">' + response.file_name + '</div>');
+
+                        let cardBodyFile = $('<div class="card-body"></div>');
+                        cardBodyFile.append('<div class="d-flex align-items-center mb-3">' +
+                                        '<i class="fas fa-file me-3" style="font-size: 2rem;"></i>' +
+                                        '<div><h5 class="card-title mb-0">' + response.file_name + '</h5>' +
+                                        '<small class="text-muted">' + response.file_url + '</small></div>' +
+                                        '</div>');
+
+                        cardBodyFile.append('<div class="text-end">' +
+                                        '<a href="#" class="btn btn-sm btn-danger" onclick="removeFileActions('+response.file_id+',\''+response.file_url+'\'); return false;">' +
+                                        '<i class="fas fa-trash me-1"></i>Excluir</a>' +
+                                        '</div>');
+
+                        cardHolderFile.append(cardBodyFile);
+                        $('#fontList').append(cardHolderFile);
+                    } else {
+                        $('#fontList').html('<p style="color: red;">Erro: ' + response.message + '</p>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        $('#fontList').html('<p style="color: red;">Erro: ' + response.message + '</p>');
+                    } catch (e) {
+                        $('#fontList').html('<p style="color: red;">Erro desconhecido: ' + error + '</p>');
+                    }
+                }
+            });
+        });        
+    });
+    function deleteFile(fileId) {
+        $.ajax({
+            url: '{% url "mimir:excluirFonte" %}',
+            method: 'POST',
+            data: {
+                'file_id': fileId
+            },
+            success: function() {
+                $('#file-card-' + fileId).remove();
+            },
+            error: function() {
+                alert('Erro ao excluir o arquivo');
+            }
+        });
+
+    };
+    function removerCampoPorValor(seletor, valor) {
+        $(seletor).each(function() {
+            if ($(this).val() === valor) {
+                $(this).remove();
+            }
+        });
+    }
+    function removeFileActions(fileId, fileUrl) {
+        deleteFile(fileId);
+        removerCampoPorValor('input[name="urlFonte[]"]', fileUrl);
+    }
+</script>
+{% endblock %}

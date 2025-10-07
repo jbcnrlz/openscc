@@ -1,0 +1,45 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Fontes</h2>
+        <a href="{% url 'mimir:addFontes' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Adicionar nova fonte
+        </a>
+    </div>
+
+    {% if sources %}
+        <div class="row">
+            {% for source in sources %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ source.nome }}</h5>
+                        <p class="card-text">{{ source.descricao|truncatewords:30 }}</p>
+                        <p class="text-muted">
+                            <small>Upload em: {{ source.dataCriacao|date:"M d, Y" }}</small>
+                        </p>
+                        <div class="btn-group">
+                            <a href="{{ source.fonte.url }}" class="btn btn-info btn-sm" target="_blank">
+                                Visualizar arquivo
+                            </a>
+                            <a href="{% url 'mimir:updateFonte' source.id %}" class="btn btn-warning btn-sm">
+                                Editar
+                            </a>
+                            <a href="{% url 'mimir:deletarFonte' source.id %}" class="btn btn-danger btn-sm">
+                                Deletar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Nenhuma fonte feita upload. Clique em "Adicionar nova fonte" para começar.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

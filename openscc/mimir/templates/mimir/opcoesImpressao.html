@@ -1,0 +1,78 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Opções de Impressão - {{ prova.titulo }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                    <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                                    <h5>Prova Completa</h5>
+                                    <p class="text-muted">Prova com todas as perguntas</p>
+                                </div>
+                                <div class="card-footer">
+                                    <a href="{% url 'mimir:imprimirProva' prova.id %}?pdf" class="btn btn-primary btn-sm me-1" target="_blank">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                    <a href="{% url 'mimir:imprimirProva' prova.id %}" class="btn btn-secondary btn-sm" target="_blank">
+                                        <i class="fas fa-print"></i> Visualizar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                    <i class="fas fa-edit fa-3x text-success mb-3"></i>
+                                    <h5>Folha de Resposta</h5>
+                                    <p class="text-muted">Folha com linhas para respostas</p>
+                                </div>
+                                <div class="card-footer">
+                                    <a href="{% url 'mimir:imprimirFolhaResposta' prova.id %}?pdf" class="btn btn-primary btn-sm me-1" target="_blank">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                    <a href="{% url 'mimir:imprimirFolhaResposta' prova.id %}" class="btn btn-secondary btn-sm" target="_blank">
+                                        <i class="fas fa-print"></i> Visualizar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                    <i class="fas fa-check-circle fa-3x text-warning mb-3"></i>
+                                    <h5>Gabarito</h5>
+                                    <p class="text-muted">Respostas corretas da prova</p>
+                                </div>
+                                <div class="card-footer">
+                                    <a href="{% url 'mimir:imprimirGabarito' prova.id %}?pdf" class="btn btn-primary btn-sm me-1" target="_blank">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                    <a href="{% url 'mimir:imprimirGabarito' prova.id %}" class="btn btn-secondary btn-sm" target="_blank">
+                                        <i class="fas fa-print"></i> Visualizar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar para Edição
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
