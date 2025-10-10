@@ -2,7 +2,7 @@ import tempfile, os, json, re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from .models import *
-from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm
+from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm
 from django.contrib import messages
 from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto
 from django.http import JsonResponse, HttpResponse
@@ -763,3 +763,47 @@ def gerarPdfProva(request, context, tipo):
 def opcoesImpressao(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     return render(request, 'mimir/opcoesImpressao.html', {'prova': prova})
+
+
+@login_required
+def temaCreate(request):
+    if request.method == 'POST':
+        form = TemaForm(request.POST)
+        if form.is_valid():
+            tema = form.save(commit=False)
+            # Define o usuário logado como o usuário do tema
+            tema.usuario = request.user
+            # Agora salva no banco de dados
+            tema.save()
+            messages.success(request, 'Tema criado com sucesso!')
+            return redirect('mimir:listarTemas')
+    else:
+        form = TemaForm()
+    
+    return render(request, 'mimir/temaForm.html', {'form': form})
+
+@login_required
+def temaUpdate(request, pk):
+    tema = get_object_or_404(Tema, pk=pk)
+    
+    if request.method == 'POST':
+        form = TemaForm(request.POST, instance=tema)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Tema atualizado com sucesso!')
+            return redirect('mimir:listarTemas')
+    else:
+        form = TemaForm(instance=tema)
+    
+    return render(request, 'mimir/temaForm.html', {'form': form})
+
+@login_required
+def temaDelete(request, pk):
+    tema = get_object_or_404(Tema, pk=pk)
+    
+    if request.method == 'POST':
+        tema.delete()
+        messages.success(request, 'Tema excluído com sucesso!')
+        return redirect('mimir:listarTemas')
+    
+    return render(request, 'mimir/temaConfirmDelete.html', {'tema': tema})

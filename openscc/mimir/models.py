@@ -34,7 +34,7 @@ class Fontes(models.Model):
     nome = models.CharField(max_length=200, blank=False, null=False)
     dataCriacao = models.DateTimeField(auto_now_add=True)
     descricao = models.TextField(blank=True, null=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE,default=1,unique=False)
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, default=1)
 
     def __str__(self):
         return self.nome
@@ -62,3 +62,30 @@ class ImagemPergunta(models.Model):
     pergunta = models.ForeignKey(Pergunta, on_delete=models.CASCADE, related_name='imagens')
     imagem = models.ImageField(upload_to='perguntas/')
     criado_em = models.DateTimeField(auto_now_add=True)
+
+class ObjetivosAprendizagem(models.Model):
+    descricao = models.CharField(max_length=200, blank=False, null=False)
+
+    def __str__(self):
+        return self.descricao
+
+class Tema(models.Model):
+    nome = models.CharField(max_length=200, blank=False, null=False)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
+
+    def __str__(self):
+        return self.nome
+
+class Problema(models.Model):
+    titulo = models.CharField(max_length=200, blank=False, null=False)
+    assunto = models.ForeignKey(Assunto, on_delete=models.CASCADE)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    dataAplicacao = models.DateTimeField()
+    objetivos = models.ManyToManyField(ObjetivosAprendizagem)
+    tema = models.ForeignKey(Tema, on_delete=models.CASCADE)
+    fontes = models.ManyToManyField('Fontes', blank=True)
+
+class Parte(models.Model):
+    problema = models.ForeignKey(Problema, on_delete=models.CASCADE)
+    enunciado = models.TextField(blank=False, null=False)    
+    ordem = models.IntegerField(default=1)

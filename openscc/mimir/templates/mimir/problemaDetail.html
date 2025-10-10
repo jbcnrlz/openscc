@@ -1,0 +1,225 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ problema.titulo }}</h1>
+        <div>
+            <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <i class="fas fa-trash"></i> Excluir Problema
+            </button>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informações do Problema</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Tema:</strong> {{ problema.tema.nome }}</p>
+                    <p><strong>Assunto:</strong> {{ problema.assunto.nome }}</p>
+                    <p><strong>Data de Aplicação:</strong> {{ problema.dataAplicacao|date:"d/m/Y H:i" }}</p>
+                    <p><strong>Criado em:</strong> {{ problema.criado_em|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Objetivos de Aprendizagem</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for objetivo in problema.objetivos.all %}
+                        <li class="list-group-item">{{ objetivo.descricao }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            {% if problema.fontes.all %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Fontes Utilizadas</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for fonte in problema.fontes.all %}
+                        <li class="list-group-item">
+                            <strong>{{ fonte.nome }}</strong><br>
+                            <small class="text-muted">{{ fonte.descricao|truncatewords:20 }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Regerar Parte com Instruções</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'mimir:regerarParte' problema.pk %}">
+                        <div class="mb-3">
+                            <label for="parteSelect" class="form-label">Selecione a parte para regerar:</label>
+                            <select name="parte_ordem" class="form-select" id="parteSelect" required>
+                                <option value="">Selecione uma parte...</option>
+                                {% for parte in partes %}
+                                <option value="{{ parte.ordem }}">Parte {{ parte.ordem }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="fas fa-sync-alt"></i> Regerar com Instruções
+                        </button>
+                        <small class="form-text text-muted d-block mt-2">
+                            Você poderá fornecer instruções específicas para modificar a parte selecionada.
+                        </small>
+                    </form>
+                    
+                    <!-- Botão rápido para regerar a parte atual (útil quando visualizando uma parte específica) -->
+                    <div class="mt-3 pt-3 border-top">
+                        <small class="text-muted">Regerar rapidamente:</small>
+                        <div class="btn-group btn-group-sm mt-1" role="group">
+                            {% for parte in partes %}
+                            <a href="{% url 'mimir:regerarParteEspecifica' problema.pk parte.ordem %}" 
+                            class="btn btn-outline-warning" 
+                            title="Regerar Parte {{ parte.ordem }}">
+                                Parte {{ parte.ordem }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Ações</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-list"></i> Ver Todos os Problemas
+                        </a>
+                        <button class="btn btn-outline-danger btn-sm" 
+                                data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="fas fa-trash"></i> Excluir Este Problema
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Partes do Problema</h5>
+                </div>
+                <div class="card-body">
+                    {% for parte in partes %}
+                    <div class="parte-problema mb-4 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Parte {{ parte.ordem }}</h6>
+                            <div>
+                                <span class="badge bg-secondary me-2">Ordem {{ parte.ordem }}</span>
+                                <a href="{% url 'mimir:regerarParteEspecifica' problema.pk parte.ordem %}" 
+                                    class="btn btn-outline-warning btn-sm" 
+                                    title="Regerar Parte {{ parte.ordem }}">
+                                        Regerar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="enunciado">
+                            {{ parte.enunciado|linebreaks }}
+                        </div>
+                    </div>
+
+                    <!-- Modal para regerar parte específica -->
+                    <div class="modal fade" id="regerarModal{{ parte.ordem }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Regerar Parte {{ parte.ordem }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Tem certeza que deseja regerar a Parte {{ parte.ordem }}?</p>
+                                    <p><small class="text-muted">A parte será regenerada pela IA mantendo o contexto das partes anteriores.</small></p>
+                                </div>
+                                <div class="modal-footer">
+                                    <form method="post" action="{% url 'mimir:regerarParte' problema.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="parte_ordem" value="{{ parte.ordem }}">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-warning">Regerar Parte</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="alert alert-info">
+                        Este problema não possui partes definidas.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal de Exclusão no Detalhe -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Atenção:</strong> Você está prestes a excluir o problema <strong>"{{ problema.titulo }}"</strong>.
+                </div>
+                <p>Esta ação:</p>
+                <ul>
+                    <li>Excluirá permanentemente o problema</li>
+                    <li>Excluirá todas as {{ problema.parte_set.count }} partes associadas</li>
+                    <li><strong>Não poderá ser desfeita</strong></li>
+                </ul>
+                <p class="mb-0">Tem certeza que deseja continuar?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <a href="{% url 'mimir:problemaDelete' problema.pk %}" class="btn btn-danger">
+                    <i class="fas fa-trash"></i> Sim, Excluir Problema
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.parte-problema {
+    background-color: #f8f9fa;
+    border-left: 4px solid #007bff !important;
+}
+.enunciado {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+</style>
+{% endblock %}

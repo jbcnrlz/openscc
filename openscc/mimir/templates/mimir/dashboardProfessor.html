@@ -4,7 +4,7 @@
 <div class="container mt-4">
     <h2>Dashboard do professor</h2>
     <div class="row mt-4">
-        <div class="col-md-4">
+        <div class="col-md-4 mb-2">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Fontes</h5>
@@ -13,7 +13,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mb-2">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Templates</h5>
@@ -22,7 +22,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mb-2">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Perguntas</h5>
@@ -31,21 +31,30 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mb-2">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Problemas</h5>
                     <p class="card-text">Gerencie e gere novos problemas</p>
-                    <a href="#" class="btn btn-primary">Gerenciar problemas</a>
+                    <a href="{% url 'mimir:problemaList' %}" class="btn btn-primary">Gerenciar problemas</a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mb-2">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Provas</h5>
                     <p class="card-text">Crie e imprima provas, gabaritos e folhas de resposta</p>
                     <a href="{% url 'mimir:listarProvas' %}" class="btn btn-primary">Gerenciar provas</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-2">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Temas</h5>
+                    <p class="card-text">Gerencie os temas que definem quais os itens para trabalhar nos problemas</p>
+                    <a href="{% url 'mimir:listarTemas' %}" class="btn btn-primary">Gerenciar temas</a>
                 </div>
             </div>
         </div>

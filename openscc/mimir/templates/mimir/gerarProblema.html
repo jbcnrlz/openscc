@@ -1,0 +1,184 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Gerar Problema com IA</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="gerarProblemaForm">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.tema.label_tag }}
+                                    {{ form.tema }}
+                                    {% if form.tema.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.tema.errors %}
+                                        <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.assunto.label_tag }}
+                                    {{ form.assunto }}
+                                    {% if form.assunto.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.assunto.errors %}
+                                        <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.objetivos.label_tag }}
+                            <div class="border p-3 rounded">
+                                {{ form.objetivos }}
+                            </div>
+                            {% if form.objetivos.errors %}
+                            <div class="text-danger">
+                                {% for error in form.objetivos.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.fontes.label_tag }}
+                            <div class="border p-3 rounded">
+                                {% if form.fontes.field.queryset.exists %}
+                                    {{ form.fontes }}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        Nenhuma fonte cadastrada. 
+                                        <a href="{% url 'mimir:addFontes' %}" class="alert-link">
+                                            Cadastrar nova fonte
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            {% if form.fontes.help_text %}
+                            <div class="form-text">{{ form.fontes.help_text }}</div>
+                            {% endif %}
+                            {% if form.fontes.errors %}
+                            <div class="text-danger">
+                                {% for error in form.fontes.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.num_partes.label_tag }}
+                                    {{ form.num_partes }}
+                                    {% if form.num_partes.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.num_partes.errors %}
+                                        <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.data_aplicacao.label_tag }}
+                                    {{ form.data_aplicacao }}
+                                    {% if form.data_aplicacao.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.data_aplicacao.errors %}
+                                        <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.contexto_inicial.label_tag }}
+                            {{ form.contexto_inicial }}
+                            {% if form.contexto_inicial.help_text %}
+                            <div class="form-text">{{ form.contexto_inicial.help_text }}</div>
+                            {% endif %}
+                            {% if form.contexto_inicial.errors %}
+                            <div class="text-danger">
+                                {% for error in form.contexto_inicial.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:problemaList' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary" id="btnGerar">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Gerar Problema
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Como funciona</h5>
+                </div>
+                <div class="card-body">
+                    <p>O problema será gerado em partes sequenciais:</p>
+                    <ol>
+                        <li><strong>Parte 1:</strong> Baseada no contexto inicial e fontes selecionadas</li>
+                        <li><strong>Partes seguintes:</strong> Desenvolvem a partir das partes anteriores</li>
+                        <li><strong>Última parte:</strong> Inclui o desfecho ou conclusão</li>
+                    </ol>
+                    <p class="text-muted mb-0">
+                        Cada parte pode ser regerada individualmente posteriormente.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('gerarProblemaForm').addEventListener('submit', function() {
+    const btn = document.getElementById('btnGerar');
+    const spinner = btn.querySelector('.spinner-border');
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+});
+</script>
+
+<style>
+.form-check-label {
+    font-weight: normal;
+}
+.form-check {
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}

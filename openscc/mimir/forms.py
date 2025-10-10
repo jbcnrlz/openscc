@@ -1,6 +1,23 @@
-from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova
+from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem
 from django import forms
 from django.core.validators import FileExtensionValidator
+
+class TemaForm(forms.ModelForm):
+    class Meta:
+        model = Tema
+        fields = ['nome']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Digite o nome do tema'
+            })
+        }
+    
+    def clean_nome(self):
+        nome = self.cleaned_data['nome']
+        if len(nome.strip()) < 3:
+            raise forms.ValidationError('O nome do tema deve ter pelo menos 3 caracteres.')
+        return nome
 
 class ProvaForm(forms.ModelForm):
     class Meta:
@@ -120,3 +137,95 @@ class GeracaoPerguntasForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['fontes_selecionadas'].queryset = Fontes.objects.filter(user=user)
         self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
+
+class GerarProblemaForm(forms.Form):
+    tema = forms.ModelChoiceField(
+        queryset=Tema.objects.none(),
+        label="Tema",
+        required=True
+    )
+    assunto = forms.ModelChoiceField(
+        queryset=Assunto.objects.all(),
+        label="Assunto",
+        required=True
+    )
+    fontes = forms.ModelMultipleChoiceField(
+        queryset=Fontes.objects.none(),
+        label="Fontes de Referência",
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Selecione as fontes que serão usadas como base para gerar o problema"
+    )
+    objetivos = forms.ModelMultipleChoiceField(
+        queryset=ObjetivosAprendizagem.objects.all(),
+        label="Objetivos de Aprendizagem",
+        required=True,
+        widget=forms.CheckboxSelectMultiple
+    )
+    num_partes = forms.IntegerField(
+        label="Número de Partes",
+        min_value=1,
+        max_value=10,
+        initial=3,
+        required=True
+    )
+    contexto_inicial = forms.CharField(
+        label="Contexto Inicial",
+        widget=forms.Textarea(attrs={'rows': 4}),
+        required=True,
+        help_text="Descreva o cenário inicial do problema"
+    )
+    data_aplicacao = forms.DateTimeField(
+        label="Data de Aplicação",
+        required=True,
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local'})
+    )
+    
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tema'].queryset = Tema.objects.filter(usuario=user)
+        self.fields['fontes'].queryset = Fontes.objects.filter(user=user)
+
+class RegerarParteForm(forms.Form):
+    parte_ordem = forms.IntegerField(
+        label="Número da Parte para Regerar",
+        min_value=1,
+        required=True
+    )
+    instrucoes = forms.CharField(
+        label="Instruções para Regerar",
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'class': 'form-control',
+            'placeholder': 'Ex: Adicione mais detalhes sobre os exames...\nMude o desfecho para...\nInclua informações sobre...'
+        }),
+        required=True,
+        help_text="Descreva como você quer que esta parte seja modificada. Seja específico sobre o que mudar, adicionar ou remover."
+    )
+    
+    def __init__(self, *args, **kwargs):
+        max_partes = kwargs.pop('max_partes', None)
+        super().__init__(*args, **kwargs)
+        if max_partes:
+            self.fields['parte_ordem'].widget.attrs['max'] = max_partes
+
+class ProblemaForm(forms.ModelForm):
+    fontes = forms.ModelMultipleChoiceField(
+        queryset=Fontes.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple
+    )
+    class Meta:
+        model = Problema
+        fields = ['titulo', 'assunto', 'tema', 'dataAplicacao', 'objetivos', 'fontes']
+        widgets = {
+            'dataAplicacao': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'objetivos': forms.CheckboxSelectMultiple(),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user:
+            self.fields['tema'].queryset = Tema.objects.filter(usuario=user)
+            self.fields['fontes'].queryset = Fontes.objects.filter(user=user)

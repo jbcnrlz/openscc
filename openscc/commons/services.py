@@ -3,6 +3,86 @@ from django.core.files.storage import default_storage
 from django.conf import settings
 import pdfplumber, json, re
 
+def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fontes, instrucoes, parte_original):
+        prompt = f"""
+        Você é um especialista em {tema} revisando e melhorando um problema de aprendizado.
+
+        TEMA: {tema}
+        ASSUNTO: {assunto}
+        OBJETIVOS: {', '.join(objetivos)}
+
+        FONTES DE REFERÊNCIA:
+        {fontes}
+
+        CONTEXTO ANTERIOR (Partes 1 a {parte_ordem-1}):
+        {contexto_anterior}
+
+        PARTE ORIGINAL {parte_ordem} (para referência):
+        {parte_original}
+
+        INSTRUÇÕES ESPECÍFICAS DO USUÁRIO:
+        {instrucoes}
+
+        Sua tarefa é gerar uma NOVA VERSÃO para a PARTE {parte_ordem} que:
+        1. Siga rigorosamente as instruções do usuário acima
+        2. Mantenha coerência total com o contexto anterior
+        3. Preserve os objetivos de aprendizagem originais
+        4. Integre as fontes de referência quando relevante
+        5. Mantenha o mesmo nível de detalhe e complexidade
+        6. Seja uma melhoria clara em relação à versão original
+
+        Diretrizes importantes:
+        - Foque em atender especificamente às instruções do usuário
+        - Mantenha o fluxo narrativo natural
+        - Não quebre a continuidade com as partes seguintes
+        - Se as instruções pedirem mudanças específicas, implemente-as claramente
+
+        Forneça APENAS o texto da nova parte {parte_ordem}, sem marcações, números ou comentários.
+        """
+        
+        return prompt
+
+def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, contexto_anterior,fontes):
+    total_partes = total_partes if total_partes else "N"
+    return f"""
+    Você é um especialista em {tema} criando um problema de aprendizado sequencial.
+    
+    TEMA: {tema}
+    ASSUNTO: {assunto}
+    OBJETIVOS: {', '.join(objetivos)}
+    
+    FONTES DE REFERÊNCIA:
+    {fontes}
+
+    CONTEXTO ANTERIOR:
+    {contexto_anterior}
+    
+    Gere a PARTE {parte_atual} de {total_partes} deste problema.
+    
+    Esta parte deve:
+    1. Desenvolver naturalmente a partir do contexto anterior
+    2. Adicionar novas informações ou complicações relevantes
+    3. Manter coerência com o tema e objetivos
+    4. Ser autocontida mas deixar espaço para desenvolvimento futuro
+    5. Incluir elementos práticos e realistas
+    
+    Forneça apenas o texto da parte {parte_atual}, sem marcações ou números.
+    """
+
+
+def chamarApiLLM(prompt):
+    try:
+        # Gerar conteúdo
+        # Configurar API do Gemini
+        client = genai.Client(api_key=settings.GEMINI_API_KEY) # Recomendado: usar settings
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )             
+        return response.text                
+    except Exception:
+        return None
+
 def extrair_texto_pdf(caminho_arquivo):
     """Extrai texto de PDF com tratamento robusto de erros"""
     try:

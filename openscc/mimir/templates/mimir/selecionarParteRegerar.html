@@ -1,0 +1,76 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-sync-alt"></i>
+                        Selecionar Parte para Regerar
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Selecione qual parte você deseja regerar</h6>
+                        <p class="mb-0">
+                            Escolha uma parte do problema abaixo. Na próxima tela você poderá fornecer instruções específicas para modificar essa parte.
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Problema: {{ problema.titulo }}</h6>
+                        <p class="text-muted mb-0">Tema: {{ problema.tema.nome }} | Assunto: {{ problema.assunto.nome }}</p>
+                    </div>
+
+                    <div class="list-group">
+                        {% for parte in partes %}
+                        <a href="{% url 'mimir:regerarParteEspecifica' problema.pk parte.ordem %}"
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Parte {{ parte.ordem }}</h6>
+                                <small class="text-muted">Ordem {{ parte.ordem }}</small>
+                            </div>
+                            <p class="mb-1 text-muted">{{ parte.enunciado|truncatewords:30 }}</p>
+                            <small class="text-primary">Clique para regerar esta parte</small>
+                        </a>
+                        {% empty %}
+                        <div class="list-group-item">
+                            <p class="text-muted mb-0">Nenhuma parte encontrada para este problema.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar para o Problema
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Como funciona a regeração</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li>Selecione a parte que deseja modificar</li>
+                        <li>Forneça instruções específicas sobre o que mudar</li>
+                        <li>Visualize o preview da nova parte</li>
+                        <li>Confirme para salvar as alterações</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.list-group-item:hover {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+}
+</style>
+{% endblock %}
