@@ -3,6 +3,26 @@ from django.core.files.storage import default_storage
 from django.conf import settings
 import pdfplumber, json, re
 
+def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fontes_info, instrucoesGuia):
+        return f"""
+        Com base no problema abaixo, gere um GUIA DO TUTOR detalhado seguindo EXATAMENTE a estrutura fornecida:
+
+        # TÍTULO DO PROBLEMA: {titulo}
+        TEMA: {tema}
+        ASSUNTO: {assunto}
+        OBJETIVOS DE APRENDIZAGEM: {', '.join(objetivos)}
+
+        # TEXTO COMPLETO DO PROBLEMA:
+        {texto_problema}
+
+        # FONTES DE REFERÊNCIA:
+        {fontes_info}
+
+        --- ESTRUTURA DO GUIA DO TUTOR ---
+
+        {instrucoesGuia}
+        """
+
 def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fontes, instrucoes, parte_original):
         prompt = f"""
         Você é um especialista em {tema} revisando e melhorando um problema de aprendizado.

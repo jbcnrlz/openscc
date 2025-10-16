@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Guia do Tutor - {{ problema.titulo }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @frame footer {
+                -pdf-frame-content: footerContent;
+                bottom: 1cm;
+                margin-left: 2cm;
+                margin-right: 2cm;
+                height: 1cm;
+            }
+        }
+        
+        body {
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 10px;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+            color: #27ae60;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin: 5px 0;
+        }
+        
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: table-row;
+        }
+        
+        .info-label {
+            display: table-cell;
+            font-weight: bold;
+            padding: 4px 8px 4px 0;
+            width: 25%;
+            vertical-align: top;
+        }
+        
+        .info-value {
+            display: table-cell;
+            padding: 4px 0;
+            vertical-align: top;
+        }
+        
+        .guia-content {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .guia-section {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        
+        .guia-section-title {
+            background-color: #e8f5e8;
+            padding: 8px 12px;
+            border-left: 4px solid #27ae60;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+        
+        .guia-subsection {
+            margin-bottom: 12px;
+        }
+        
+        .guia-subsection-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 6px;
+            font-size: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 3px;
+        }
+        
+        .lista-obj {
+            margin: 5px 0;
+            padding-left: 15px;
+        }
+        
+        .lista-obj li {
+            margin-bottom: 3px;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            color: #7f8c8d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            padding: 6px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 6px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        ul, ol {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 3px;
+        }
+        
+        strong {
+            color: #2c3e50;
+        }
+        
+        /* Estilos específicos para o conteúdo do guia */
+        .guia-content h1 {
+            font-size: 16px;
+            color: #27ae60;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .guia-content h2 {
+            font-size: 14px;
+            color: #2c3e50;
+            border-left: 4px solid #3498db;
+            padding-left: 10px;
+            margin: 15px 0 10px 0;
+        }
+        
+        .guia-content h3 {
+            font-size: 12px;
+            color: #34495e;
+            margin: 12px 0 8px 0;
+        }
+        
+        .guia-content h4 {
+            font-size: 11px;
+            color: #7f8c8d;
+            margin: 10px 0 6px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Guia do Tutor</h1>
+        <div class="subtitle">{{ problema.titulo }} - Exportado em {{ data_exportacao }}</div>
+    </div>
+
+    <!-- Informações do Problema -->
+    <div class="info-grid">
+        <div class="info-row">
+            <div class="info-label">Tema:</div>
+            <div class="info-value">{{ problema.tema.nome }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Assunto:</div>
+            <div class="info-value">{{ problema.assunto.nome }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Objetivos:</div>
+            <div class="info-value">
+                <ul class="lista-obj">
+                    {% for objetivo in problema.objetivos.all %}
+                    <li>{{ objetivo.descricao }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo do Guia -->
+    <div class="guia-content">
+        {{ guia_tutor.conteudo|linebreaks }}
+    </div>
+
+    <div id="footerContent" class="footer">
+        Página <pdf:pagenumber> de <pdf:pagecount> - Guia do Tutor - Gerado em {{ data_exportacao }}
+    </div>
+</body>
+</html>

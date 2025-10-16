@@ -5,7 +5,8 @@ from . import views
 from .viewsClasses.PerguntasTemplate import PerguntasView
 from .viewsClasses.TemaListView import TemaListView
 from .viewsClasses.ProblemasView import ProblemaListView, ProblemaDetailView, GerarProblemaView, ProblemaCreateView, RegerarParteView, ProblemaDeleteView, ProblemaDeleteAjaxView
-
+from .viewsClasses.GuiaTutorView import GerarGuiaTutorView, VisualizarGuiaTutorView, AtualizarGuiaTutorView
+from .viewsClasses.ExportarPDFView import ExportarProblemaPDFView, ExportarGuiaTutorPDFView, ExportarCompletoPDFView
 app_name = 'mimir'
 
 urlpatterns = [    
@@ -47,4 +48,10 @@ urlpatterns = [
     path('problema/<int:pk>/delete-ajax/', ProblemaDeleteAjaxView.as_view(), name='problemaDeleteAjax'),
     path('problema/<int:problema_id>/regerar-parte/', RegerarParteView.as_view(), name='regerarParte'),
     path('problema/<int:problema_id>/regerar-parte/<int:parte_ordem>/', RegerarParteView.as_view(), name='regerarParteEspecifica'),
+    path('problema/<int:problema_id>/gerar-guia-tutor/', GerarGuiaTutorView.as_view(), name='gerarGuiaTutor'),
+    path('problema/<int:pk>/guia-tutor/', VisualizarGuiaTutorView.as_view(), name='visualizarGuiaTutor'),
+    path('problema/<int:problema_id>/atualizar-guia-tutor/', AtualizarGuiaTutorView.as_view(), name='atualizarGuiaTutor'),
+    path('problema/<int:problema_id>/exportar-pdf/', ExportarProblemaPDFView.as_view(), name='exportarPDF'),
+    path('problema/<int:problema_id>/exportar-guia-pdf/', ExportarGuiaTutorPDFView.as_view(), name='exportarGuiaPDF'),
+    path('problema/<int:problema_id>/exportar-completo-pdf/', ExportarCompletoPDFView.as_view(), name='exportarCompletoPDF'),
 ]

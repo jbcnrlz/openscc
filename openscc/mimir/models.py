@@ -14,6 +14,7 @@ User.add_to_class('isProfessor', isProfessor)
 class Assunto(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     nome = models.CharField(max_length=200, blank=False, null=False)
+    layoutGuiaTutor = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.nome
@@ -89,3 +90,16 @@ class Parte(models.Model):
     problema = models.ForeignKey(Problema, on_delete=models.CASCADE)
     enunciado = models.TextField(blank=False, null=False)    
     ordem = models.IntegerField(default=1)
+
+class GuiaTutor(models.Model):
+    problema = models.OneToOneField(Problema, on_delete=models.CASCADE, related_name='guia_tutor')
+    conteudo = models.TextField(blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Guia do Tutor"
+        verbose_name_plural = "Guias do Tutor"
+    
+    def __str__(self):
+        return f"Guia do Tutor - {self.problema.titulo}"

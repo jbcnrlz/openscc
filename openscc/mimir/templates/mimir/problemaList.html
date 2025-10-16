@@ -75,7 +75,8 @@
                         </a>
                         <button class="btn btn-sm btn-outline-danger delete-btn" 
                                 data-problem-id="{{ problema.pk }}" 
-                                data-problem-title="{{ problema.titulo }}">
+                                data-problem-title="{{ problema.titulo }}"
+                                data-problem-delete-url="{% url 'mimir:problemaDeleteAjax' problema.pk %}">
                             <i class="fas fa-trash"></i> Excluir
                         </button>
                     </div>
@@ -112,7 +113,6 @@
                 <p class="mb-0">Comece gerando um problema com IA ou criando um manualmente.</p>
                 <div class="mt-3">
                     <a href="{% url 'mimir:gerarProblema' %}" class="btn btn-primary me-2">Gerar com IA</a>
-                    <a href="{% url 'mimir:problemaCreate' %}" class="btn btn-outline-primary">Criar Manual</a>
                 </div>
             </div>
         </div>
@@ -165,11 +165,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     deleteButtons.forEach(button => {
         button.addEventListener('click', function() {
+            console.log(this);
             const problemId = this.getAttribute('data-problem-id');
             const problemTitle = this.getAttribute('data-problem-title');
+            const deleteUrl = this.getAttribute('data-problem-delete-url');
             
             if (confirm(`Tem certeza que deseja excluir o problema "${problemTitle}"?`)) {
-                fetch(`/problema/${problemId}/delete-ajax/`, {
+                fetch(deleteUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken'),

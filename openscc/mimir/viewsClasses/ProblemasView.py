@@ -146,7 +146,7 @@ class RegerarParteView(LoginRequiredMixin, View):
         }
         return render(request, 'mimir/selecionarParteRegerar.html', context)
 
-    def post(self, request, problema_id):
+    def post(self, request, problema_id,parte_ordem=None):
         problema = get_object_or_404(Problema, id=problema_id)        
         
         # Se parte_ordem não veio na URL, pega do formulário
@@ -234,7 +234,7 @@ class ProblemaDeleteAjaxView(LoginRequiredMixin, View):
     """View para exclusão via AJAX"""
     
     def post(self, request, pk):
-        problema = get_object_or_404(Problema, pk=pk, user=request.user)
+        problema = get_object_or_404(Problema, pk=pk)
         
         try:
             problema_title = problema.titulo
