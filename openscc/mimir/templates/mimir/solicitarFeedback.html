@@ -1,0 +1,58 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-comment-medical"></i>
+                        Solicitar Feedback - Parte {{ parte.ordem }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Problema: {{ problema.titulo }}</h6>
+                        <p class="mb-0"><strong>Parte {{ parte.ordem }}:</strong> {{ parte.enunciado|truncatewords:30 }}</p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="especialista" class="form-label">Selecionar Especialista:</label>
+                            <select name="especialista_id" class="form-select" id="especialista" required>
+                                <option value="">Selecione um especialista...</option>
+                                {% for especialista in especialistas %}
+                                <option value="{{ especialista.id }}">
+                                    {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
+                                </option>
+                                {% empty %}
+                                <option value="" disabled>Nenhum especialista disponível</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Especialistas são usuários com conhecimento no tema do problema.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="mensagem" class="form-label">Mensagem para o Especialista (opcional):</label>
+                            <textarea name="mensagem" class="form-control" id="mensagem" 
+                                      rows="4" placeholder="Descreva quais aspectos você gostaria que o especialista avalie..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:problemaDetail' problema.id %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary" {% if not especialistas %}disabled{% endif %}>
+                                <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -17,6 +17,7 @@ class ProblemaListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return Problema.objects.filter(tema__usuario=self.request.user)
 
+'''
 class ProblemaDetailView(LoginRequiredMixin, DetailView):
     model = Problema
     template_name = 'mimir/problemaDetail.html'
@@ -31,7 +32,57 @@ class ProblemaDetailView(LoginRequiredMixin, DetailView):
         context['partes'] = partes        
         context['regerar_form'] = RegerarParteForm(max_partes=partes.count())
         return context
+'''
+class ProblemaDetailView(LoginRequiredMixin, DetailView):
+    model = Problema
+    template_name = 'mimir/problemaDetail.html'
+    context_object_name = 'problema'
 
+    def get_queryset(self):
+        # Retorna todos os problemas para verificação manual de permissão
+        return Problema.objects.all()
+
+    def get_object(self, queryset=None):
+        # Obtém o objeto normalmente
+        obj = super().get_object(queryset)
+        
+        # Verifica as permissões
+        user = self.request.user
+        eh_autor = obj.tema.usuario == user
+        tem_feedback = obj.partes.filter(feedbacks__especialista=user).exists()
+        
+        if not (eh_autor or tem_feedback):
+            from django.http import Http404
+            raise Http404("Problema não encontrado ou você não tem permissão para visualizá-lo.")
+            
+        return obj
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        problema = self.object
+        user = self.request.user
+        
+        # Obter partes ordenadas
+        partes = problema.partes.all().order_by('ordem')
+        
+        # Verificar se o usuário é o autor do problema
+        eh_autor = problema.assunto.user == user
+        
+        # Obter lista de especialistas (apenas para autores)
+        from django.contrib.auth.models import User
+        especialistas = User.objects.filter(
+            is_active=True
+        ).exclude(
+            id=user.id
+        ).order_by('first_name', 'last_name') if eh_autor else User.objects.none()
+        
+        context['partes'] = partes        
+        context['regerar_form'] = RegerarParteForm(max_partes=partes.count()) if eh_autor else None
+        context['especialistas'] = especialistas
+        context['eh_autor'] = eh_autor
+        context['user'] = user
+        
+        return context
 class GerarProblemaView(LoginRequiredMixin, View):
     template_name = 'mimir/gerarProblema.html'
     

@@ -5,12 +5,21 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>{{ problema.titulo }}</h1>
         <div>
-            <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary me-2">
-                <i class="fas fa-arrow-left"></i> Voltar
-            </a>
-            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
-                <i class="fas fa-trash"></i> Excluir Problema
-            </button>
+            {% if eh_autor %}
+                <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                    <i class="fas fa-trash"></i> Excluir Problema
+                </button>
+            {% else %}
+                <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-arrow-left"></i> Voltar para Feedbacks
+                </a>
+                <span class="badge bg-info">
+                    <i class="fas fa-user-tie"></i> Visualizando como Especialista
+                </span>
+            {% endif %}
         </div>
     </div>
 
@@ -36,6 +45,9 @@
                     <p><strong>Assunto:</strong> {{ problema.assunto.nome }}</p>
                     <p><strong>Data de Aplicação:</strong> {{ problema.dataAplicacao|date:"d/m/Y H:i" }}</p>
                     <p><strong>Criado em:</strong> {{ problema.criado_em|date:"d/m/Y H:i" }}</p>
+                    {% if not eh_autor %}
+                    <p><strong>Autor:</strong> {{ problema.tema.usuario.get_full_name|default:problema.tema.usuario.username }}</p>
+                    {% endif %}
                 </div>
             </div>
 
@@ -70,12 +82,15 @@
             </div>
             {% endif %}
 
+            <!-- Seção de Regerar Parte (apenas para autores) -->
+            {% if eh_autor %}
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Regerar Parte com Instruções</h5>
                 </div>
                 <div class="card-body">
                     <form method="get" action="{% url 'mimir:regerarParte' problema.pk %}">
+                        {% csrf_token %}
                         <div class="mb-3">
                             <label for="parteSelect" class="form-label">Selecione a parte para regerar:</label>
                             <select name="parte_ordem" class="form-select" id="parteSelect" required>
@@ -93,7 +108,7 @@
                         </small>
                     </form>
                     
-                    <!-- Botão rápido para regerar a parte atual (útil quando visualizando uma parte específica) -->
+                    <!-- Botão rápido para regerar a parte atual -->
                     <div class="mt-3 pt-3 border-top">
                         <small class="text-muted">Regerar rapidamente:</small>
                         <div class="btn-group btn-group-sm mt-1" role="group">
@@ -108,6 +123,9 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
+
+                <!-- Seção de Exportar PDF (disponível para todos) -->
             <div class="card mt-4">
                 <div class="card-header bg-info text-white">
                     <h5 class="card-title mb-0">
@@ -152,28 +170,38 @@
                     </div>
                 </div>
             </div>
+
+                <!-- Seção de Ações (diferente para autores e especialistas) -->
             <div class="card mt-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Ações</h5>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-list"></i> Ver Todos os Problemas
-                        </a>
-                        <button class="btn btn-outline-danger btn-sm" 
-                                data-bs-toggle="modal" data-bs-target="#deleteModal">
-                            <i class="fas fa-trash"></i> Excluir Este Problema
-                        </button>
+                        {% if eh_autor %}
+                            <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-list"></i> Ver Meus Problemas
+                            </a>
+                            <button class="btn btn-outline-danger btn-sm" 
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="fas fa-trash"></i> Excluir Este Problema
+                            </button>
+                        {% else %}
+                            <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-comments"></i> Meus Feedbacks
+                            </a>                                
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Partes do Problema</h5>
+                    {% if not eh_autor %}
+                    <small class="text-muted">Modo de visualização - Apenas leitura</small>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     {% for parte in partes %}
@@ -182,46 +210,249 @@
                             <h6 class="mb-0">Parte {{ parte.ordem }}</h6>
                             <div>
                                 <span class="badge bg-secondary me-2">Ordem {{ parte.ordem }}</span>
+                                
+                                <!-- Botões de ação (apenas para autores) -->
+                                {% if eh_autor %}
+                                <button class="btn btn-outline-info btn-sm me-1" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#feedbackModal{{ parte.ordem }}"
+                                        title="Solicitar Feedback">
+                                    <i class="fas fa-comment-medical"></i> Feedback
+                                </button>
+                                
+                                {% if parte.feedbacks.exists %}
+                                <button class="btn btn-info btn-sm me-1" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#verFeedbacksModal{{ parte.ordem }}"
+                                        title="Ver Feedbacks">
+                                    <i class="fas fa-comments"></i> ({{ parte.feedbacks.count }})
+                                </button>
+                                {% endif %}
+                                
                                 <a href="{% url 'mimir:regerarParteEspecifica' problema.pk parte.ordem %}" 
                                     class="btn btn-outline-warning btn-sm" 
                                     title="Regerar Parte {{ parte.ordem }}">
-                                        Regerar
+                                    Regerar
                                 </a>
+                                {% else %}
+                                <!-- Para especialistas: indicador de feedback pendente -->
+                                {% for feedback in parte.feedbacks.all %}
+                                    {% if feedback.especialista == user and not feedback.comentarios %}
+                                    <a href="{% url 'mimir:fornecerFeedback' feedback.id %}" 
+                                       class="btn btn-success btn-sm">
+                                        <i class="fas fa-edit"></i> Fornecer Feedback
+                                    </a>
+                                    {% elif feedback.especialista == user and feedback.comentarios %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i> Feedback Enviado
+                                    </span>
+                                    {% endif %}
+                                {% endfor %}
+                                {% endif %}
                             </div>
                         </div>
                         <div class="enunciado">
                             {{ parte.enunciado|linebreaks }}
                         </div>
+                        
+                        <!-- Indicador de feedbacks (apenas para autores) -->
+                        {% if eh_autor and parte.feedbacks.exists %}
+                        <div class="mt-2">
+                            <small class="text-info">
+                                <i class="fas fa-exclamation-circle"></i>
+                                {{ parte.feedbacks.count }} feedback(s) disponível(is) para consideração
+                            </small>
+                        </div>
+                        {% endif %}
                     </div>
 
-                    <!-- Modal para regerar parte específica -->
-                    <div class="modal fade" id="regerarModal{{ parte.ordem }}" tabindex="-1">
-                        <div class="modal-dialog">
+                    <!-- Modais (apenas para autores) -->
+                    {% if eh_autor %}
+                    <!-- Modal para pedir feedback -->
+                    <div class="modal fade" id="feedbackModal{{ parte.ordem }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title">Regerar Parte {{ parte.ordem }}</h5>
+                                    <h5 class="modal-title">Solicitar Feedback - Parte {{ parte.ordem }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="post" action="{% url 'mimir:solicitarFeedback' problema.pk parte.ordem %}">
+                                    {% csrf_token %}
+                                    <div class="modal-body">
+                                        <div class="alert alert-info">
+                                            <h6>Parte {{ parte.ordem }}</h6>
+                                            <p class="mb-0">{{ parte.enunciado|truncatewords:30 }}</p>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="especialista{{ parte.ordem }}" class="form-label">Selecionar Especialista: *</label>
+                                            <select name="especialista_id" class="form-select" id="especialista{{ parte.ordem }}" required>
+                                                <option value="">Selecione um especialista...</option>
+                                                {% for especialista in especialistas %}
+                                                <option value="{{ especialista.id }}">
+                                                    {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
+                                                </option>
+                                                {% empty %}
+                                                <option value="" disabled>Nenhum especialista disponível no sistema</option>
+                                                {% endfor %}
+                                            </select>
+                                            {% if not especialistas %}
+                                            <div class="alert alert-warning mt-2">
+                                                <small>
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    Nenhum usuário cadastrado como especialista. 
+                                                    <a href="{% url 'admin:auth_user_add' %}" target="_blank">Cadastre usuários primeiro</a>.
+                                                </small>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="mensagem{{ parte.ordem }}" class="form-label">Mensagem para o Especialista (opcional):</label>
+                                            <textarea name="mensagem" class="form-control" id="mensagem{{ parte.ordem }}" 
+                                                      rows="3" placeholder="Descreva quais aspectos você gostaria que o especialista avalie..."></textarea>
+                                        </div>
+                                        
+                                        <div class="alert alert-info">
+                                            <small>
+                                                <strong>Informação:</strong> O especialista receberá uma notificação e poderá 
+                                                fornecer feedback específico sobre esta parte do problema.
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary" {% if not especialistas %}disabled{% endif %}>
+                                            <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal para ver feedbacks existentes -->
+                    <div class="modal fade" id="verFeedbacksModal{{ parte.ordem }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Feedbacks - Parte {{ parte.ordem }}</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <p>Tem certeza que deseja regerar a Parte {{ parte.ordem }}?</p>
-                                    <p><small class="text-muted">A parte será regenerada pela IA mantendo o contexto das partes anteriores.</small></p>
+                                    {% for feedback in parte.feedbacks.all %}
+                                    <div class="feedback-item mb-3 p-3 border rounded {% if feedback.utilizado %}border-success{% else %}bg-light{% endif %}">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <strong>{{ feedback.especialista.get_full_name|default:feedback.especialista.username }}</strong>
+                                                <small class="text-muted"> - {{ feedback.criado_em|date:"d/m/Y H:i" }}</small>
+                                            </div>
+                                            <div>
+                                                {% if feedback.utilizado %}
+                                                <span class="badge bg-success">Utilizado</span>
+                                                {% else %}
+                                                <span class="badge bg-warning">Pendente</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        {% if feedback.mensagem_solicitacao %}
+                                        <div class="solicitacao-content mb-2">
+                                            <strong>Sua solicitação:</strong>
+                                            <p class="mb-1">{{ feedback.mensagem_solicitacao|linebreaks }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="feedback-content mb-2">
+                                            <strong>Feedback do especialista:</strong>
+                                            {% if feedback.comentarios %}
+                                                <p class="mb-1">{{ feedback.comentarios|linebreaks }}</p>
+                                            {% else %}
+                                                <p class="mb-1 text-muted">Aguardando feedback do especialista...</p>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if feedback.resposta_autor %}
+                                        <div class="resposta-content mb-2">
+                                            <strong>Sua resposta:</strong>
+                                            <p class="mb-1">{{ feedback.resposta_autor|linebreaks }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="feedback-actions">
+                                            {% if feedback.comentarios and not feedback.utilizado %}
+                                            <form method="post" action="{% url 'mimir:marcarFeedbackUtilizado' feedback.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-check"></i> Marcar como Utilizado
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            
+                                            {% if feedback.comentarios %}
+                                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#responderFeedbackModal{{ feedback.id }}">
+                                                <i class="fas fa-reply"></i> Responder
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <div class="alert alert-info">
+                                        Nenhum feedback recebido para esta parte.
+                                    </div>
+                                    {% endfor %}
                                 </div>
                                 <div class="modal-footer">
-                                    <form method="post" action="{% url 'mimir:regerarParte' problema.pk %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="parte_ordem" value="{{ parte.ordem }}">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-warning">Regerar Parte</button>
-                                    </form>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Modal para responder feedback -->
+                    {% for feedback in parte.feedbacks.all %}
+                    <div class="modal fade" id="responderFeedbackModal{{ feedback.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Responder Feedback</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="post" action="{% url 'mimir:responderFeedback' feedback.id %}">
+                                    {% csrf_token %}
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Feedback de {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}:</label>
+                                            <div class="border p-2 bg-light rounded">
+                                                {{ feedback.comentarios|linebreaks }}
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="resposta{{ feedback.id }}" class="form-label">Sua Resposta:</label>
+                                            <textarea name="resposta" class="form-control" id="resposta{{ feedback.id }}" 
+                                                      rows="4" placeholder="Agradeça o feedback e comente como pretende utilizá-lo...">{{ feedback.resposta_autor|default:'' }}</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Salvar Resposta</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %} <!-- Fim do if eh_autor para modais -->
+
                     {% empty %}
                     <div class="alert alert-info">
                         Este problema não possui partes definidas.
                     </div>
                     {% endfor %}
+                    
+                    <!-- Guia do Tutor (disponível para todos) -->
                     <div class="card md-4">
                         <div class="card-header bg-success text-white">
                             <h5 class="card-title mb-0">
@@ -237,12 +468,14 @@
                                     <a href="{% url 'mimir:visualizarGuiaTutor' problema.pk %}" class="btn btn-success btn-sm">
                                         <i class="fas fa-eye"></i> Ver Guia do Tutor
                                     </a>
+                                    {% if eh_autor %}
                                     <form method="post" action="{% url 'mimir:atualizarGuiaTutor' problema.pk %}" class="d-inline">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-warning btn-sm">
                                             <i class="fas fa-sync-alt"></i> Atualizar
                                         </button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </div>
                             <small class="text-muted">
@@ -251,12 +484,14 @@
                             {% else %}
                             <div class="d-flex justify-content-between align-items-center">
                                 <p class="mb-0">Guia do Tutor ainda não gerado para este problema.</p>
+                                {% if eh_autor %}
                                 <form method="post" action="{% url 'mimir:gerarGuiaTutor' problema.pk %}">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="fas fa-robot"></i> Gerar Guia do Tutor
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
                             <small class="text-muted">
                                 O Guia do Tutor fornece orientações completas para facilitar a discussão do caso.
@@ -264,13 +499,14 @@
                             {% endif %}
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
     </div>
 </div>
-<!-- Modal de Exclusão no Detalhe -->
+
+<!-- Modal de Exclusão (apenas para autores) -->
+{% if eh_autor %}
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -299,6 +535,8 @@
         </div>
     </div>
 </div>
+{% endif %}
+
 <style>
 .parte-problema {
     background-color: #f8f9fa;
@@ -307,6 +545,12 @@
 .enunciado {
     font-size: 0.95rem;
     line-height: 1.5;
+}
+.feedback-item {
+    border-left: 4px solid #17a2b8 !important;
+}
+.feedback-item.border-success {
+    border-left-color: #28a745 !important;
 }
 </style>
 {% endblock %}

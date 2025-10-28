@@ -89,7 +89,6 @@ def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, co
     Forneça apenas o texto da parte {parte_atual}, sem marcações ou números.
     """
 
-
 def chamarApiLLM(prompt):
     try:
         # Gerar conteúdo
@@ -102,6 +101,35 @@ def chamarApiLLM(prompt):
         return response.text                
     except Exception:
         return None
+
+def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
+    """Processa PDF em lotes para evitar timeout"""
+    textos_por_lote = []
+    
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            total_paginas = len(pdf.pages)
+            lotes = [pdf.pages[i:i+max_pages_per_batch] 
+                    for i in range(0, total_paginas, max_pages_per_batch)]
+            
+            for indice_lote, lote_paginas in enumerate(lotes):
+                texto_lote = f"FONTE: {fileName} - LOTE {indice_lote + 1}\n"
+                
+                for i, pagina in enumerate(lote_paginas, 1):
+                    try:
+                        texto_pagina = pagina.extract_text()
+                        if texto_pagina and texto_pagina.strip():
+                            texto_lote += f"--- PÁGINA {(indice_lote * max_pages_per_batch) + i} ---\n"
+                            texto_lote += texto_pagina.strip() + "\n\n"
+                    except Exception as e:
+                        texto_lote += f"Erro na página {(indice_lote * max_pages_per_batch) + i}: {str(e)}\n"
+                
+                textos_por_lote.append(texto_lote)
+                
+    except Exception as e:
+        textos_por_lote.append(f"Erro ao processar {fp[1]}: {str(e)}")
+    
+    return textos_por_lote
 
 def extrair_texto_pdf(caminho_arquivo):
     """Extrai texto de PDF com tratamento robusto de erros"""
@@ -134,7 +162,7 @@ def getQuestionsFromSource(file_path,qtPerguntas,infoExtras):
         # Extrair texto do PDF
         completoTudo = ''
         for fp in file_path:
-            conteudo_extraido = extrair_texto_pdf(fp[0])
+            conteudo_extraido = processar_pdf_em_lotes(fp[0],fp[1])
             texto_completo = "\n".join(conteudo_extraido)
             completoTudo += f"FONTE - {fp[1]}\n" + texto_completo + "\n\n"
         

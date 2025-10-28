@@ -1,4 +1,4 @@
-from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem
+from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista
 from django import forms
 from django.core.validators import FileExtensionValidator
 
@@ -229,3 +229,34 @@ class ProblemaForm(forms.ModelForm):
         if user:
             self.fields['tema'].queryset = Tema.objects.filter(usuario=user)
             self.fields['fontes'].queryset = Fontes.objects.filter(user=user)
+
+class SolicitarFeedbackForm(forms.Form):
+    """Form para solicitar feedback de especialista"""
+    especialista_id = forms.IntegerField(
+        widget=forms.HiddenInput(),
+        required=True
+    )
+    mensagem = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': 'Descreva quais aspectos você gostaria que o especialista avalie...'
+        }),
+        required=False,
+        label='Mensagem para o Especialista'
+    )
+
+class ResponderFeedbackForm(forms.ModelForm):
+    """Form para responder ao feedback recebido"""
+    class Meta:
+        model = FeedbackEspecialista
+        fields = ['resposta_autor']
+        widgets = {
+            'resposta_autor': forms.Textarea(attrs={
+                'rows': 6,
+                'placeholder': 'Agradeça o feedback e comente como pretende utilizá-lo nas melhorias...',
+                'class': 'form-control'
+            }),
+        }
+        labels = {
+            'resposta_autor': 'Sua Resposta'
+        }
