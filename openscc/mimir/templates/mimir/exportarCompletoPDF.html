@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ problema.titulo }} - Caso Completo</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @frame footer {
+                -pdf-frame-content: footerContent;
+                bottom: 1cm;
+                margin-left: 2cm;
+                margin-right: 2cm;
+                height: 1cm;
+            }
+        }
+        
+        body {
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin: 5px 0;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            background-color: #f8f9fa;
+            padding: 8px 12px;
+            border-left: 4px solid #3498db;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: table-row;
+        }
+        
+        .info-label {
+            display: table-cell;
+            font-weight: bold;
+            padding: 4px 8px 4px 0;
+            width: 30%;
+            vertical-align: top;
+        }
+        
+        .info-value {
+            display: table-cell;
+            padding: 4px 0;
+            vertical-align: top;
+        }
+        
+        .parte {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            page-break-inside: avoid;
+        }
+        
+        .parte-header {
+            background-color: #ecf0f1;
+            padding: 6px 10px;
+            margin: -10px -10px 10px -10px;
+            border-radius: 4px 4px 0 0;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .parte-content {
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        
+        .guia-content {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .guia-section {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        
+        .guia-section-title {
+            background-color: #e8f5e8;
+            padding: 6px 10px;
+            border-left: 4px solid #27ae60;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .guia-subsection {
+            margin-bottom: 10px;
+        }
+        
+        .guia-subsection-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 11px;
+        }
+        
+        .lista-obj {
+            margin: 5px 0;
+            padding-left: 15px;
+        }
+        
+        .lista-obj li {
+            margin-bottom: 3px;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            color: #7f8c8d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            padding: 6px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 6px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        ul, ol {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 3px;
+        }
+        
+        strong {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ problema.titulo }}</h1>
+        <div class="subtitle">Caso Clínico Completo - Exportado em {{ data_exportacao }}</div>
+    </div>
+
+    <!-- Seção de Informações do Problema -->
+    <div class="section">
+        <div class="section-title">📋 Informações do Caso</div>
+        <div class="info-grid">
+            <div class="info-row">
+                <div class="info-label">Tema:</div>
+                <div class="info-value">{{ problema.tema.nome }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Assunto:</div>
+                <div class="info-value">{{ problema.assunto.nome }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Data de Aplicação:</div>
+                <div class="info-value">{{ problema.dataAplicacao|date:"d/m/Y" }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Criado em:</div>
+                <div class="info-value">{{ problema.criado_em|date:"d/m/Y" }}</div>
+            </div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-row">
+                <div class="info-label">Objetivos de Aprendizagem:</div>
+                <div class="info-value">
+                    <ul class="lista-obj">
+                        {% for objetivo in problema.objetivos.all %}
+                        <li>{{ objetivo.descricao }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        {% if problema.fontes.all %}
+        <div class="info-grid">
+            <div class="info-row">
+                <div class="info-label">Fontes Utilizadas:</div>
+                <div class="info-value">
+                    <ul class="lista-obj">
+                        {% for fonte in problema.fontes.all %}
+                        <li>{{ fonte.nome }}{% if fonte.descricao %} - {{ fonte.descricao }}{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Seção das Partes do Problema -->
+    <div class="section">
+        <div class="section-title">📖 Desenvolvimento do Caso</div>
+        {% for parte in partes %}
+        <div class="parte">
+            <div class="parte-header">Parte {{ parte.ordem }}</div>
+            <div class="parte-content">{{ parte.enunciado|linebreaks }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Seção do Guia do Tutor -->
+    {% if guia_tutor %}
+    <div class="page-break"></div>
+    
+    <div class="header">
+        <h1>Guia do Tutor</h1>
+        <div class="subtitle">{{ problema.titulo }} - Exportado em {{ data_exportacao }}</div>
+    </div>
+
+    <div class="section">
+        <div class="guia-content">
+            {{ guia_tutor.conteudo|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div id="footerContent" class="footer">
+        Página <pdf:pagenumber> de <pdf:pagecount> - Gerado pelo Sistema Mimir em {{ data_exportacao }}
+    </div>
+</body>
+</html>

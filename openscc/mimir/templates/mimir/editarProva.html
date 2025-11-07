@@ -77,10 +77,41 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
-                                <h6>Pergunta {{ forloop.counter }}</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6>Pergunta {{ forloop.counter }}</h6>
+                                    <div>
+                                        <!-- Botões de Feedback para Pergunta -->
+                                        <button class="btn btn-outline-info btn-sm me-1" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#feedbackPerguntaModal{{ pergunta.id }}"
+                                                title="Solicitar Feedback">
+                                            <i class="fas fa-comment-medical"></i> Feedback
+                                        </button>
+                                        
+                                        {% if pergunta.feedbacks.exists %}
+                                        <button class="btn btn-info btn-sm me-1" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#verFeedbacksPerguntaModal{{ pergunta.id }}"
+                                                title="Ver Feedbacks">
+                                            <i class="fas fa-comments"></i> ({{ pergunta.feedbacks.count }})
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
                                 <p><strong>Pergunta:</strong> {{ pergunta.pergunta }}</p>
                                 <p><strong>Gabarito:</strong> {{ pergunta.gabarito }}</p>
                                 <p><strong>Tipo:</strong> {{ pergunta.tipoDePergunta }}</p>
+                                
+                                <!-- Indicador de feedbacks -->
+                                {% if pergunta.feedbacks.exists %}
+                                <div class="mt-2">
+                                    <small class="text-info">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        {{ pergunta.feedbacks.count }} feedback(s) disponível(is)
+                                    </small>
+                                </div>
+                                {% endif %}
                             </div>
                             <div>
                                 <form method="post" action="{% url 'mimir:removerPerguntaProva' prova.id pergunta.id %}">
@@ -91,6 +122,185 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Modal para pedir feedback da pergunta -->
+                <div class="modal fade" id="feedbackPerguntaModal{{ pergunta.id }}" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Solicitar Feedback - Pergunta {{ forloop.counter }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="post" action="{% url 'mimir:solicitarFeedbackPergunta' prova.id pergunta.id %}">
+                                {% csrf_token %}
+                                <div class="modal-body">
+                                    <div class="alert alert-info">
+                                        <h6>Pergunta {{ forloop.counter }}</h6>
+                                        <p class="mb-0"><strong>Pergunta:</strong> {{ pergunta.pergunta|truncatewords:30 }}</p>
+                                        <p class="mb-0"><strong>Tipo:</strong> {{ pergunta.tipoDePergunta }}</p>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="especialistaPergunta{{ pergunta.id }}" class="form-label">Selecionar Especialista: *</label>
+                                        <select name="especialista_id" class="form-select" id="especialistaPergunta{{ pergunta.id }}" required>
+                                            <option value="">Selecione um especialista...</option>
+                                            {% for especialista in especialistas %}
+                                            <option value="{{ especialista.id }}">
+                                                {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
+                                            </option>
+                                            {% empty %}
+                                            <option value="" disabled>Nenhum especialista disponível no sistema</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if not especialistas %}
+                                        <div class="alert alert-warning mt-2">
+                                            <small>
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                Nenhum usuário cadastrado como especialista. 
+                                                <a href="{% url 'admin:auth_user_add' %}" target="_blank">Cadastre usuários primeiro</a>.
+                                            </small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="mensagemPergunta{{ pergunta.id }}" class="form-label">Mensagem para o Especialista (opcional):</label>
+                                        <textarea name="mensagem" class="form-control" id="mensagemPergunta{{ pergunta.id }}" 
+                                                  rows="3" placeholder="Descreva quais aspectos você gostaria que o especialista avalie..."></textarea>
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <small>
+                                            <strong>Informação:</strong> O especialista receberá uma notificação e poderá 
+                                            fornecer feedback específico sobre esta pergunta.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-primary" {% if not especialistas %}disabled{% endif %}>
+                                        <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal para ver feedbacks da pergunta -->
+                <div class="modal fade" id="verFeedbacksPerguntaModal{{ pergunta.id }}" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Feedbacks - Pergunta {{ forloop.counter }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                {% for feedback in pergunta.feedbacks.all %}
+                                <div class="feedback-item mb-3 p-3 border rounded {% if feedback.utilizado %}border-success{% else %}bg-light{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <strong>{{ feedback.especialista.get_full_name|default:feedback.especialista.username }}</strong>
+                                            <small class="text-muted"> - {{ feedback.criado_em|date:"d/m/Y H:i" }}</small>
+                                        </div>
+                                        <div>
+                                            {% if feedback.utilizado %}
+                                            <span class="badge bg-success">Utilizado</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if feedback.mensagem_solicitacao %}
+                                    <div class="solicitacao-content mb-2">
+                                        <strong>Sua solicitação:</strong>
+                                        <p class="mb-1">{{ feedback.mensagem_solicitacao|linebreaks }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="feedback-content mb-2">
+                                        <strong>Feedback do especialista:</strong>
+                                        {% if feedback.comentarios %}
+                                            <p class="mb-1">{{ feedback.comentarios|linebreaks }}</p>
+                                        {% else %}
+                                            <p class="mb-1 text-muted">Aguardando feedback do especialista...</p>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {% if feedback.resposta_autor %}
+                                    <div class="resposta-content mb-2">
+                                        <strong>Sua resposta:</strong>
+                                        <p class="mb-1">{{ feedback.resposta_autor|linebreaks }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="feedback-actions">
+                                        {% if feedback.comentarios and not feedback.utilizado %}
+                                        <form method="post" action="{% url 'mimir:marcarFeedbackUtilizado' feedback.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check"></i> Marcar como Utilizado
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        
+                                        {% if feedback.comentarios %}
+                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#responderFeedbackPerguntaModal{{ feedback.id }}">
+                                            <i class="fas fa-reply"></i> Responder
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="alert alert-info">
+                                    Nenhum feedback recebido para esta pergunta.
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal para responder feedback da pergunta -->
+                {% for feedback in pergunta.feedbacks.all %}
+                <div class="modal fade" id="responderFeedbackPerguntaModal{{ feedback.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Responder Feedback</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="post" action="{% url 'mimir:responderFeedback' feedback.id %}">
+                                {% csrf_token %}
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Feedback de {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}:</label>
+                                        <div class="border p-2 bg-light rounded">
+                                            {{ feedback.comentarios|linebreaks }}
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="respostaPergunta{{ feedback.id }}" class="form-label">Sua Resposta:</label>
+                                        <textarea name="resposta" class="form-control" id="respostaPergunta{{ feedback.id }}" 
+                                                  rows="4" placeholder="Agradeça o feedback e comente como pretende utilizá-lo...">{{ feedback.resposta_autor|default:'' }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-primary">Salvar Resposta</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
                 {% endfor %}
             {% else %}
                 <p class="text-muted">Nenhuma pergunta adicionada à prova ainda.</p>
@@ -98,7 +308,7 @@
         </div>
     </div>
 
-    <!-- No template editar_prova.html, após o formulário de edição -->
+    <!-- Impressão -->
     <div class="card">
         <div class="card-header">
             <h5>Impressão</h5>
@@ -111,4 +321,13 @@
         </div>
     </div>
 </div>
+
+<style>
+.feedback-item {
+    border-left: 4px solid #17a2b8 !important;
+}
+.feedback-item.border-success {
+    border-left-color: #28a745 !important;
+}
+</style>
 {% endblock %}

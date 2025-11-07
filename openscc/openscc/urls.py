@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.static import static
 from django.conf import settings
+from django.views.generic.base import RedirectView
 
 admin.site.site_title = "OpenSCC - Sistema Aberto de Controle de Conferência"
 admin.site.site_header = "OpenSCC - Sistema Aberto de Controle de Conferência"
@@ -25,6 +26,7 @@ admin.site.site_header = "Administração do Sistema"
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('login', RedirectView.as_view(url='login/', permanent=True)),
     path("accounts/", include("django.contrib.auth.urls")),
     path("mimir/", include("mimir.urls")),
     path("", include("submission.urls")),

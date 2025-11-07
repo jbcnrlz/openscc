@@ -1,0 +1,229 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-sync-alt"></i>
+                        Regerar Parte {{ parte_ordem }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Como funciona:</h6>
+                        <p class="mb-0">
+                            Descreva abaixo como você quer que a <strong>Parte {{ parte_ordem }}</strong> seja modificada. 
+                            A IA irá regenerar esta parte seguindo suas instruções específicas.
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Problema: {{ problema.titulo }}</h6>
+                        <p class="text-muted mb-0">Tema: {{ problema.tema.nome }} | Assunto: {{ problema.assunto.nome }}</p>
+                    </div>
+
+                    <form method="post" id="regerarForm">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.parte_ordem.label_tag }}
+                                    {{ form.parte_ordem }}
+                                    {% if form.parte_ordem.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.parte_ordem.errors %}
+                                        <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.instrucoes.label_tag }}
+                            {{ form.instrucoes }}
+                            {% if form.instrucoes.help_text %}
+                            <div class="form-text">{{ form.instrucoes.help_text }}</div>
+                            {% endif %}
+                            {% if form.instrucoes.errors %}
+                            <div class="text-danger">
+                                {% for error in form.instrucoes.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" id="btnConfirmar" class="btn btn-warning">
+                                <i class="fas fa-sync-alt"></i> Confirmar Regeração
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Exemplos de Instruções -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Exemplos de Instruções</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Para adicionar detalhes:</h6>
+                            <ul class="small">
+                                <li>"Adicione mais sintomas específicos"</li>
+                                <li>"Inclua valores numéricos nos exames"</li>
+                                <li>"Descreva com mais detalhes o exame físico"</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Para modificar conteúdo:</h6>
+                            <ul class="small">
+                                <li>"Mude o desfecho para um cenário mais complexo"</li>
+                                <li>"Inclua uma complicação inesperada"</li>
+                                <li>"Faça o caso evoluir de forma diferente"</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <h6>Para melhorar clareza:</h6>
+                            <ul class="small">
+                                <li>"Simplifique a linguagem técnica"</li>
+                                <li>"Organize as informações em tópicos"</li>
+                                <li>"Adicione marcadores para listas"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('btnPreview');
+    const confirmBtn = document.getElementById('btnConfirmar');
+    const previewSection = document.getElementById('previewSection');
+    const previewContent = document.getElementById('previewContent');
+    const form = document.getElementById('regerarForm');
+    
+    // Gerar preview
+    previewBtn.addEventListener('click', function() {
+        const parteOrdem = document.getElementById('id_parte_ordem').value;
+        const instrucoes = document.getElementById('id_instrucoes').value;
+        
+        if (!parteOrdem || !instrucoes) {
+            alert('Por favor, preencha o número da parte e as instruções.');
+            return;
+        }
+        
+        // Mostrar loading
+        previewContent.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2">Gerando preview...</p>
+            </div>
+        `;
+        previewSection.classList.remove('d-none');
+        
+        // Fazer requisição AJAX
+        fetch(`/problemas/{{ problema.pk }}/regerar-parte-ajax/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `parte_ordem=${parteOrdem}&instrucoes=${encodeURIComponent(instrucoes)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                previewContent.innerHTML = data.preview.replace(/\n/g, '<br>');
+                confirmBtn.disabled = false;
+            } else {
+                previewContent.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        ${data.message}
+                    </div>
+                `;
+                confirmBtn.disabled = true;
+            }
+        })
+        .catch(error => {
+            previewContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Erro ao gerar preview. Tente novamente.
+                </div>
+            `;
+            confirmBtn.disabled = true;
+        });
+    });
+    
+    // Confirmar regeração
+    form.addEventListener('submit', function(e) {
+        const instrucoes = document.getElementById('id_instrucoes').value;
+        if (!instrucoes.trim()) {
+            e.preventDefault();
+            alert('Por favor, forneça instruções para a regeração.');
+            return;
+        }
+        
+        // Mostrar loading no botão de confirmação
+        confirmBtn.innerHTML = `
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Regerando...
+        `;
+        confirmBtn.disabled = true;
+    });
+    
+    // Função para obter o token CSRF
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+
+<style>
+#previewContent {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+</style>
+{% endblock %}
