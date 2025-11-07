@@ -175,14 +175,6 @@ def inscricao(request, id):
             # Fazer a inscrição
             atv.participantes.add(request.user)
             
-            # Criar registro na tabela de participação
-            ParticipanteAtividade.objects.create(
-                atividade=atv,
-                user=request.user,
-                presenca=False,
-                data_registro=timezone.now()
-            )
-            
             messages.success(request, f"Inscrição na atividade '{atv.nome}' realizada com sucesso!")
             
             # Redirecionar mantendo a data selecionada
