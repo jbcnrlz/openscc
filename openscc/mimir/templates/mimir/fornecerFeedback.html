@@ -1,0 +1,365 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-edit"></i>
+                        Fornecer Feedback
+                        <span class="badge bg-light text-primary ms-2">
+                            {% if feedback.tipo == 'problema' %}Problema{% else %}Pergunta{% endif %}
+                        </span>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Cabeçalho com informações da solicitação -->
+                    <div class="alert alert-info">
+
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6>Solicitação de: {{ feedback.solicitante.get_full_name|default:feedback.solicitante.username }}</h6>
+                                
+                                {% if feedback.tipo == 'problema' %}
+                                    <p class="mb-1"><strong>Problema:</strong> {{ feedback.parte.problema.titulo }}</p>
+                                    <p class="mb-0"><strong>Parte {{ feedback.parte.ordem }}:</strong> {{ feedback.parte.enunciado|truncatewords:50 }}</p>
+                                {% else %}
+                                    <p class="mb-1"><strong>Prova:</strong> {{ feedback.pergunta.prova_set.first.titulo|default:"Prova" }}</p>
+                                    <p class="mb-0"><strong>Assunto:</strong> {{ feedback.pergunta.assunto.nome }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-info">Status: {{ feedback.get_status_display }}</span>
+                                <!-- No template fornecerFeedback.html, após o alerta de informações -->
+                                <div class="mt-2">
+                                    {% if feedback.tipo == 'pergunta' and feedback.pergunta %}
+                                        {% with prova=feedback.pergunta.get_primeira_prova %}
+                                            {% if prova %}
+                                                <a href="{% url 'mimir:visualizarProvaEspecialistaComFeedback' prova.id feedback.id %}" 
+                                                class="btn btn-outline-info btn-sm">
+                                                    <i class="fas fa-eye me-1"></i> Visualizar Prova Completa
+                                                </a>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                </div>
+
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    {% if feedback.mensagem_solicitacao %}
+                    <div class="mb-3 p-3 bg-light rounded">
+                        <strong>Mensagem do solicitante:</strong>
+                        <p class="mb-0">{{ feedback.mensagem_solicitacao }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Alerta sobre sobreposição -->
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-info-circle me-2"></i>Importante sobre o Feedback</h6>
+                        <p class="mb-0">
+                            <strong>Seu feedback pode substituir o conteúdo original!</strong> 
+                            Quando o autor aceitar seu feedback, o conteúdo {% if feedback.tipo == 'problema' %}da parte do problema{% else %}da pergunta e gabarito{% endif %} 
+                            será atualizado com suas sugestões.
+                        </p>
+                    </div>
+
+                    <!-- Detalhes do Conteúdo Original -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0">
+                                    {% if feedback.tipo == 'problema' %}
+                                        <i class="fas fa-clipboard-list me-2"></i>
+                                        Conteúdo Original - Parte {{ feedback.parte.ordem }}
+                                    {% else %}
+                                        <i class="fas fa-question-circle me-2"></i>
+                                        Conteúdo Original - Pergunta
+                                    {% endif %}
+                                </h6>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="copiarConteudoOriginal()">
+                                    <i class="fas fa-copy me-1"></i> Copiar Conteúdo
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if feedback.tipo == 'problema' %}
+                                <div class="mb-3">
+                                    <strong>Enunciado Completo:</strong>
+                                    <div class="mt-1 p-3 bg-light rounded border original-content" id="conteudoOriginal">
+                                        {{ feedback.parte.enunciado|linebreaks }}
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Tema:</strong>
+                                        <p>{{ feedback.parte.problema.tema.nome }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Assunto:</strong>
+                                        <p>{{ feedback.parte.problema.assunto.nome }}</p>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="mb-3">
+                                    <strong>Pergunta Completa:</strong>
+                                    <div class="mt-1 p-3 bg-light rounded border original-content" id="perguntaOriginal">
+                                        {{ feedback.pergunta.pergunta|linebreaks }}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <strong>Gabarito Original:</strong>
+                                    <div class="mt-1 p-3 bg-light rounded border original-content" id="gabaritoOriginal">
+                                        {{ feedback.pergunta.gabarito|linebreaks }}
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <strong>Tipo:</strong>
+                                        <p>{{ feedback.pergunta.tipoDePergunta }}</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Assunto:</strong>
+                                        <p>{{ feedback.pergunta.assunto.nome }}</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Prova:</strong>
+                                        <p>{{ feedback.pergunta.prova_set.first.titulo|default:"N/A" }}</p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Formulário de Feedback -->
+                    <form method="post" id="feedbackForm">
+                        {% csrf_token %}
+                        
+                        {% if feedback.tipo == 'problema' %}
+                            <!-- Feedback para Problemas -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-edit me-2"></i>
+                                        Seu Feedback - Parte do Problema
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="comentarios" class="form-label">
+                                            Enunciado Revisado *
+                                            <small class="text-muted">(substituirá o conteúdo original)</small>
+                                        </label>
+                                        <textarea name="comentarios" class="form-control" id="comentarios" 
+                                                  rows="12" placeholder="Digite aqui a versão revisada do enunciado...
+- Mantenha a estrutura original
+- Corrija erros de formatação
+- Melhore a clareza e precisão
+- Sugira melhorias na redação
+- Mantenha o nível de dificuldade apropriado" required>{{ feedback.comentarios|default:'' }}</textarea>
+                                        <small class="form-text text-muted">
+                                            Este texto substituirá o enunciado original quando o autor aceitar seu feedback.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                        {% else %}
+                            <!-- Feedback para Perguntas -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-edit me-2"></i>
+                                        Seu Feedback - Pergunta e Gabarito
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="pergunta_revisada" class="form-label">
+                                            Pergunta Revisada *
+                                            <small class="text-muted">(substituirá a pergunta original)</small>
+                                        </label>
+                                        <textarea name="pergunta_revisada" class="form-control" id="pergunta_revisada" 
+                                                  rows="8" placeholder="Digite aqui a versão revisada da pergunta...
+- Corrija eventuais erros
+- Melhore a clareza da questão
+- Verifique a precisão técnica
+- Mantenha o formato apropriado" required>{{ pergunta_revisada|default:feedback.pergunta.pergunta }}</textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="gabarito_revisado" class="form-label">
+                                            Gabarito Revisado *
+                                            <small class="text-muted">(substituirá o gabarito original)</small>
+                                        </label>
+                                        <textarea name="gabarito_revisado" class="form-control" id="gabarito_revisado" 
+                                                  rows="6" placeholder="Digite aqui a versão revisada do gabarito...
+- Para questões objetivas: letra da alternativa correta
+- Para questões discursivas: padrão de resposta esperado
+- Verifique a correção técnica
+- Mantenha o formato apropriado" required>{{ gabarito_revisado|default:feedback.pergunta.gabarito }}</textarea>
+                                    </div>
+
+                                    <div class="alert alert-info">
+                                        <small>
+                                            <i class="fas fa-info-circle"></i>
+                                            <strong>Nota:</strong> A pergunta e o gabarito serão concatenados automaticamente 
+                                            com o separador <code>---GABARITO---</code> para garantir o processamento correto.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Dicas para feedback de qualidade -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-lightbulb me-2"></i>
+                                    Dicas para um Feedback de Qualidade
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>O que verificar:</h6>
+                                        <ul class="small">
+                                            <li>Clareza e objetividade</li>
+                                            <li>Precisão técnica/conceitual</li>
+                                            <li>Gramática e ortografia</li>
+                                            <li>Formatação adequada</li>
+                                            <li>Nível de dificuldade apropriado</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Como fornecer:</h6>
+                                        <ul class="small">
+                                            <li>Seja específico e construtivo</li>
+                                            <li>Explique o "porquê" das mudanças</li>
+                                            <li>Mantenha tom profissional</li>
+                                            <li>Destaque pontos fortes também</li>
+                                            <li>Sugira alternativas quando possível</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <small>
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Lembrete:</strong> Seu feedback será visível para o autor 
+                                {% if feedback.tipo == 'problema' %}do problema{% else %}da prova{% endif %}. 
+                                Mantenha um tom profissional e construtivo.
+                            </small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check"></i> 
+                                {% if feedback.comentarios %}Atualizar Feedback{% else %}Enviar Feedback{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarConteudoOriginal() {
+    {% if feedback.tipo == 'problema' %}
+        // Copiar enunciado do problema
+        const conteudo = document.getElementById('conteudoOriginal').innerText;
+        navigator.clipboard.writeText(conteudo).then(function() {
+            showToast('Conteúdo original copiado para a área de transferência!');
+        });
+    {% else %}
+        // Copiar pergunta e gabarito
+        const pergunta = document.getElementById('perguntaOriginal').innerText;
+        const gabarito = document.getElementById('gabaritoOriginal').innerText;
+        const conteudoCompleto = pergunta + "\n\n---GABARITO---\n\n" + gabarito;
+        
+        navigator.clipboard.writeText(conteudoCompleto).then(function() {
+            showToast('Pergunta e gabarito copiados para a área de transferência!');
+        });
+    {% endif %}
+}
+
+function showToast(message) {
+    // Criar e mostrar um toast de notificação
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed bottom-0 end-0 p-3';
+    toast.style.zIndex = '11';
+    toast.innerHTML = `
+        <div class="toast show" role="alert">
+            <div class="toast-header bg-success text-white">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong class="me-auto">Sucesso</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    // Remover automaticamente após 3 segundos
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Para perguntas, concatenar automaticamente antes do envio
+document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+    {% if feedback.tipo == 'pergunta' %}
+        const pergunta = document.getElementById('pergunta_revisada').value;
+        const gabarito = document.getElementById('gabarito_revisado').value;
+        
+        if (pergunta && gabarito) {
+            // Criar campo hidden com o conteúdo concatenado
+            let hiddenField = document.getElementById('comentarios_concatenados');
+            if (!hiddenField) {
+                hiddenField = document.createElement('input');
+                hiddenField.type = 'hidden';
+                hiddenField.name = 'comentarios';
+                hiddenField.id = 'comentarios_concatenados';
+                this.appendChild(hiddenField);
+            }
+            hiddenField.value = pergunta + '\n\n---GABARITO---\n\n' + gabarito;
+        }
+    {% endif %}
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.alert-info {
+    border-left: 4px solid #17a2b8;
+}
+.original-content {
+    font-family: 'Courier New', monospace;
+    background-color: #f8f9fa !important;
+}
+.toast {
+    min-width: 250px;
+}
+.badge {
+    font-size: 0.7rem;
+}
+</style>
+{% endblock %}

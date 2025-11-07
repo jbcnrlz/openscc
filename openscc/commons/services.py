@@ -3,6 +3,134 @@ from django.core.files.storage import default_storage
 from django.conf import settings
 import pdfplumber, json, re
 
+def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fontes_info, instrucoesGuia):
+        return f"""
+        Com base no problema abaixo, gere um GUIA DO TUTOR detalhado seguindo EXATAMENTE a estrutura fornecida:
+
+        # TÍTULO DO PROBLEMA: {titulo}
+        TEMA: {tema}
+        ASSUNTO: {assunto}
+        OBJETIVOS DE APRENDIZAGEM: {', '.join(objetivos)}
+
+        # TEXTO COMPLETO DO PROBLEMA:
+        {texto_problema}
+
+        # FONTES DE REFERÊNCIA:
+        {fontes_info}
+
+        --- ESTRUTURA DO GUIA DO TUTOR ---
+
+        {instrucoesGuia}
+        """
+
+def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fontes, instrucoes, parte_original):
+        prompt = f"""
+        Você é um especialista em {tema} revisando e melhorando um problema de aprendizado.
+
+        TEMA: {tema}
+        ASSUNTO: {assunto}
+        OBJETIVOS: {', '.join(objetivos)}
+
+        FONTES DE REFERÊNCIA:
+        {fontes}
+
+        CONTEXTO ANTERIOR (Partes 1 a {parte_ordem-1}):
+        {contexto_anterior}
+
+        PARTE ORIGINAL {parte_ordem} (para referência):
+        {parte_original}
+
+        INSTRUÇÕES ESPECÍFICAS DO USUÁRIO:
+        {instrucoes}
+
+        Sua tarefa é gerar uma NOVA VERSÃO para a PARTE {parte_ordem} que:
+        1. Siga rigorosamente as instruções do usuário acima
+        2. Mantenha coerência total com o contexto anterior
+        3. Preserve os objetivos de aprendizagem originais
+        4. Integre as fontes de referência quando relevante
+        5. Mantenha o mesmo nível de detalhe e complexidade
+        6. Seja uma melhoria clara em relação à versão original
+
+        Diretrizes importantes:
+        - Foque em atender especificamente às instruções do usuário
+        - Mantenha o fluxo narrativo natural
+        - Não quebre a continuidade com as partes seguintes
+        - Se as instruções pedirem mudanças específicas, implemente-as claramente
+
+        Forneça APENAS o texto da nova parte {parte_ordem}, sem marcações, números ou comentários.
+        """
+        
+        return prompt
+
+def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, contexto_anterior,fontes):
+    total_partes = total_partes if total_partes else "N"
+    return f"""
+    Você é um especialista em {tema} criando um problema de aprendizado sequencial.
+    
+    TEMA: {tema}
+    ASSUNTO: {assunto}
+    OBJETIVOS: {', '.join(objetivos)}
+    
+    FONTES DE REFERÊNCIA:
+    {fontes}
+
+    CONTEXTO ANTERIOR:
+    {contexto_anterior}
+    
+    Gere a PARTE {parte_atual} de {total_partes} deste problema.
+    
+    Esta parte deve:
+    1. Desenvolver naturalmente a partir do contexto anterior
+    2. Adicionar novas informações ou complicações relevantes
+    3. Manter coerência com o tema e objetivos
+    4. Ser autocontida mas deixar espaço para desenvolvimento futuro
+    5. Incluir elementos práticos e realistas
+    
+    Forneça apenas o texto da parte {parte_atual}, sem marcações ou números.
+    """
+
+def chamarApiLLM(prompt):
+    try:
+        # Gerar conteúdo
+        # Configurar API do Gemini
+        client = genai.Client(api_key=settings.GEMINI_API_KEY) # Recomendado: usar settings
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )             
+        return response.text                
+    except Exception:
+        return None
+
+def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
+    """Processa PDF em lotes para evitar timeout"""
+    textos_por_lote = []
+    
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            total_paginas = len(pdf.pages)
+            lotes = [pdf.pages[i:i+max_pages_per_batch] 
+                    for i in range(0, total_paginas, max_pages_per_batch)]
+            
+            for indice_lote, lote_paginas in enumerate(lotes):
+                texto_lote = f"FONTE: {fileName} - LOTE {indice_lote + 1}\n"
+                
+                for i, pagina in enumerate(lote_paginas, 1):
+                    try:
+                        texto_pagina = pagina.extract_text()
+                        if texto_pagina and texto_pagina.strip():
+                            texto_lote += f"--- PÁGINA {(indice_lote * max_pages_per_batch) + i} ---\n"
+                            texto_lote += texto_pagina.strip() + "\n\n"
+                    except Exception as e:
+                        texto_lote += f"Erro na página {(indice_lote * max_pages_per_batch) + i}: {str(e)}\n"
+                
+                textos_por_lote.append(texto_lote)
+                
+    except Exception as e:
+        textos_por_lote.append(f"Erro ao processar {fp[1]}: {str(e)}")
+    
+    return textos_por_lote
+
 def extrair_texto_pdf(caminho_arquivo):
     """Extrai texto de PDF com tratamento robusto de erros"""
     try:
@@ -34,7 +162,7 @@ def getQuestionsFromSource(file_path,qtPerguntas,infoExtras):
         # Extrair texto do PDF
         completoTudo = ''
         for fp in file_path:
-            conteudo_extraido = extrair_texto_pdf(fp[0])
+            conteudo_extraido = processar_pdf_em_lotes(fp[0],fp[1])
             texto_completo = "\n".join(conteudo_extraido)
             completoTudo += f"FONTE - {fp[1]}\n" + texto_completo + "\n\n"
         

@@ -1,0 +1,99 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-comment-medical"></i>
+                        Solicitar Feedback - Pergunta
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Prova: {{ prova.titulo }}</h6>
+                        <p class="mb-0"><strong>Pergunta:</strong> {{ pergunta.pergunta|truncatewords:30 }}</p>
+                        <p class="mb-0"><strong>Tipo:</strong> {{ pergunta.tipoDePergunta }}</p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="especialista" class="form-label">Selecionar Especialista:</label>
+                            <select name="especialista_id" class="form-select" id="especialista" required>
+                                <option value="">Selecione um especialista...</option>
+                                {% for especialista in especialistas %}
+                                <option value="{{ especialista.id }}">
+                                    {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
+                                </option>
+                                {% empty %}
+                                <option value="" disabled>Nenhum especialista disponível</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Especialistas são usuários com conhecimento no assunto da prova.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="mensagem" class="form-label">Mensagem para o Especialista (opcional):</label>
+                            <textarea name="mensagem" class="form-control" id="mensagem" 
+                                      rows="4" placeholder="Descreva quais aspectos você gostaria que o especialista avalie...
+- Clareza da pergunta
+- Adequação do gabarito
+- Dificuldade apropriada
+- Outras observações..."></textarea>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <small>
+                                <strong>Importante:</strong> O especialista receberá acesso à pergunta completa, 
+                                incluindo o gabarito, para poder fornecer um feedback adequado.
+                            </small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary" {% if not especialistas %}disabled{% endif %}>
+                                <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Detalhes da Pergunta -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Detalhes Completos da Pergunta</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Pergunta Completa:</strong>
+                        <p class="mt-1 p-2 bg-light rounded">{{ pergunta.pergunta|linebreaks }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Gabarito:</strong>
+                        <p class="mt-1 p-2 bg-light rounded">{{ pergunta.gabarito|linebreaks }}</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Tipo:</strong>
+                            <p>{{ pergunta.tipoDePergunta }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Assunto:</strong>
+                            <p>{{ pergunta.assunto.nome }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

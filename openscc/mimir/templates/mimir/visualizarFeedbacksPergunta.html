@@ -1,0 +1,176 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-comments"></i>
+                        Feedbacks - Pergunta
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Prova: {{ prova.titulo }}</h6>
+                        <p class="mb-0"><strong>Pergunta:</strong> {{ pergunta.pergunta|truncatewords:30 }}</p>
+                        <p class="mb-0"><strong>Tipo:</strong> {{ pergunta.tipoDePergunta }}</p>
+                    </div>
+
+                    {% if feedbacks %}
+                        {% for feedback in feedbacks %}
+                        <div class="feedback-item mb-4 p-3 border rounded {% if feedback.utilizado %}border-success{% else %}bg-light{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong>{{ feedback.especialista.get_full_name|default:feedback.especialista.username }}</strong>
+                                    <small class="text-muted"> - {{ feedback.criado_em|date:"d/m/Y H:i" }}</small>
+                                </div>
+                                <div>
+                                    {% if feedback.utilizado %}
+                                    <span class="badge bg-success">Utilizado</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            {% if feedback.mensagem_solicitacao %}
+                            <div class="solicitacao-content mb-2">
+                                <strong>Sua solicitação:</strong>
+                                <p class="mb-1">{{ feedback.mensagem_solicitacao|linebreaks }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="feedback-content mb-2">
+                                <strong>Feedback do especialista:</strong>
+                                {% if feedback.comentarios %}
+                                    <p class="mb-1">{{ feedback.comentarios|linebreaks }}</p>
+                                {% else %}
+                                    <p class="mb-1 text-muted">Aguardando feedback do especialista...</p>
+                                {% endif %}
+                            </div>
+                            
+                            {% if feedback.resposta_autor %}
+                            <div class="resposta-content mb-2">
+                                <strong>Sua resposta:</strong>
+                                <p class="mb-1">{{ feedback.resposta_autor|linebreaks }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="feedback-actions mt-3">
+                                {% if feedback.comentarios and not feedback.utilizado %}
+                                <form method="post" action="{% url 'mimir:marcarFeedbackUtilizado' feedback.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-check"></i> Marcar como Utilizado
+                                    </button>
+                                </form>
+                                {% endif %}
+                                
+                                {% if feedback.comentarios %}
+                                <button type="button" class="btn btn-outline-primary btn-sm" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#responderFeedbackModal{{ feedback.id }}">
+                                    <i class="fas fa-reply"></i> Responder
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Modal para responder feedback -->
+                        <div class="modal fade" id="responderFeedbackModal{{ feedback.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Responder Feedback</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="post" action="{% url 'mimir:responderFeedback' feedback.id %}">
+                                        {% csrf_token %}
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Feedback de {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}:</label>
+                                                <div class="border p-2 bg-light rounded">
+                                                    {{ feedback.comentarios|linebreaks }}
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="resposta{{ feedback.id }}" class="form-label">Sua Resposta:</label>
+                                                <textarea name="resposta" class="form-control" id="resposta{{ feedback.id }}" 
+                                                          rows="4" placeholder="Agradeça o feedback e comente como pretende utilizá-lo...">{{ feedback.resposta_autor|default:'' }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary">Salvar Resposta</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5>Nenhum feedback recebido</h5>
+                            <p class="text-muted">Esta pergunta ainda não recebeu nenhum feedback.</p>
+                            <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-primary">
+                                <i class="fas fa-arrow-left"></i> Voltar para a Prova
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Detalhes da Pergunta -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Detalhes da Pergunta</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Pergunta:</strong>
+                        <p class="mt-1 p-2 bg-light rounded">{{ pergunta.pergunta|linebreaks }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Gabarito:</strong>
+                        <p class="mt-1 p-2 bg-light rounded">{{ pergunta.gabarito|linebreaks }}</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Tipo:</strong>
+                            <p>{{ pergunta.tipoDePergunta }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Assunto:</strong>
+                            <p>{{ pergunta.assunto.nome }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar para Edição da Prova
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.feedback-item {
+    border-left: 4px solid #17a2b8 !important;
+    transition: transform 0.2s ease;
+}
+.feedback-item:hover {
+    transform: translateY(-2px);
+}
+.feedback-item.border-success {
+    border-left-color: #28a745 !important;
+}
+</style>
+{% endblock %}

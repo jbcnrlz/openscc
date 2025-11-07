@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ problema.titulo }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @frame footer {
+                -pdf-frame-content: footerContent;
+                bottom: 1cm;
+                margin-left: 2cm;
+                margin-right: 2cm;
+                height: 1cm;
+            }
+        }
+        
+        body {
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin: 5px 0;
+        }
+        
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: table-row;
+        }
+        
+        .info-label {
+            display: table-cell;
+            font-weight: bold;
+            padding: 4px 8px 4px 0;
+            width: 30%;
+            vertical-align: top;
+        }
+        
+        .info-value {
+            display: table-cell;
+            padding: 4px 0;
+            vertical-align: top;
+        }
+        
+        .parte {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            page-break-inside: avoid;
+        }
+        
+        .parte-header {
+            background-color: #ecf0f1;
+            padding: 6px 10px;
+            margin: -10px -10px 10px -10px;
+            border-radius: 4px 4px 0 0;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .parte-content {
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        
+        .lista-obj {
+            margin: 5px 0;
+            padding-left: 15px;
+        }
+        
+        .lista-obj li {
+            margin-bottom: 3px;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            color: #7f8c8d;
+        }
+        
+        ul, ol {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ problema.titulo }}</h1>
+        <div class="subtitle">Caso Clínico - Exportado em {{ data_exportacao }}</div>
+    </div>
+
+    <!-- Informações do Problema -->
+    <div class="info-grid">
+        <div class="info-row">
+            <div class="info-label">Tema:</div>
+            <div class="info-value">{{ problema.tema.nome }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Assunto:</div>
+            <div class="info-value">{{ problema.assunto.nome }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Data de Aplicação:</div>
+            <div class="info-value">{{ problema.dataAplicacao|date:"d/m/Y" }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Objetivos:</div>
+            <div class="info-value">
+                <ul class="lista-obj">
+                    {% for objetivo in problema.objetivos.all %}
+                    <li>{{ objetivo.descricao }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partes do Problema -->
+    {% for parte in partes %}
+    <div class="parte">
+        <div class="parte-header">Parte {{ parte.ordem }}</div>
+        <div class="parte-content">{{ parte.enunciado|linebreaks }}</div>
+    </div>
+    {% endfor %}
+
+    <div id="footerContent" class="footer">
+        Página <pdf:pagenumber> de <pdf:pagecount> - {{ problema.titulo }} - Gerado em {{ data_exportacao }}
+    </div>
+</body>
+</html>

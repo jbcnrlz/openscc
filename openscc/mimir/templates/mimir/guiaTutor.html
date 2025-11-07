@@ -1,0 +1,203 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-chalkboard-teacher"></i>
+            Guia do Tutor
+        </h1>
+        <div>
+            {% if guia_tutor %}
+            <a href="{% url 'mimir:exportarGuiaPDF' problema.pk %}" class="btn btn-danger me-2">
+                <i class="fas fa-file-pdf"></i> Exportar PDF
+            </a>
+            {% endif %}
+            <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Voltar ao Problema
+            </a>
+            {% if guia_tutor %}
+            <form method="post" action="{% url 'mimir:atualizarGuiaTutor' problema.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-sync-alt"></i> Atualizar Guia
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Informações do Problema
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ problema.titulo }}</h6>
+                    <p class="mb-2"><strong>Tema:</strong> {{ problema.tema.nome }}</p>
+                    <p class="mb-2"><strong>Assunto:</strong> {{ problema.assunto.nome }}</p>
+                    <p class="mb-2"><strong>Data de Aplicação:</strong> {{ problema.dataAplicacao|date:"d/m/Y" }}</p>
+                    
+                    <div class="mt-3">
+                        <strong>Objetivos:</strong>
+                        <ul class="list-unstyled mt-1">
+                            {% for objetivo in problema.objetivos.all %}
+                            <li><small class="text-muted">• {{ objetivo.descricao }}</small></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {% if not guia_tutor %}
+                    <div class="alert alert-warning mt-3">
+                        <small>
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Guia do Tutor ainda não gerado.
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Ações</h5>
+                </div>
+                <div class="card-body">
+                    {% if not guia_tutor %}
+                    <form method="post" action="{% url 'mimir:gerarGuiaTutor' problema.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-sm w-100 mb-2">
+                            <i class="fas fa-robot"></i> Gerar Guia do Tutor
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-outline-secondary btn-sm w-100 mb-2">
+                        <i class="fas fa-file-alt"></i> Ver Problema Completo
+                    </a>
+                    
+                    {% if guia_tutor %}
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-clock"></i>
+                            Última atualização: {{ guia_tutor.atualizado_em|date:"d/m/Y H:i" }}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            {% if guia_tutor %}
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-book"></i>
+                        Guia do Tutor - {{ problema.titulo }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="guia-content">
+                        {{ guia_tutor.conteudo|linebreaks }}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            Gerado em: {{ guia_tutor.criado_em|date:"d/m/Y H:i" }}
+                        </small>
+                        <form method="post" action="{% url 'mimir:atualizarGuiaTutor' problema.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-chalkboard-teacher fa-3x text-muted mb-3"></i>
+                    <h4>Guia do Tutor Não Gerado</h4>
+                    <p class="text-muted mb-4">
+                        O Guia do Tutor fornece orientações detalhadas para facilitar a discussão do caso com os alunos.
+                    </p>
+                    <form method="post" action="{% url 'mimir:gerarGuiaTutor' problema.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-robot"></i> Gerar Guia do Tutor com IA
+                        </button>
+                    </form>
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            O guia incluirá: interpretação de achados, aspectos fisiopatológicos, plano de cuidado e perguntas para discussão.
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.guia-content {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+}
+
+.guia-content h1,
+.guia-content h2,
+.guia-content h3,
+.guia-content h4 {
+    color: #2c3e50;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.guia-content h1 {
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
+}
+
+.guia-content h2 {
+    border-left: 4px solid #2ecc71;
+    padding-left: 1rem;
+}
+
+.guia-content h3 {
+    color: #34495e;
+}
+
+.guia-content ul, 
+.guia-content ol {
+    padding-left: 1.5rem;
+}
+
+.guia-content li {
+    margin-bottom: 0.5rem;
+}
+
+.guia-content strong {
+    color: #2980b9;
+}
+
+.guia-content .emoji {
+    font-size: 1.1em;
+    margin-right: 0.3em;
+}
+
+/* Estilo para as seções principais */
+.guia-content > h2:first-of-type {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border-left: 4px solid #e74c3c;
+}
+</style>
+{% endblock %}

@@ -131,4 +131,5 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MEDIA_ROOT = os.path.join(str(Path(__file__).resolve().parent.parent.parent),"media")
-GEMINI_API_KEY = "GEMINI_API_KEY"
+GEMINI_API_KEY = "AIzaSyCvdi0DtMEURKemFS4KABYybX0L57btUo4"
+APPEND_SLASH = True

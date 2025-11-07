@@ -1,0 +1,85 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-reply"></i>
+                        Responder Feedback
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Feedback de: {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}</h6>
+                        
+                        {% if feedback.tipo == 'problema' %}
+                            <p class="mb-1"><strong>Problema:</strong> {{ feedback.parte.problema.titulo }}</p>
+                            <p class="mb-0"><strong>Parte {{ feedback.parte.ordem }}:</strong> {{ feedback.parte.enunciado|truncatewords:30 }}</p>
+                        {% else %}
+                            <p class="mb-1"><strong>Prova:</strong> {{ feedback.pergunta.prova_set.first.titulo|default:"Prova" }}</p>
+                            <p class="mb-0"><strong>Pergunta:</strong> {{ feedback.pergunta.pergunta|truncatewords:30 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Feedback do especialista:</label>
+                        <div class="border p-3 bg-light rounded">
+                            {{ feedback.comentarios|linebreaks }}
+                        </div>
+                    </div>
+
+                    {% if feedback.mensagem_solicitacao %}
+                    <div class="mb-3">
+                        <label class="form-label">Sua solicitação original:</label>
+                        <div class="border p-3 bg-light rounded">
+                            {{ feedback.mensagem_solicitacao|linebreaks }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.resposta_autor.id_for_label }}" class="form-label">Sua Resposta:</label>
+                            {{ form.resposta_autor }}
+                            <small class="form-text text-muted">
+                                Agradeça o feedback e comente como pretende utilizá-lo nas melhorias.
+                            </small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            {% if feedback.tipo == 'problema' %}
+                                <a href="{% url 'mimir:problemaDetail' feedback.parte.problema.id %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            {% else %}
+                                {% with prova=feedback.pergunta.prova_set.first %}
+                                    {% if prova %}
+                                        <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                                    {% else %}
+                                        <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check"></i> Salvar Resposta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.alert-info {
+    border-left: 4px solid #17a2b8;
+}
+</style>
+{% endblock %}

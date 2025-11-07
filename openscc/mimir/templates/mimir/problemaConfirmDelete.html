@@ -1,0 +1,47 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Confirmar Exclusão
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Tem certeza que deseja excluir este problema?</h5>
+                    
+                    <div class="alert alert-warning">
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita. Todas as partes do problema também serão excluídas.
+                    </div>
+
+                    <div class="problem-info mb-4 p-3 border rounded">
+                        <h6>{{ problema.titulo }}</h6>
+                        <p class="mb-1"><strong>Tema:</strong> {{ problema.tema.nome }}</p>
+                        <p class="mb-1"><strong>Assunto:</strong> {{ problema.assunto.nome }}</p>
+                        <p class="mb-1"><strong>Criado em:</strong> {{ problema.criado_em|date:"d/m/Y H:i" }}</p>
+                        <p class="mb-0"><strong>Partes:</strong> {{ problema.parte_set.count }}</p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i>
+                                Confirmar Exclusão
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
