@@ -1,0 +1,267 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-primary">Aplicações de Prova</h1>
+        <div>
+            {% if aplicacoes %}
+            <a href="{% url 'mimir:selecionarProvaParaAplicacao' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Nova Aplicação
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas - Só mostra se tiver aplicações -->
+    {% if aplicacoes %}
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Total de Aplicações
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ aplicacoes.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Aplicações Ativas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {{ aplicacoes_ativas }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-play-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                Total de Alunos
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {{ total_alunos_geral }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Provas Concluídas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {{ total_concluidas_geral }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lista de Aplicações -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>Minhas Aplicações de Prova
+            </h5>
+            {% if aplicacoes %}
+            <a href="{% url 'mimir:selecionarProvaParaAplicacao' %}" class="btn btn-light btn-sm">
+                <i class="fas fa-plus me-1"></i>Nova Aplicação
+            </a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if aplicacoes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Prova</th>
+                            <th>Período</th>
+                            <th>Alunos</th>
+                            <th>Status</th>
+                            <th>Progresso</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for aplicacao in aplicacoes %}
+                        <tr>
+                            <td>
+                                <strong>{{ aplicacao.prova.titulo }}</strong>
+                                <br>
+                                <small class="text-muted">{{ aplicacao.prova.assunto.nome }}</small>
+                            </td>
+                            <td>
+                                <small>
+                                    <strong>Início:</strong> {{ aplicacao.data_disponivel|date:"d/m/Y H:i" }}<br>
+                                    <strong>Término:</strong> {{ aplicacao.data_limite|date:"d/m/Y H:i" }}
+                                </small>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ aplicacao.total_alunos }} alunos</span>
+                            </td>
+                            <td>
+                                {% if aplicacao.disponivel %}
+                                    {% if aplicacao.esta_disponivel %}
+                                        <span class="badge bg-success">Disponível</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Fora do período</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativa</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 8px;">
+                                    {% if aplicacao.total_alunos > 0 %}
+                                    {% widthratio aplicacao.alunos_concluidos aplicacao.total_alunos 100 as progress_width %}
+                                    <div class="progress-bar bg-success" style="width: {{ progress_width }}%">
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <small>{{ aplicacao.alunos_concluidos }}/{{ aplicacao.total_alunos }} concluíram</small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'mimir:detalhesAplicacaoProva' aplicacao.id %}" 
+                                       class="btn btn-outline-primary" title="Detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:editarAplicacaoProva' aplicacao.id %}" 
+                                       class="btn btn-outline-warning" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:excluirAplicacaoProva' aplicacao.id %}" 
+                                       class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- Estado vazio com call-to-action -->
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-4x text-muted mb-4"></i>
+                <h4 class="text-muted mb-3">Nenhuma aplicação de prova encontrada</h4>
+                <p class="text-muted mb-4">Crie sua primeira aplicação de prova para disponibilizá-la aos alunos.</p>
+                
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card border-dashed mb-4">
+                            <div class="card-body text-center p-4">
+                                <i class="fas fa-rocket fa-2x text-primary mb-3"></i>
+                                <h5 class="text-primary">Comece criando uma aplicação</h5>
+                                <p class="text-muted small">
+                                    Selecione uma prova existente e defina o período de aplicação para seus alunos.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <a href="{% url 'mimir:selecionarProvaParaAplicacao' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>Criar Primeira Aplicação
+                    </a>
+                    <a href="{% url 'mimir:criarProva' %}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-file-alt me-2"></i>Criar Nova Prova
+                    </a>
+                </div>
+                
+                <div class="mt-4">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Primeiro crie uma prova, depois você poderá aplicá-la aos alunos.
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Ajuda Rápida - Só mostra se tiver aplicações -->
+    {% if aplicacoes %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-light border-0">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-1">Precisa criar uma nova aplicação?</h6>
+                            <p class="mb-0 text-muted small">Selecione uma prova existente para criar uma nova aplicação.</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{% url 'mimir:selecionarProvaParaAplicacao' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Nova Aplicação
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.border-dashed {
+    border: 2px dashed #dee2e6 !important;
+    border-radius: 0.375rem;
+}
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+.card {
+    border-radius: 0.5rem;
+}
+.btn {
+    border-radius: 0.375rem;
+}
+.progress {
+    border-radius: 0.375rem;
+}
+.badge {
+    border-radius: 0.375rem;
+}
+</style>
+{% endblock %}

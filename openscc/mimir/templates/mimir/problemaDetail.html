@@ -1,4 +1,5 @@
 {% extends "mimirBase.html" %}
+{% load feedback_tags %}
 
 {% block mainContent %}
 <div class="container mt-4">
@@ -125,7 +126,7 @@
             </div>
             {% endif %}
 
-                <!-- Seção de Exportar PDF (disponível para todos) -->
+            <!-- Seção de Exportar PDF (disponível para todos) -->
             <div class="card mt-4">
                 <div class="card-header bg-info text-white">
                     <h5 class="card-title mb-0">
@@ -171,7 +172,7 @@
                 </div>
             </div>
 
-                <!-- Seção de Ações (diferente para autores e especialistas) -->
+            <!-- Seção de Ações (diferente para autores e especialistas) -->
             <div class="card mt-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Ações</h5>
@@ -205,7 +206,7 @@
                 </div>
                 <div class="card-body">
                     {% for parte in partes %}
-                    <div class="parte-problema mb-4 p-3 border rounded">
+                    <div class="parte-problema mb-4 p-3 border rounded" id="parte-{{ parte.ordem }}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0">Parte {{ parte.ordem }}</h6>
                             <div>
@@ -213,6 +214,25 @@
                                 
                                 <!-- Botões de ação (apenas para autores) -->
                                 {% if eh_autor %}
+                                <!-- Botão de Editar -->
+                                <button class="btn btn-outline-primary btn-sm me-1" 
+                                        onclick="toggleEditMode({{ parte.ordem }})"
+                                        id="edit-btn-{{ parte.ordem }}"
+                                        title="Editar Parte">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                                
+                                <!-- Botão de Gerenciar Mídias -->
+                                <button class="btn btn-outline-success btn-sm me-1" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#midiasModal{{ parte.ordem }}"
+                                        title="Gerenciar Mídias">
+                                    <i class="fas fa-paperclip"></i> Mídias
+                                    {% if parte.midias.exists %}
+                                    <span class="badge bg-primary">{{ parte.midias.count }}</span>
+                                    {% endif %}
+                                </button>
+                                
                                 <button class="btn btn-outline-info btn-sm me-1" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#feedbackModal{{ parte.ordem }}"
@@ -251,8 +271,76 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="enunciado">
-                            {{ parte.enunciado|linebreaks }}
+                        
+                        <!-- Modo Visualização -->
+                        <div class="enunciado-view" id="enunciado-view-{{ parte.ordem }}">
+                            <div class="enunciado">
+                                {{ parte.enunciado|linebreaks }}
+                            </div>
+                            
+                            <!-- Exibição de Mídias (Modo Visualização) -->
+                            {% if parte.midias.exists %}
+                            <div class="midias-container mt-3">
+                                <h6 class="text-muted mb-2">
+                                    <i class="fas fa-paperclip"></i> Arquivos Anexados ({{ parte.midias.count }})
+                                </h6>
+                                <div class="row g-2">
+                                    {% for midia in parte.midias.all %}
+                                    <div class="col-auto">
+                                        <div class="card midia-card">
+                                            <div class="card-body text-center p-2">
+                                                <i class="{{ midia.get_icone_tipo }} fa-2x mb-1 text-primary"></i>
+                                                <div class="midia-info">
+                                                    <small class="d-block text-truncate" style="max-width: 120px;" title="{{ midia.arquivo.name|basename }}">
+                                                        {{ midia.arquivo.name|basename }}
+                                                    </small>
+                                                    {% if midia.descricao %}
+                                                    <small class="text-muted d-block" title="{{ midia.descricao }}">
+                                                        {{ midia.descricao|truncatewords:3 }}
+                                                    </small>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="mt-1">
+                                                    <a href="{{ midia.arquivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Modo Edição (inicialmente oculto) -->
+                        <div class="enunciado-edit" id="enunciado-edit-{{ parte.ordem }}" style="display: none;">
+                            <form method="post" action="{% url 'mimir:editarParte' parte.id %}" class="parte-edit-form">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="enunciado-text-{{ parte.ordem }}" class="form-label">Enunciado da Parte {{ parte.ordem }}:</label>
+                                    <textarea class="form-control" id="enunciado-text-{{ parte.ordem }}" 
+                                              name="enunciado" rows="8" 
+                                              placeholder="Digite o enunciado da parte...">{{ parte.enunciado }}</textarea>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            <i class="fas fa-save"></i> Salvar Alterações
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm" 
+                                                onclick="toggleEditMode({{ parte.ordem }})">
+                                            <i class="fas fa-times"></i> Cancelar
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-info" id="char-count-{{ parte.ordem }}">
+                                            {{ parte.enunciado|length }} caracteres
+                                        </span>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                         
                         <!-- Indicador de feedbacks (apenas para autores) -->
@@ -266,9 +354,145 @@
                         {% endif %}
                     </div>
 
-                    <!-- Modais (apenas para autores) -->
+                    <!-- Modal para Gerenciar Mídias (apenas para autores) -->
                     {% if eh_autor %}
+                    <div class="modal fade" id="midiasModal{{ parte.ordem }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Gerenciar Mídias - Parte {{ parte.ordem }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <!-- Formulário para adicionar nova mídia -->
+                                    <div class="card mb-4">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">Adicionar Nova Mídia</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <form method="post" action="{% url 'mimir:adicionarMidiaParte' parte.id %}" 
+                                                  enctype="multipart/form-data" id="midiaForm{{ parte.ordem }}">
+                                                {% csrf_token %}
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label for="arquivo{{ parte.ordem }}" class="form-label">Arquivo: *</label>
+                                                            <input type="file" class="form-control" id="arquivo{{ parte.ordem }}" 
+                                                                   name="arquivo" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt" required>
+                                                            <div class="form-text">
+                                                                Formatos suportados: Imagens, Áudio, PDF, Vídeo, Documentos
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label for="tipo{{ parte.ordem }}" class="form-label">Tipo: *</label>
+                                                            <select class="form-select" id="tipo{{ parte.ordem }}" name="tipo" required>
+                                                                <option value="imagem">Imagem</option>
+                                                                <option value="audio">Áudio</option>
+                                                                <option value="pdf">PDF</option>
+                                                                <option value="video">Vídeo</option>
+                                                                <option value="documento">Documento</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="descricao{{ parte.ordem }}" class="form-label">Descrição (opcional):</label>
+                                                    <input type="text" class="form-control" id="descricao{{ parte.ordem }}" 
+                                                           name="descricao" placeholder="Ex: Imagem do ECG, Áudio do coração, etc.">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="ordem{{ parte.ordem }}" class="form-label">Ordem de Exibição:</label>
+                                                    <input type="number" class="form-control" id="ordem{{ parte.ordem }}" 
+                                                           name="ordem" value="{{ parte.midias.count|add:1 }}" min="1">
+                                                </div>
+                                                <button type="submit" class="btn btn-success">
+                                                    <i class="fas fa-plus"></i> Adicionar Mídia
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <!-- Lista de mídias existentes -->
+                                    <div class="card">
+                                        <div class="card-header bg-secondary text-white">
+                                            <h6 class="mb-0">Mídias Existentes ({{ parte.midias.count }})</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            {% if parte.midias.exists %}
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Tipo</th>
+                                                            <th>Arquivo</th>
+                                                            <th>Descrição</th>
+                                                            <th>Ordem</th>
+                                                            <th>Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for midia in parte.midias.all %}
+                                                        <tr>
+                                                            <td>
+                                                                <i class="{{ midia.get_icone_tipo }}"></i>
+                                                                {{ midia.get_tipo_display }}
+                                                            </td>
+                                                            <td>
+                                                                <small class="text-truncate d-block" style="max-width: 150px;">
+                                                                    {{ midia.arquivo.name|basename }}
+                                                                </small>
+                                                            </td>
+                                                            <td>
+                                                                {% if midia.descricao %}
+                                                                <small>{{ midia.descricao|truncatewords:5 }}</small>
+                                                                {% else %}
+                                                                <small class="text-muted">-</small>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-secondary">{{ midia.ordem }}</span>
+                                                            </td>
+                                                            <td>
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <a href="{{ midia.arquivo.url }}" target="_blank" 
+                                                                       class="btn btn-outline-primary" title="Visualizar">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </a>
+                                                                    <form method="post" action="{% url 'mimir:excluirMidiaParte' midia.id %}" 
+                                                                          class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir esta mídia?');">
+                                                                        {% csrf_token %}
+                                                                        <button type="submit" class="btn btn-outline-danger" title="Excluir">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </form>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            {% else %}
+                                            <div class="alert alert-info mb-0">
+                                                <i class="fas fa-info-circle"></i>
+                                                Nenhuma mídia adicionada a esta parte ainda.
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Modal para pedir feedback -->
+                    {% if eh_autor %}
                     <div class="modal fade" id="feedbackModal{{ parte.ordem }}" tabindex="-1">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
@@ -541,6 +765,11 @@
 .parte-problema {
     background-color: #f8f9fa;
     border-left: 4px solid #007bff !important;
+    transition: all 0.3s ease;
+}
+.parte-problema.editing {
+    border-left-color: #28a745 !important;
+    background-color: #f0fff4;
 }
 .enunciado {
     font-size: 0.95rem;
@@ -552,5 +781,214 @@
 .feedback-item.border-success {
     border-left-color: #28a745 !important;
 }
+.enunciado-edit textarea {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+.midia-card {
+    width: 140px;
+    transition: transform 0.2s;
+}
+.midia-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.midia-info small {
+    font-size: 0.75rem;
+}
 </style>
+
+<script>
+// Função para alternar entre modo visualização e edição
+function toggleEditMode(parteOrdem) {
+    const viewElement = document.getElementById(`enunciado-view-${parteOrdem}`);
+    const editElement = document.getElementById(`enunciado-edit-${parteOrdem}`);
+    const editButton = document.getElementById(`edit-btn-${parteOrdem}`);
+    const parteElement = document.getElementById(`parte-${parteOrdem}`);
+    const textarea = document.getElementById(`enunciado-text-${parteOrdem}`);
+    
+    if (viewElement.style.display === 'none') {
+        // Sair do modo edição
+        viewElement.style.display = 'block';
+        editElement.style.display = 'none';
+        editButton.innerHTML = '<i class="fas fa-edit"></i> Editar';
+        editButton.classList.remove('btn-primary');
+        editButton.classList.add('btn-outline-primary');
+        parteElement.classList.remove('editing');
+    } else {
+        // Entrar no modo edição
+        viewElement.style.display = 'none';
+        editElement.style.display = 'block';
+        editButton.innerHTML = '<i class="fas fa-eye"></i> Visualizar';
+        editButton.classList.remove('btn-outline-primary');
+        editButton.classList.add('btn-primary');
+        parteElement.classList.add('editing');
+        
+        // Focar no textarea e atualizar contador de caracteres
+        if (textarea) {
+            textarea.focus();
+            updateCharCount(parteOrdem);
+        }
+    }
+}
+
+// Atualizar contador de caracteres
+function updateCharCount(parteOrdem) {
+    const textarea = document.getElementById(`enunciado-text-${parteOrdem}`);
+    const charCount = document.getElementById(`char-count-${parteOrdem}`);
+    
+    if (textarea && charCount) {
+        // Atualizar contador inicial
+        charCount.textContent = `${textarea.value.length} caracteres`;
+        
+        // Adicionar event listener para atualizações em tempo real
+        textarea.addEventListener('input', function() {
+            charCount.textContent = `${this.value.length} caracteres`;
+        });
+    }
+}
+
+// Configurar todos os contadores de caracteres
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar event listeners para formulários de edição
+    document.querySelectorAll('.parte-edit-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            
+            // Mostrar loading
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            submitButton.disabled = true;
+            
+            // Enviar formulário via AJAX para melhor experiência
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const url = this.action;
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na resposta do servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // Atualizar a visualização com o novo conteúdo
+                    const parteElement = this.closest('.parte-problema');
+                    const parteOrdem = parteElement.id.replace('parte-', '');
+                    const viewElement = document.getElementById(`enunciado-view-${parteOrdem}`);
+                    
+                    // Converter quebras de linha para HTML
+                    const formattedContent = data.novo_enunciado.replace(/\n/g, '<br>');
+                    viewElement.querySelector('.enunciado').innerHTML = formattedContent;
+                    
+                    // Sair do modo edição
+                    toggleEditMode(parteOrdem);
+                    
+                    // Mostrar mensagem de sucesso
+                    showAlert('Alterações salvas com sucesso!', 'success');
+                } else {
+                    throw new Error(data.message || 'Erro ao salvar');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                showAlert('Erro ao salvar as alterações. Tente novamente.', 'danger');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            });
+        });
+    });
+    
+    // Configurar formulários de upload de mídia
+    document.querySelectorAll('form[id^="midiaForm"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            
+            // Mostrar loading
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            submitButton.disabled = true;
+            
+            const formData = new FormData(this);
+            const url = this.action;
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showAlert('Mídia adicionada com sucesso! A página será recarregada.', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(data.message || 'Erro ao enviar mídia');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                showAlert('Erro ao adicionar mídia. Tente novamente.', 'danger');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            });
+        });
+    });
+    
+    // Rolagem suave para partes
+    document.querySelectorAll('.parte-problema h6').forEach(title => {
+        title.style.cursor = 'pointer';
+        title.addEventListener('click', function() {
+            this.closest('.parte-problema').scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'start'
+            });
+        });
+    });
+});
+
+// Função para mostrar alertas
+function showAlert(message, type) {
+    // Remover alertas existentes
+    const existingAlerts = document.querySelectorAll('.alert.alert-dismissible');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Inserir no início do conteúdo principal
+    const mainContent = document.querySelector('.container.mt-4');
+    const firstChild = mainContent.firstChild;
+    mainContent.insertBefore(alertDiv, firstChild);
+    
+    // Remover automaticamente após 5 segundos
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            const bsAlert = new bootstrap.Alert(alertDiv);
+            bsAlert.close();
+        }
+    }, 5000);
+}
+</script>
 {% endblock %}

@@ -1,0 +1,485 @@
+{% extends "mimirBase.html" %}
+{% load feedback_tags %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <!-- Cabeçalho da Prova -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-0">{{ prova_aluno.prova.titulo }}</h4>
+                <small>{{ prova_aluno.prova.descricao }}</small>
+            </div>
+            <div class="text-end">
+                <div id="timer" class="h5 mb-0">02:00:00</div>
+                <small>Tempo restante</small>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <p class="mb-2"><strong>Assunto:</strong> {{ prova_aluno.prova.assunto.nome }}</p>
+                    <p class="mb-0"><strong>Status:</strong> 
+                        <span class="badge bg-warning text-dark">Em Andamento</span>
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#finalizarModal">
+                        <i class="fas fa-flag-checkered me-1"></i>Finalizar Prova
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo de Status -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <h4 class="text-primary">{{ perguntas|length }}</h4>
+                    <small class="text-muted">Total de Questões</small>
+                </div>
+                <div class="col-md-4">
+                    <h4 class="text-success" id="contador-respostas-header">0</h4>
+                    <small class="text-muted">Respondidas</small>
+                </div>
+                <div class="col-md-4">
+                    <h4 class="text-warning" id="contador-pendentes-header">{{ perguntas|length }}</h4>
+                    <small class="text-muted">Pendentes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário da Prova - Todas as questões visíveis -->
+    <form id="provaForm">
+        {% csrf_token %}
+        
+        {% for pergunta in perguntas %}
+        {% with resposta_existente=respostas_existentes|get_item:pergunta.id %}
+        <div class="card shadow-sm mb-4 questao-item" id="questao-{{ forloop.counter }}">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Questão {{ forloop.counter }}</h5>
+                <span class="badge" id="status-badge-{{ pergunta.id }}">
+                    {% if resposta_existente and resposta_existente.resposta_texto %}
+                    <i class="fas fa-check text-success"></i> Respondida
+                    {% else %}
+                    <i class="fas fa-clock text-warning"></i> Pendente
+                    {% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <!-- Enunciado -->
+                <div class="mb-4">
+                    <div class="enunciado-questao">
+                        {{ pergunta.pergunta|linebreaks }}
+                    </div>
+                    
+                    <!-- Imagens da questão -->
+                    {% for imagem in pergunta.imagens.all %}
+                    <div class="text-center my-3">
+                        <img src="{{ imagem.imagem.url }}" alt="Imagem da questão {{ forloop.parentloop.counter }}" 
+                             class="img-fluid rounded shadow-sm" style="max-height: 300px;">
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Área de resposta -->
+                <div class="mb-3">
+                    <label for="resposta-{{ pergunta.id }}" class="form-label fw-bold">Sua resposta:</label>
+                    <textarea class="form-control resposta-texto" 
+                              id="resposta-{{ pergunta.id }}" 
+                              name="resposta-{{ pergunta.id }}"
+                              rows="6" 
+                              placeholder="Digite sua resposta aqui..."
+                              data-pergunta-id="{{ pergunta.id }}">{% if resposta_existente %}{{ resposta_existente.resposta_texto }}{% endif %}</textarea>
+                </div>
+
+                <!-- Status de salvamento -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted" id="status-{{ pergunta.id }}">
+                        {% if resposta_existente and resposta_existente.resposta_texto %}
+                        <i class="fas fa-check text-success"></i> Resposta salva - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
+                        {% else %}
+                        <i class="fas fa-sync text-secondary"></i> Não salvo
+                        {% endif %}
+                    </small>
+                    <small class="text-muted">Questão {{ forloop.counter }} de {{ perguntas|length }}</small>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+
+        <!-- Botão de Finalizar fixo no final -->
+        <div class="sticky-bottom py-3 bg-light border-top">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted" id="contador-final">
+                            <strong id="contador-respostas-final">0</strong> de {{ perguntas|length }} questões respondidas
+                        </span>
+                    </div>
+                    <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#finalizarModal">
+                        <i class="fas fa-flag-checkered me-2"></i>Finalizar Prova
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal de Finalização -->
+<div class="modal fade" id="finalizarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Finalizar Prova</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja finalizar a prova?</p>
+                <p class="text-muted small">Após finalizar, você não poderá mais alterar suas respostas.</p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Resumo:</strong>
+                    <div class="mt-2">
+                        <div><strong>Respondidas:</strong> <span id="contador-respostas-modal">0</span> de {{ perguntas|length }} questões</div>
+                        <div><strong>Pendentes:</strong> <span id="contador-pendentes-modal">{{ perguntas|length }}</span> questões</div>
+                    </div>
+                </div>
+
+                <!-- Lista de questões pendentes -->
+                <div class="alert alert-warning" id="alert-pendentes" style="display: none;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Atenção!</strong> Você possui questões pendentes:
+                    <div id="lista-pendentes" class="mt-2 small"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continuar Prova</button>
+                <button type="button" class="btn btn-success" id="btn-finalizar-confirmado">
+                    <i class="fas fa-flag-checkered me-1"></i>Finalizar Mesmo Assim
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== DECLARAÇÃO DE VARIÁVEIS GLOBAIS =====
+let respostasSalvas = new Set();
+let tempoRestante = {{ aplicacao.tempo_limite.total_seconds|default:7200|stringformat:"d" }};
+
+// ===== DECLARAÇÃO DE TODAS AS FUNÇÕES PRIMEIRO =====
+
+// Timer
+function iniciarTimer() {
+    const timerElement = document.getElementById('timer');
+    
+    const timerInterval = setInterval(() => {
+        tempoRestante--;
+        
+        if (tempoRestante <= 0) {
+            clearInterval(timerInterval);
+            finalizarProvaAutomaticamente();
+            return;
+        }
+        
+        const horas = Math.floor(tempoRestante / 3600);
+        const minutos = Math.floor((tempoRestante % 3600) / 60);
+        const segundos = tempoRestante % 60;
+        
+        timerElement.textContent = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+        
+        // Alerta quando faltar 5 minutos
+        if (tempoRestante === 300) {
+            mostrarAlertaTempo('5 minutos');
+        }
+        // Alerta quando faltar 1 minuto
+        else if (tempoRestante === 60) {
+            mostrarAlertaTempo('1 minuto');
+        }
+    }, 1000);
+}
+
+function mostrarAlertaTempo(tempo) {
+    const alerta = document.createElement('div');
+    alerta.className = 'alert alert-warning alert-dismissible fade show';
+    alerta.innerHTML = `
+        <i class="fas fa-clock me-2"></i>
+        <strong>Atenção!</strong> Faltam ${tempo} para o término da prova.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container.py-4').insertBefore(alerta, document.querySelector('.card'));
+}
+
+function finalizarProvaAutomaticamente() {
+    // Salvar todas as respostas antes de finalizar
+    salvarTodasRespostas().then(() => {
+        alert('Tempo esgotado! A prova será finalizada automaticamente.');
+        window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
+    });
+}
+
+// Salvar resposta via AJAX
+function salvarResposta(perguntaId) {
+    const respostaTexto = document.getElementById(`resposta-${perguntaId}`).value;
+    const statusElement = document.getElementById(`status-${perguntaId}`);
+    const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
+    
+    // Se estiver vazio, não salva imediatamente (aguarda auto-save)
+    if (!respostaTexto.trim()) {
+        // Remove do conjunto de respostas salvas se estiver vazio
+        if (respostasSalvas.has(perguntaId)) {
+            respostasSalvas.delete(perguntaId);
+            badgeElement.innerHTML = '<i class="fas fa-clock text-warning"></i> Pendente';
+            badgeElement.className = 'badge bg-warning';
+            statusElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Não salvo';
+            atualizarContadores();
+        }
+        return;
+    }
+    
+    // Atualizar visualmente imediatamente
+    statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Salvando...';
+    
+    fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            pergunta_id: perguntaId,
+            resposta_texto: respostaTexto
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            const agora = new Date(data.salvo_em);
+            const hora = agora.getHours().toString().padStart(2, '0');
+            const minuto = agora.getMinutes().toString().padStart(2, '0');
+            
+            statusElement.innerHTML = `<i class="fas fa-check text-success"></i> Resposta salva - ${hora}:${minuto}`;
+            
+            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> Respondida';
+            badgeElement.className = 'badge bg-success';
+            respostasSalvas.add(perguntaId);
+            
+            atualizarContadores();
+        } else {
+            throw new Error(data.message || 'Erro ao salvar resposta');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar resposta:', error);
+        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao salvar';
+        
+        // Tentar novamente após 5 segundos se ainda houver texto
+        if (document.getElementById(`resposta-${perguntaId}`).value.trim()) {
+            setTimeout(() => salvarResposta(perguntaId), 5000);
+        }
+    });
+}
+
+// Função auxiliar para salvar resposta individual (usada no salvamento em lote)
+function salvarRespostaIndividual(perguntaId, respostaTexto) {
+    return fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            pergunta_id: perguntaId,
+            resposta_texto: respostaTexto
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            respostasSalvas.add(perguntaId);
+            return data;
+        } else {
+            throw new Error(data.message || 'Erro ao salvar resposta');
+        }
+    });
+}
+
+// Salvar todas as respostas antes de finalizar
+function salvarTodasRespostas() {
+    const promises = [];
+    const textareas = document.querySelectorAll('.resposta-texto');
+    
+    textareas.forEach(textarea => {
+        const perguntaId = textarea.dataset.perguntaId;
+        const respostaTexto = textarea.value.trim();
+        
+        if (respostaTexto) {
+            promises.push(
+                salvarRespostaIndividual(perguntaId, respostaTexto)
+                    .catch(error => {
+                        console.error(`Erro ao salvar questão ${perguntaId}:`, error);
+                        // Continua mesmo com erro, mas marca como não salvo
+                        return {status: 'error', perguntaId: perguntaId};
+                    })
+            );
+        }
+    });
+    
+    return Promise.allSettled(promises);
+}
+
+function atualizarContadores() {
+    const total = {{ perguntas|length }};
+    const respondidas = respostasSalvas.size;
+    const pendentes = total - respondidas;
+    
+    // Atualizar todos os contadores
+    const contadorRespostasHeader = document.getElementById('contador-respostas-header');
+    const contadorPendentesHeader = document.getElementById('contador-pendentes-header');
+    const contadorRespostasFinal = document.getElementById('contador-respostas-final');
+    const contadorRespostasModal = document.getElementById('contador-respostas-modal');
+    const contadorPendentesModal = document.getElementById('contador-pendentes-modal');
+    
+    if (contadorRespostasHeader) contadorRespostasHeader.textContent = respondidas;
+    if (contadorPendentesHeader) contadorPendentesHeader.textContent = pendentes;
+    if (contadorRespostasFinal) contadorRespostasFinal.textContent = respondidas;
+    if (contadorRespostasModal) contadorRespostasModal.textContent = respondidas;
+    if (contadorPendentesModal) contadorPendentesModal.textContent = pendentes;
+    
+    // Atualizar cores dos contadores
+    if (contadorPendentesHeader) {
+        contadorPendentesHeader.className = pendentes > 0 ? 'text-warning' : 'text-success';
+    }
+    if (contadorPendentesModal) {
+        contadorPendentesModal.className = pendentes > 0 ? 'text-warning' : 'text-success';
+    }
+}
+
+// ===== INICIALIZAÇÃO E EVENT LISTENERS =====
+
+function inicializarProva() {
+    // Inicializar contador de respostas salvas
+    {% for pergunta in perguntas %}
+        {% with resposta_existente=respostas_existentes|get_item:pergunta.id %}
+        {% if resposta_existente and resposta_existente.resposta_texto.strip %}
+        respostasSalvas.add({{ pergunta.id }});
+        {% endif %}
+        {% endwith %}
+    {% endfor %}
+
+    // Se a prova já foi iniciada, calcular tempo restante baseado no início
+    {% if prova_aluno.data_inicio %}
+        const tempoDecorrido = Math.floor((new Date().getTime() - new Date('{{ prova_aluno.data_inicio|date:"c" }}').getTime()) / 1000);
+        tempoRestante = Math.max(0, {{ aplicacao.tempo_limite.total_seconds|default:7200|stringformat:"d" }} - tempoDecorrido);
+    {% endif %}
+
+    atualizarContadores();
+    iniciarTimer();
+
+    // Configurar modal de finalização
+    const finalizarModal = document.getElementById('finalizarModal');
+    
+    if (finalizarModal) {
+        finalizarModal.addEventListener('show.bs.modal', function() {
+            atualizarContadores();
+            
+            // Listar questões pendentes
+            const listaPendentes = document.getElementById('lista-pendentes');
+            const alertPendentes = document.getElementById('alert-pendentes');
+            const total = {{ perguntas|length }};
+            const pendentes = total - respostasSalvas.size;
+            
+            if (pendentes > 0 && listaPendentes && alertPendentes) {
+                let listaHTML = '';
+                // Percorre todas as perguntas para encontrar as pendentes
+                {% for pergunta in perguntas %}
+                    if (!respostasSalvas.has({{ pergunta.id }})) {
+                        listaHTML += `<span class="badge bg-warning me-1 mb-1">Questão {{ forloop.counter }}</span>`;
+                    }
+                {% endfor %}
+                listaPendentes.innerHTML = listaHTML;
+                alertPendentes.style.display = 'block';
+            } else if (alertPendentes) {
+                alertPendentes.style.display = 'none';
+            }
+        });
+        
+        // Botão de finalização confirmado
+        const btnFinalizar = document.getElementById('btn-finalizar-confirmado');
+        if (btnFinalizar) {
+            btnFinalizar.addEventListener('click', function() {
+                // Desabilitar botão para evitar múltiplos cliques
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Finalizando...';
+                
+                salvarTodasRespostas().then(() => {
+                    window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
+                });
+            });
+        }
+    }
+    
+    // Adicionar rolagem suave para as questões
+    document.querySelectorAll('.questao-item .card-header').forEach(header => {
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', function() {
+            this.parentElement.scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+
+    // Adicionar event listeners para os textareas
+    document.querySelectorAll('.resposta-texto').forEach(textarea => {
+        textarea.addEventListener('keyup', function() {
+            const perguntaId = this.dataset.perguntaId;
+            // Debounce para evitar muitas requisições
+            clearTimeout(this._timeout);
+            this._timeout = setTimeout(() => {
+                salvarResposta(perguntaId);
+            }, 1000); // Espera 1 segundo após a última tecla
+        });
+    });
+
+    // Auto-save periódico
+    setInterval(() => {
+        document.querySelectorAll('.resposta-texto').forEach(textarea => {
+            if (textarea.value.trim()) {
+                const perguntaId = textarea.dataset.perguntaId;
+                salvarResposta(perguntaId);
+            }
+        });
+    }, 30000); // Salva a cada 30 segundos
+
+    // Prevenir saída acidental da página
+    window.addEventListener('beforeunload', function(e) {
+        if (respostasSalvas.size > 0) {
+            e.preventDefault();
+            e.returnValue = 'Você tem respostas não salvas. Tem certeza que deseja sair?';
+            return e.returnValue;
+        }
+    });
+}
+
+// ===== INICIAR A APLICAÇÃO QUANDO O DOCUMENTO ESTIVER PRONTO =====
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarProva();
+});
+</script>
+{% endblock %}

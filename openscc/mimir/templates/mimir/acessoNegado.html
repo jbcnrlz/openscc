@@ -1,0 +1,91 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h2><i class="fas fa-exclamation-triangle"></i> Acesso Negado</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <i class="fas fa-lock fa-5x text-danger mb-4"></i>
+                        <h3 class="text-danger">Você não tem permissão para acessar esta página</h3>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h5>Informações do seu acesso:</h5>
+                        <p class="mb-1"><strong>Usuário:</strong> {{ user.username }}</p>
+                        <p class="mb-1"><strong>Grupos:</strong> 
+                            {% for group in user.groups.all %}
+                                <span class="badge bg-secondary">{{ group.name }}</span>
+                            {% empty %}
+                                <span class="text-warning">Nenhum grupo atribuído</span>
+                            {% endfor %}
+                        </p>
+                    </div>
+                    
+                    <p class="lead">
+                        O sistema Mimir é restrito aos grupos <strong>Professor</strong> e <strong>Aluno</strong>.
+                        Se você acredita que deveria ter acesso, entre em contato com o administrador do sistema.
+                    </p>
+                    
+                    <div class="mt-4">
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'mimir:redirecionar_por_grupo' %}" class="btn btn-primary me-2">
+                                <i class="fas fa-home"></i> Ir para Minha Área
+                            </a>
+                            <a href="{% url 'logout' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-sign-out-alt"></i> Sair
+                            </a>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt"></i> Fazer Login
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Informações sobre os grupos -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-chalkboard-teacher"></i> Grupo Professor</h6>
+                        </div>
+                        <div class="card-body">
+                            <small>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success"></i> Criar problemas</li>
+                                    <li><i class="fas fa-check text-success"></i> Gerenciar provas</li>
+                                    <li><i class="fas fa-check text-success"></i> Solicitar feedbacks</li>
+                                    <li><i class="fas fa-check text-success"></i> Corrigir respostas</li>
+                                </ul>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="fas fa-user-graduate"></i> Grupo Aluno</h6>
+                        </div>
+                        <div class="card-body">
+                            <small>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success"></i> Realizar provas</li>
+                                    <li><i class="fas fa-check text-success"></i> Visualizar problemas</li>
+                                    <li><i class="fas fa-check text-success"></i> Ver resultados</li>
+                                    <li><i class="fas fa-check text-success"></i> Acessar materiais</li>
+                                </ul>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

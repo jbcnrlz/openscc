@@ -1,0 +1,218 @@
+<!-- templates/mimir/detalhes_aplicacao_prova.html -->
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <!-- Cabeçalho -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="mb-0">{{ aplicacao.prova.titulo }}</h4>
+                    <small class="opacity-75">Detalhes da Aplicação</small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="btn-group">
+                        <a href="{% url 'mimir:editarAplicacaoProva' aplicacao.id %}" 
+                           class="btn btn-warning btn-sm">
+                            <i class="fas fa-edit me-1"></i>Editar
+                        </a>
+                        <a href="{% url 'mimir:excluirAplicacaoProva' aplicacao.id %}" 
+                           class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash me-1"></i>Excluir
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Assunto:</strong> {{ aplicacao.prova.assunto.nome }}</p>
+                    <p><strong>Data de Início:</strong> {{ aplicacao.data_disponivel|date:"d/m/Y H:i" }}</p>
+                    <p><strong>Data Limite:</strong> {{ aplicacao.data_limite|date:"d/m/Y H:i" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Tempo Limite:</strong> {{ aplicacao.tempo_limite }}</p>
+                    <p><strong>Status:</strong> 
+                        {% if aplicacao.disponivel %}
+                            {% if aplicacao.esta_disponivel %}
+                                <span class="badge bg-success">Disponível</span>
+                            {% else %}
+                                <span class="badge bg-warning">Fora do período</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary">Inativa</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Criada em:</strong> {{ aplicacao.criado_em|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Total de Alunos
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ total_alunos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Concluíram
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ alunos_concluidos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                Corrigidas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ alunos_corrigidos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-bar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Média Geral
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {% if media_geral %}{{ media_geral|floatformat:1 }}{% else %}--{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-star fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Alunos -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-user-graduate me-2"></i>Alunos Participantes
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if provas_alunos %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Aluno</th>
+                            <th>Status</th>
+                            <th>Início</th>
+                            <th>Conclusão</th>
+                            <th>Nota</th>
+                            <th>Respostas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prova_aluno in provas_alunos %}
+                        <tr>
+                            <td>
+                                <strong>{{ prova_aluno.aluno.get_full_name|default:prova_aluno.aluno.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ prova_aluno.aluno.email }}</small>
+                            </td>
+                            <td>
+                                {% if prova_aluno.status == 'pendente' %}
+                                    <span class="badge bg-secondary">Pendente</span>
+                                {% elif prova_aluno.status == 'em_andamento' %}
+                                    <span class="badge bg-warning text-dark">Em Andamento</span>
+                                {% elif prova_aluno.status == 'concluida' %}
+                                    <span class="badge bg-info">Concluída</span>
+                                {% elif prova_aluno.status == 'corrigida' %}
+                                    <span class="badge bg-success">Corrigida</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prova_aluno.data_inicio %}
+                                    {{ prova_aluno.data_inicio|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    <span class="text-muted">--</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prova_aluno.data_conclusao %}
+                                    {{ prova_aluno.data_conclusao|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    <span class="text-muted">--</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prova_aluno.nota_final %}
+                                    <strong>{{ prova_aluno.nota_final|floatformat:1 }}</strong>
+                                {% else %}
+                                    <span class="text-muted">--</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ prova_aluno.total_respostas }}</span>
+                            </td>
+                            <td>
+                                {% if prova_aluno.status == 'concluida' or prova_aluno.status == 'corrigida' %}
+                                <a href="{% url 'mimir:corrigirProvaAluno' prova_aluno.id %}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye me-1"></i>Ver
+                                </a>
+                                {% else %}
+                                <span class="text-muted">--</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-user-times fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum aluno adicionado</h5>
+                <p class="text-muted">Adicione alunos a esta aplicação de prova.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

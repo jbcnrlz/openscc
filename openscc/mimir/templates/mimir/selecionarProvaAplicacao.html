@@ -1,0 +1,56 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-primary">Selecionar Prova para Aplicação</h1>
+        <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
+        </a>
+    </div>
+
+    <div class="row">
+        {% if provas %}
+            {% for prova in provas %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ prova.titulo }}</h5>
+                        <p class="card-text text-muted small">
+                            {{ prova.descricao|truncatewords:20 }}
+                        </p>
+                        <div class="mb-3">
+                            <span class="badge bg-primary">{{ prova.assunto.nome }}</span>
+                            <span class="badge bg-secondary ms-1">{{ prova.perguntas.count }} questões</span>
+                        </div>
+                        <div class="small text-muted mb-3">
+                            <i class="fas fa-calendar me-1"></i>
+                            Criada em: {{ prova.dataCriacao|date:"d/m/Y" }}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'mimir:criarAplicacaoProva' prova.id %}" 
+                           class="btn btn-primary w-100">
+                            <i class="fas fa-plus me-1"></i>Criar Aplicação
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">Nenhuma prova encontrada</h4>
+                        <p class="text-muted mb-4">Você precisa criar uma prova antes de poder aplicá-la.</p>
+                        <a href="{% url 'mimir:criarProva' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i>Criar Primeira Prova
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -13,6 +13,22 @@ def isProfessor(self):
 
 User.add_to_class('isProfessor', isProfessor)
 
+def isAluno(self):
+    """
+    Verifica se o usuário pertence a um grupo específico
+    """
+    return self.groups.filter(name="Aluno").exists()
+
+User.add_to_class('isAluno', isAluno)
+
+def isMembroAutorizado(self):
+    """
+    Verifica se o usuário pertence a um dos grupos autorizados
+    """
+    return self.groups.filter(name__in=["Professor", "Aluno"]).exists()
+
+User.add_to_class('isMembroAutorizado', isMembroAutorizado)
+
 class Assunto(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     nome = models.CharField(max_length=200, blank=False, null=False)
@@ -164,6 +180,63 @@ class Parte(models.Model):
             return feedback_utilizado.comentarios.strip()
         return self.enunciado
 
+    @property
+    def midias(self):
+        """Property para acessar as mídias da parte"""
+        return self.midiaparte_set.all()
+
+class MidiaParte(models.Model):
+    """
+    Model para armazenar mídias (imagens, áudios, PDFs) associadas a partes do problema
+    """
+    TIPO_MIDIA_CHOICES = [
+        ('imagem', 'Imagem'),
+        ('audio', 'Áudio'),
+        ('pdf', 'PDF'),
+        ('video', 'Vídeo'),
+        ('documento', 'Documento'),
+    ]
+    
+    parte = models.ForeignKey(Parte, on_delete=models.CASCADE, related_name='midias')
+    arquivo = models.FileField(
+        upload_to='partes_midia/%Y/%m/%d/',
+        help_text="Faça upload de imagens, áudios, PDFs ou outros documentos"
+    )
+    tipo = models.CharField(max_length=20, choices=TIPO_MIDIA_CHOICES, default='imagem')
+    descricao = models.CharField(max_length=255, blank=True, null=True, help_text="Descrição opcional da mídia")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    ordem = models.IntegerField(default=1, help_text="Ordem de exibição da mídia")
+    
+    class Meta:
+        verbose_name = 'Mídia da Parte'
+        verbose_name_plural = 'Mídias das Partes'
+        ordering = ['parte', 'ordem', 'criado_em']
+    
+    def __str__(self):
+        return f"Mídia {self.id} - Parte {self.parte.ordem} - {self.get_tipo_display()}"
+    
+    def get_icone_tipo(self):
+        """Retorna o ícone correspondente ao tipo de mídia"""
+        icones = {
+            'imagem': 'fas fa-image',
+            'audio': 'fas fa-music',
+            'pdf': 'fas fa-file-pdf',
+            'video': 'fas fa-video',
+            'documento': 'fas fa-file-alt',
+        }
+        return icones.get(self.tipo, 'fas fa-file')
+    
+    def is_imagem(self):
+        return self.tipo == 'imagem'
+    
+    def is_audio(self):
+        return self.tipo == 'audio'
+    
+    def is_pdf(self):
+        return self.tipo == 'pdf'
+    
+    def is_video(self):
+        return self.tipo == 'video'
 
 class GuiaTutor(models.Model):
     problema = models.OneToOneField(Problema, on_delete=models.CASCADE, related_name='guia_tutor')
@@ -311,3 +384,135 @@ class FeedbackEspecialista(models.Model):
         self.status = 'respondido'
         self.respondido_em = timezone.now()
         self.save()
+
+# Adicione ao models.py
+class ProvaAluno(models.Model):
+    """
+    Model para gerenciar a relação aluno-prova (modelo intermediário)
+    """
+    STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('em_andamento', 'Em Andamento'),
+        ('concluida', 'Concluída'),
+        ('corrigida', 'Corrigida'),
+    ]
+
+    # ForeignKeys para os dois modelos relacionados
+    aplicacao_prova = models.ForeignKey(
+        'AplicacaoProva', 
+        on_delete=models.CASCADE,
+        related_name='provas_alunos'
+    )
+    aluno = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    # Removemos a FK direta para Prova, pois já temos através de aplicacao_prova
+    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_conclusao = models.DateTimeField(null=True, blank=True)
+    data_entrega = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    tempo_decorrido = models.DurationField(default=datetime.timedelta(0))
+    nota_final = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        unique_together = ['aplicacao_prova', 'aluno']
+        verbose_name = 'Prova do Aluno'
+        verbose_name_plural = 'Provas dos Alunos'
+
+    def __str__(self):
+        return f"{self.aluno.username} - {self.aplicacao_prova.prova.titulo}"
+
+    @property
+    def prova(self):
+        """Property para acessar a prova através da aplicação"""
+        return self.aplicacao_prova.prova
+
+    def iniciar_prova(self):
+        """Marca a prova como iniciada"""
+        self.status = 'em_andamento'
+        self.data_inicio = timezone.now()
+        self.save()
+
+    def finalizar_prova(self):
+        """Marca a prova como concluída"""
+        self.status = 'concluida'
+        self.data_conclusao = timezone.now()
+        self.save()
+
+    def calcular_nota(self):
+        """Calcula a nota automaticamente baseada nas respostas corretas"""
+        respostas = self.respostas.all()
+        total_perguntas = self.aplicacao_prova.prova.perguntas.count()
+        if total_perguntas == 0:
+            return 0
+        
+        corretas = 0
+        for resposta in respostas:
+            if resposta.resposta_texto and resposta.pergunta.gabarito:
+                # Comparação simples - em um sistema real você teria lógica mais complexa
+                if resposta.resposta_texto.strip().lower() == resposta.pergunta.gabarito.strip().lower():
+                    corretas += 1
+        
+        self.nota_final = (corretas / total_perguntas) * 10
+        self.save()
+        return self.nota_final
+
+class RespostaAluno(models.Model):
+    """
+    Model para armazenar as respostas dos alunos às perguntas
+    """
+    aluno = models.ForeignKey(User, on_delete=models.CASCADE)
+    pergunta = models.ForeignKey(Pergunta, on_delete=models.CASCADE)
+    prova_aluno = models.ForeignKey(ProvaAluno, on_delete=models.CASCADE, related_name='respostas')
+    resposta_texto = models.TextField(blank=True, null=True)
+    resposta_arquivo = models.FileField(upload_to='respostas_alunos/', blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['aluno', 'pergunta', 'prova_aluno']
+        verbose_name = 'Resposta do Aluno'
+        verbose_name_plural = 'Respostas dos Alunos'
+
+    def __str__(self):
+        return f"Resposta de {self.aluno.username} para {self.pergunta.id}"
+
+class AplicacaoProva(models.Model):
+    """
+    Model para gerenciar a aplicação de provas para turmas/alunos
+    """
+    prova = models.ForeignKey(Prova, on_delete=models.CASCADE)
+    alunos = models.ManyToManyField(
+        User, 
+        through=ProvaAluno,
+        related_name='aplicacoes_prova'
+    )
+    data_disponivel = models.DateTimeField()
+    data_limite = models.DateTimeField()
+    tempo_limite = models.DurationField(help_text="Tempo limite para realização da prova")
+    disponivel = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Aplicação de Prova'
+        verbose_name_plural = 'Aplicações de Provas'
+
+    def __str__(self):
+        return f"Aplicação: {self.prova.titulo}"
+
+    def esta_disponivel(self):
+        """Verifica se a prova está disponível para realização"""
+        agora = timezone.now()
+        return (self.disponivel and 
+                self.data_disponivel <= agora <= self.data_limite)
+
+    def adicionar_aluno(self, aluno):
+        """Adiciona um aluno à aplicação da prova"""
+        ProvaAluno.objects.get_or_create(
+            aplicacao_prova=self,
+            aluno=aluno,
+            defaults={'status': 'pendente'}
+        )
+
+    def remover_aluno(self, aluno):
+        """Remove um aluno da aplicação da prova"""
+        ProvaAluno.objects.filter(aplicacao_prova=self, aluno=aluno).delete()
