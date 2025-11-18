@@ -1,0 +1,230 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-primary">Dashboard do Aluno</h1>
+        <span class="badge bg-primary">
+            <i class="fas fa-user-graduate me-1"></i> {{ user.get_full_name|default:user.username }}
+        </span>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Provas Pendentes
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ provas_pendentes.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                Em Andamento
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ provas_andamento.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-play-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Concluídas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ provas_concluidas.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Corrigidas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ provas_corrigidas.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-bar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Provas -->
+    <div class="row">
+        <!-- Provas Pendentes -->
+        {% if provas_pendentes %}
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock me-2"></i>Provas
+                                        <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock me-2"></i>Provas Pendentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for prova_aluno in provas_pendentes %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100 border-primary">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ prova_aluno.prova.titulo }}</h6>
+                                    <p class="card-text small text-muted">
+                                        {{ prova_aluno.prova.descricao|truncatewords:20 }}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-primary">Pendente</span>
+                                        <a href="{% url 'mimir:iniciarProva' prova_aluno.id %}" 
+                                           class="btn btn-primary btn-sm">
+                                            Iniciar Prova
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Provas em Andamento -->
+        {% if provas_andamento %}
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-play-circle me-2"></i>Provas em Andamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for prova_aluno in provas_andamento %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100 border-warning">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ prova_aluno.prova.titulo }}</h6>
+                                    <p class="card-text small text-muted">
+                                        Iniciada em: {{ prova_aluno.data_inicio|date:"d/m/Y H:i" }}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-warning text-dark">Em Andamento</span>
+                                        <a href="{% url 'mimir:iniciarProva' prova_aluno.id %}" 
+                                           class="btn btn-warning btn-sm">
+                                            Continuar
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Provas Concluídas e Corrigidas -->
+        {% if provas_concluidas or provas_corrigidas %}
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Provas Finalizadas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for prova_aluno in provas_concluidas %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ prova_aluno.prova.titulo }}</h6>
+                                    <p class="card-text small text-muted">
+                                        Concluída em: {{ prova_aluno.data_conclusao|date:"d/m/Y H:i" }}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-success">Concluída</span>
+                                        <a href="{% url 'mimir:verResultadoProva' prova_aluno.id %}" 
+                                           class="btn btn-success btn-sm">
+                                            Ver Resultado
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        {% for prova_aluno in provas_corrigidas %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100 border-info">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ prova_aluno.prova.titulo }}</h6>
+                                    <p class="card-text">
+                                        <strong>Nota: {{ prova_aluno.nota_final|floatformat:1 }}</strong>
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-info">Corrigida</span>
+                                        <a href="{% url 'mimir:verResultadoProva' prova_aluno.id %}" 
+                                           class="btn btn-info btn-sm text-white">
+                                            Detalhes
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not provas_pendentes and not provas_andamento and not provas_concluidas and not provas_corrigidas %}
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhuma prova disponível</h5>
+                    <p class="text-muted">Aguarde até que seu professor disponibilize novas provas.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

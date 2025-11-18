@@ -2,18 +2,34 @@ import os, json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from .models import *
-from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm
+from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm, AplicacaoProvaForm
 from django.contrib import messages
 from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.template.loader import render_to_string
 from weasyprint import HTML
+from django.db.models import Count, Avg, Q
+from .decorators import acesso_mimir_requerido, grupo_requerido
+
+def acessoNegado(request):
+    """View para página de acesso negado"""
+    return render(request, 'mimir/acessoNegado.html')
+
+@login_required
+def redirecionarPorGrupo(request):
+    """Redireciona o usuário baseado no seu grupo"""
+    if request.user.isProfessor():
+        return redirect('mimir:dashboardProfessor')
+    elif request.user.isAluno():
+        return redirect('mimir:dashboardAluno')
+    else:
+        return redirect('mimir:acessoNegado')
 
 @csrf_exempt
 @require_POST
@@ -228,15 +244,23 @@ def generateQuestions(request):
             })
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def dashboardProfessor(request):
+    if request.user.isAluno():
+        return redirect('mimir:dashboardAluno')
     return render(request, "mimir/dashboardProfessor.html")
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def visualizarFontes(request):
     sources = Fontes.objects.filter(user=request.user)
     return render(request, "mimir/listarFontes.html", {"sources": sources})
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def addFonte(request):
     form = None
     if request.method == 'POST':
@@ -259,6 +283,8 @@ def addFonte(request):
     return render(request, "mimir/cadastrarFonte.html", {"source" : None,"form": form})
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def updateFonte(request, fonte_id):
     try:
         fonte = Fontes.objects.get(id=fonte_id, user=request.user)
@@ -280,6 +306,8 @@ def updateFonte(request, fonte_id):
     return render(request, "mimir/cadastrarFonte.html", {"source": fonte, "form": form})
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def deletarFonte(request, fonte_id):
     # Obtém a fonte ou retorna 404
     fonte = get_object_or_404(Fontes, id=fonte_id)
@@ -304,12 +332,16 @@ def deletarFonte(request, fonte_id):
     return render(request, 'mimir/deletarFonte.html', context)
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def listarPerguntas(request):
     perguntas = Pergunta.objects.all()
     return render(request, "mimir/listarPerguntas.html", {"perguntas": perguntas})
 
 @csrf_exempt
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def gerarPerguntas(request):
     if request.method == 'POST':
         form = GeracaoPerguntasForm(request.user, request.POST)
@@ -365,6 +397,8 @@ def gerarPerguntas(request):
 
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def salvarPerguntasForm(request):
     if request.method == 'POST':
         perguntas_selecionadas_ids = request.POST.getlist('perguntas_selecionadas')
@@ -431,6 +465,8 @@ def salvarPerguntasForm(request):
         return redirect('mimir:visualizarPerguntas')
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def visualizarPerguntasFonte(request, pID):
     pergunta = get_object_or_404(Pergunta, id=pID)    
 
@@ -450,6 +486,8 @@ def visualizarPerguntasFonte(request, pID):
     })
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def editarPergunta(request, pID):
     pergunta = get_object_or_404(Pergunta, id=pID)
     
@@ -534,6 +572,8 @@ def editarPergunta(request, pID):
     })
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def deletarPergunta(request, pID):
     """
     View para deletar uma pergunta
@@ -578,6 +618,8 @@ def deletarPergunta(request, pID):
                 return redirect('mimir:visualizarPergunta', pID=pergunta.id)    
             
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def criarProva(request):
     if not request.user.isProfessor():
         messages.error(request, "Apenas professores podem criar provas.")
@@ -612,7 +654,9 @@ def criarProva(request):
     }
     return render(request, 'mimir/criarProva.html', context)
 
-@login_required(login_url='/login/')
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def editarProva(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     
@@ -669,6 +713,8 @@ def editarProva(request, prova_id):
     return render(request, 'mimir/editarProva.html', context)
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def adicionarPerguntaExistente(request, prova_id):
     if request.method == 'POST':
         prova = get_object_or_404(Prova, id=prova_id, user=request.user)
@@ -684,6 +730,8 @@ def adicionarPerguntaExistente(request, prova_id):
     return redirect('mimir:editarProva', prova_id=prova_id)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def removerPerguntaProva(request, prova_id, pergunta_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     pergunta = get_object_or_404(Pergunta, id=pergunta_id)
@@ -694,11 +742,15 @@ def removerPerguntaProva(request, prova_id, pergunta_id):
     return redirect('mimir:editarProva', prova_id=prova_id)
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def listarProvas(request):
     provas = Prova.objects.filter(user=request.user).order_by('-dataCriacao')
     return render(request, 'mimir/listarProvas.html', {'provas': provas})
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def imprimirProva(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id)
     perguntas = prova.perguntas.all().prefetch_related('imagens')
@@ -717,6 +769,8 @@ def imprimirProva(request, prova_id):
     return render(request, 'mimir/imprimirProva.html', context)
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def imprimirFolhaResposta(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     
@@ -733,6 +787,8 @@ def imprimirFolhaResposta(request, prova_id):
     return render(request, 'mimir/imprimirFolhaResposta.html', context)
 
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def imprimirGabarito(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     
@@ -774,13 +830,18 @@ def gerarPdfProva(request, context, tipo):
     
     return response
 
+
 @login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def opcoesImpressao(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     return render(request, 'mimir/opcoesImpressao.html', {'prova': prova})
 
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def temaCreate(request):
     if request.method == 'POST':
         form = TemaForm(request.POST)
@@ -798,6 +859,8 @@ def temaCreate(request):
     return render(request, 'mimir/temaForm.html', {'form': form})
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def temaUpdate(request, pk):
     tema = get_object_or_404(Tema, pk=pk)
     
@@ -813,6 +876,8 @@ def temaUpdate(request, pk):
     return render(request, 'mimir/temaForm.html', {'form': form})
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def temaDelete(request, pk):
     tema = get_object_or_404(Tema, pk=pk)
     
@@ -824,6 +889,8 @@ def temaDelete(request, pk):
     return render(request, 'mimir/temaConfirmDelete.html', {'tema': tema})
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def solicitarFeedback(request, problema_id, parte_ordem):
     """
     View para solicitar feedback de um especialista para uma parte específica
@@ -880,6 +947,8 @@ def solicitarFeedback(request, problema_id, parte_ordem):
     return render(request, 'mimir/solicitarFeedback.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def visualizarFeedbacksParte(request, problema_id, parte_ordem):
     """
     View para visualizar todos os feedbacks de uma parte específica
@@ -903,6 +972,8 @@ def visualizarFeedbacksParte(request, problema_id, parte_ordem):
     return render(request, 'mimir/visualizarFeedbacks.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def marcarFeedbackUtilizado(request, feedback_id):
     """
     View para marcar um feedback como utilizado (tanto problemas quanto perguntas)
@@ -948,6 +1019,8 @@ def marcarFeedbackUtilizado(request, feedback_id):
             return redirect('mimir:meusFeedbacks')
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def responderFeedback(request, feedback_id):
     """
     View para responder a um feedback recebido (tanto problemas quanto perguntas)
@@ -993,6 +1066,8 @@ def responderFeedback(request, feedback_id):
     return render(request, 'mimir/responderFeedback.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def meusFeedbacks(request):
     """
     View para listar todos os feedbacks do usuário
@@ -1031,6 +1106,8 @@ def meusFeedbacks(request):
     return render(request, 'mimir/meusFeedbacks.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def fornecerFeedback(request, feedback_id):
     """
     View para especialista fornecer feedback para problemas ou perguntas
@@ -1111,6 +1188,8 @@ def fornecerFeedback(request, feedback_id):
     return render(request, 'mimir/fornecerFeedback.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def excluirFeedback(request, feedback_id):
     """
     View para excluir um feedback (apenas autor ou admin)
@@ -1135,6 +1214,8 @@ def excluirFeedback(request, feedback_id):
     return render(request, 'mimir/excluirFeedback.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def solicitarFeedbackPergunta(request, prova_id, pergunta_id):
     """
     View para solicitar feedback de um especialista para uma pergunta específica
@@ -1209,6 +1290,8 @@ def solicitarFeedbackPergunta(request, prova_id, pergunta_id):
     return render(request, 'mimir/solicitarFeedbackPergunta.html', context)
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def visualizarFeedbacksPergunta(request, prova_id, pergunta_id):
     """
     View para visualizar todos os feedbacks de uma pergunta específica
@@ -1233,6 +1316,8 @@ def visualizarFeedbacksPergunta(request, prova_id, pergunta_id):
 
 @login_required
 @require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def aceitarFeedback(request, feedback_id):
     """
     View para aceitar e aplicar o feedback do especialista
@@ -1249,6 +1334,8 @@ def aceitarFeedback(request, feedback_id):
 
 @login_required
 @require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def rejeitarFeedback(request, feedback_id):
     """
     View para rejeitar o feedback do especialista
@@ -1265,6 +1352,8 @@ def rejeitarFeedback(request, feedback_id):
     return redirect('mimir:meusFeedbacks')
 
 @login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
 def visualizarProvaEspecialista(request, prova_id, feedback_id=None):
     """
     View para especialista visualizar prova (somente leitura) relacionada a um feedback
@@ -1310,3 +1399,583 @@ def visualizarProvaEspecialista(request, prova_id, feedback_id=None):
     }
     
     return render(request, 'mimir/visualizarProvaEspecialista.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def dashboardAluno(request):
+   
+    # Buscar provas do aluno através do modelo ProvaAluno
+    provas_aluno = ProvaAluno.objects.filter(aluno=request.user).select_related(
+        'aplicacao_prova__prova__assunto'
+    )
+    
+    context = {
+        'provas_pendentes': provas_aluno.filter(status='pendente'),
+        'provas_andamento': provas_aluno.filter(status='em_andamento'),
+        'provas_concluidas': provas_aluno.filter(status='concluida'),
+        'provas_corrigidas': provas_aluno.filter(status='corrigida'),
+    }
+    
+    return render(request, 'mimir/dashboardAluno.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def listarProvasDisponiveis(request):
+    """Lista provas disponíveis para o aluno"""
+    
+    # Buscar aplicações de prova onde o aluno está incluído
+    aplicacoes_disponiveis = AplicacaoProva.objects.filter(
+        alunos=request.user,
+        disponivel=True,
+        data_disponivel__lte=timezone.now(),
+        data_limite__gte=timezone.now()
+    ).select_related('prova__assunto').prefetch_related('prova__perguntas')
+    
+    # Para cada aplicação, verificar se já existe um ProvaAluno
+    aplicacoes_com_status = []
+    for aplicacao in aplicacoes_disponiveis:
+        prova_aluno = ProvaAluno.objects.filter(
+            aplicacao_prova=aplicacao,
+            aluno=request.user
+        ).first()
+        
+        aplicacoes_com_status.append({
+            'aplicacao': aplicacao,
+            'prova_aluno': prova_aluno,
+            'status': prova_aluno.status if prova_aluno else 'pendente'
+        })
+    
+    context = {
+        'aplicacoes_com_status': aplicacoes_com_status,
+    }
+    
+    return render(request, 'mimir/listarProvasDisponiveis.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def iniciarProva(request, prova_aluno_id):
+    """Inicia uma prova para o aluno"""
+    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
+    
+    if prova_aluno.status not in ['pendente', 'em_andamento']:
+        return render(request, 'mimir/erroProva.html', {
+            'mensagem': 'Esta prova já foi concluída.'
+        })
+    
+    # Verifica se a prova ainda está disponível através da aplicação
+    aplicacao = prova_aluno.aplicacao_prova
+    
+    if not aplicacao.esta_disponivel():
+        return render(request, 'mimir/erroProva.html', {
+            'mensagem': 'O prazo para realização desta prova expirou.'
+        })
+    
+    # Inicia a prova se ainda não foi iniciada
+    if prova_aluno.status == 'pendente':
+        prova_aluno.iniciar_prova()
+    
+    # Carrega as perguntas da prova através da aplicação
+    perguntas = aplicacao.prova.perguntas.all().prefetch_related('imagens')
+    
+    # Carrega respostas existentes
+    respostas_existentes = {
+        resposta.pergunta_id: resposta 
+        for resposta in RespostaAluno.objects.filter(
+            aluno=request.user, 
+            prova_aluno=prova_aluno
+        )
+    }
+    
+    context = {
+        'prova_aluno': prova_aluno,
+        'perguntas': perguntas,
+        'respostas_existentes': respostas_existentes,
+        'aplicacao': aplicacao,
+    }
+    
+    return render(request, 'mimir/resolverProva.html', context)
+
+@login_required
+@require_http_methods(["POST"])
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def salvarResposta(request, prova_aluno_id):
+    """Salva uma resposta do aluno (AJAX)"""
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
+            
+            # Verifica se a prova ainda está em andamento
+            if prova_aluno.status != 'em_andamento':
+                return JsonResponse({'status': 'error', 'message': 'Prova não está em andamento'}, status=400)
+            
+            data = json.loads(request.body)
+            pergunta_id = data.get('pergunta_id')
+            resposta_texto = data.get('resposta_texto', '')
+            
+            pergunta = get_object_or_404(Pergunta, id=pergunta_id)
+            
+            # Verifica se a pergunta pertence à prova
+            if not prova_aluno.aplicacao_prova.prova.perguntas.filter(id=pergunta_id).exists():
+                return JsonResponse({'status': 'error', 'message': 'Pergunta não pertence a esta prova'}, status=400)
+            
+            # Salva ou atualiza a resposta
+            resposta, created = RespostaAluno.objects.get_or_create(
+                aluno=request.user,
+                pergunta=pergunta,
+                prova_aluno=prova_aluno,
+                defaults={'resposta_texto': resposta_texto}
+            )
+            
+            if not created:
+                resposta.resposta_texto = resposta_texto
+                resposta.save()
+            
+            return JsonResponse({
+                'status': 'success', 
+                'salvo_em': resposta.atualizado_em.isoformat(),
+                'created': created,
+                'pergunta_id': pergunta_id
+            })
+        
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Dados JSON inválidos'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Erro interno: {str(e)}'}, status=500)
+    
+    return JsonResponse({'status': 'error', 'message': 'Requisição inválida'}, status=400)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def finalizarProva(request, prova_aluno_id):
+    """Finaliza a prova e calcula a nota"""
+    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
+    
+    if prova_aluno.status == 'em_andamento':
+        prova_aluno.finalizar_prova()
+        # Calcula nota automaticamente (para questões objetivas)
+        prova_aluno.calcular_nota()
+    
+    return redirect('mimir:verResultadoProva', prova_aluno_id=prova_aluno.id)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Aluno')
+def verResultadoProva(request, prova_aluno_id):
+    """Exibe o resultado da prova para o aluno"""
+    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
+    
+    # Carrega perguntas e respostas
+    perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all().prefetch_related('imagens')
+    respostas = {
+        resposta.pergunta_id: resposta 
+        for resposta in RespostaAluno.objects.filter(
+            aluno=request.user, 
+            prova_aluno=prova_aluno
+        )
+    }
+    
+    context = {
+        'prova_aluno': prova_aluno,
+        'perguntas': perguntas,
+        'respostas': respostas,
+    }
+    
+    return render(request, 'mimir/resultadoProva.html', context)
+
+@login_required
+def criarProvaAluno(request, aplicacao_id):
+    """Cria um registro ProvaAluno para um aluno iniciar uma prova"""
+    if not request.user.isAluno():
+        return redirect('mimir:dashboardProfessor')
+    
+    aplicacao = get_object_or_404(AplicacaoProva, id=aplicacao_id, alunos=request.user)
+    
+    # Verifica se já existe um ProvaAluno
+    prova_aluno, created = ProvaAluno.objects.get_or_create(
+        aplicacao_prova=aplicacao,
+        aluno=request.user,
+        defaults={'status': 'pendente'}
+    )
+    
+    return redirect('mimir:iniciarProva', prova_aluno_id=prova_aluno.id)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def listarAplicacoesProva(request):
+    """Lista todas as aplicações de prova do professor"""
+    
+    aplicacoes = AplicacaoProva.objects.filter(
+        prova__user=request.user
+    ).select_related('prova').prefetch_related('alunos').annotate(
+        total_alunos=Count('alunos'),
+        alunos_concluidos=Count('provas_alunos', filter=Q(provas_alunos__status='concluida'))
+    )
+    
+    # Verificar se o professor tem provas criadas
+    tem_provas = Prova.objects.filter(user=request.user).exists()
+    
+    # Calcular estatísticas para os cards (apenas se houver aplicações)
+    aplicacoes_ativas = aplicacoes.filter(disponivel=True).count() if aplicacoes else 0
+    
+    total_alunos_geral = 0
+    total_concluidas_geral = 0
+    
+    for aplicacao in aplicacoes:
+        total_alunos_geral += aplicacao.total_alunos
+        total_concluidas_geral += aplicacao.alunos_concluidos
+    
+    context = {
+        'aplicacoes': aplicacoes,
+        'aplicacoes_ativas': aplicacoes_ativas,
+        'total_alunos_geral': total_alunos_geral,
+        'total_concluidas_geral': total_concluidas_geral,
+        'tem_provas': tem_provas,  # Para saber se pode criar aplicação
+    }
+    
+    return render(request, 'mimir/listarAplicacoesProva.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def selecionarProvaParaAplicacao(request):
+    """Lista provas disponíveis para criar uma aplicação"""
+    
+    provas = Prova.objects.filter(user=request.user).select_related('assunto')
+    
+    context = {
+        'provas': provas,
+    }
+    
+    return render(request, 'mimir/selecionarProvaAplicacao.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def criarAplicacaoProva(request, prova_id):
+    """Cria uma nova aplicação de prova"""
+    
+    # Garantir que a prova pertence ao professor
+    prova = get_object_or_404(Prova, id=prova_id, user=request.user)
+    
+    if request.method == 'POST':
+        form = AplicacaoProvaForm(request.POST)
+        if form.is_valid():
+            aplicacao = form.save(commit=False)
+            aplicacao.prova = prova
+            aplicacao.save()
+            
+            # Adicionar alunos selecionados
+            alunos_selecionados = form.cleaned_data['alunos']
+            for aluno in alunos_selecionados:
+                aplicacao.adicionar_aluno(aluno)
+            
+            messages.success(request, 'Aplicação de prova criada com sucesso!')
+            return redirect('mimir:detalhesAplicacaoProva', aplicacao_id=aplicacao.id)
+    else:
+        form = AplicacaoProvaForm()
+    
+    context = {
+        'prova': prova,
+        'form': form,
+    }
+    
+    return render(request, 'mimir/criarAplicacaoProva.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def detalhesAplicacaoProva(request, aplicacao_id):
+    """Detalhes de uma aplicação de prova com estatísticas"""
+    
+    aplicacao = get_object_or_404(
+        AplicacaoProva, 
+        id=aplicacao_id, 
+        prova__user=request.user
+    )
+    
+    # Estatísticas dos alunos
+    provas_alunos = ProvaAluno.objects.filter(
+        aplicacao_prova=aplicacao
+    ).select_related('aluno').annotate(
+        total_respostas=Count('respostas')
+    )
+    
+    # Calcular médias
+    if provas_alunos.filter(nota_final__isnull=False).exists():
+        media_geral = provas_alunos.filter(nota_final__isnull=False).aggregate(
+            media=Avg('nota_final')
+        )['media']
+    else:
+        media_geral = None
+    
+    context = {
+        'aplicacao': aplicacao,
+        'provas_alunos': provas_alunos,
+        'media_geral': media_geral,
+        'total_alunos': provas_alunos.count(),
+        'alunos_concluidos': provas_alunos.filter(status='concluida').count(),
+        'alunos_corrigidos': provas_alunos.filter(status='corrigida').count(),
+    }
+    
+    return render(request, 'mimir/detalhesAplicacaoProva.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def editarAplicacaoProva(request, aplicacao_id):
+    """Edita uma aplicação de prova existente"""
+    
+    aplicacao = get_object_or_404(
+        AplicacaoProva, 
+        id=aplicacao_id, 
+        prova__user=request.user
+    )
+    
+    if request.method == 'POST':
+        form = AplicacaoProvaForm(request.POST, instance=aplicacao)
+        if form.is_valid():
+            aplicacao = form.save()
+            
+            # Atualizar alunos
+            alunos_selecionados = form.cleaned_data['alunos']
+            alunos_atuais = set(aplicacao.alunos.all())
+            alunos_novos = set(alunos_selecionados)
+            
+            # Remover alunos que foram desmarcados
+            for aluno in alunos_atuais - alunos_novos:
+                aplicacao.remover_aluno(aluno)
+            
+            # Adicionar novos alunos
+            for aluno in alunos_novos - alunos_atuais:
+                aplicacao.adicionar_aluno(aluno)
+            
+            messages.success(request, 'Aplicação de prova atualizada com sucesso!')
+            return redirect('mimir:listarAplicacoesProva')
+    else:
+        form = AplicacaoProvaForm(instance=aplicacao, initial={'alunos': aplicacao.alunos.all()})
+    
+    context = {
+        'aplicacao': aplicacao,
+        'form': form,
+    }
+    
+    return render(request, 'mimir/editarAplicacaoProva.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def excluirAplicacaoProva(request, aplicacao_id):
+    """Exclui uma aplicação de prova"""
+    
+    aplicacao = get_object_or_404(
+        AplicacaoProva, 
+        id=aplicacao_id, 
+        prova__user=request.user
+    )
+    
+    if request.method == 'POST':
+        aplicacao.delete()
+        messages.success(request, 'Aplicação de prova excluída com sucesso!')
+        return redirect('mimir:listarAplicacoesProva')
+    
+    context = {
+        'aplicacao': aplicacao,
+    }
+    
+    return render(request, 'mimir/excluirAplicacaoProva.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def corrigirProvaAluno(request, prova_aluno_id):
+    
+    prova_aluno = get_object_or_404(
+        ProvaAluno, 
+        id=prova_aluno_id,
+        aplicacao_prova__prova__user=request.user
+    )
+    
+    if request.method == 'POST':
+        # Processar correção
+        for pergunta in prova_aluno.aplicacao_prova.prova.perguntas.all():
+            nota_pergunta = request.POST.get(f'nota_{pergunta.id}')
+            feedback_pergunta = request.POST.get(f'feedback_{pergunta.id}')
+            
+            if nota_pergunta or feedback_pergunta:
+                resposta, created = RespostaAluno.objects.get_or_create(
+                    aluno=prova_aluno.aluno,
+                    pergunta=pergunta,
+                    prova_aluno=prova_aluno,
+                    defaults={
+                        'resposta_texto': ''  # Ou buscar resposta existente
+                    }
+                )
+                
+                # Aqui você pode adicionar campos para nota por questão e feedback
+                # resposta.nota = nota_pergunta
+                # resposta.feedback_professor = feedback_pergunta
+                # resposta.save()
+        
+        # Marcar como corrigida
+        prova_aluno.status = 'corrigida'
+        prova_aluno.save()
+        
+        messages.success(request, f'Prova de {prova_aluno.aluno.get_full_name()} corrigida com sucesso!')
+        return redirect('mimir:detalhesAplicacaoProva', aplicacao_id=prova_aluno.aplicacao_prova.id)
+    
+    # Carregar perguntas e respostas
+    perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all().prefetch_related('imagens')
+    respostas = {
+        resposta.pergunta_id: resposta 
+        for resposta in RespostaAluno.objects.filter(
+            aluno=prova_aluno.aluno, 
+            prova_aluno=prova_aluno
+        )
+    }
+    
+    context = {
+        'prova_aluno': prova_aluno,
+        'perguntas': perguntas,
+        'respostas': respostas,
+    }
+    
+    return render(request, 'mimir/corrigirProvaAluno.html', context)
+
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def editarParte(request, parte_id):
+    """Edita manualmente uma parte do problema via AJAX"""
+    try:
+        parte = get_object_or_404(Parte, id=parte_id)
+        
+        # Verificar se o usuário é o autor do problema
+        if parte.problema.tema.usuario != request.user:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Você não tem permissão para editar esta parte.'
+            }, status=403)
+        
+        novo_enunciado = request.POST.get('enunciado', '').strip()
+        
+        if not novo_enunciado:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'O enunciado não pode estar vazio.'
+            })
+        
+        # Salvar as alterações
+        parte.enunciado = novo_enunciado
+        parte.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Parte atualizada com sucesso!',
+            'novo_enunciado': novo_enunciado
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'Erro ao salvar: {str(e)}'
+        }, status=500)
+    
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def adicionarMidiaParte(request, parte_id):
+    """Adiciona uma mídia a uma parte do problema"""
+    try:
+        parte = get_object_or_404(Parte, id=parte_id)
+        
+        # Verificar se o usuário é o autor do problema
+        if parte.problema.tema.usuario != request.user:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Você não tem permissão para adicionar mídias a esta parte.'
+            }, status=403)
+        
+        arquivo = request.FILES.get('arquivo')
+        tipo = request.POST.get('tipo', 'imagem')
+        descricao = request.POST.get('descricao', '').strip()
+        ordem = int(request.POST.get('ordem', parte.midias.count() + 1))
+        
+        if not arquivo:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Nenhum arquivo foi enviado.'
+            })
+        
+        # Validar tipo de arquivo
+        extensoes_permitidas = {
+            'imagem': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'],
+            'audio': ['.mp3', '.wav', '.ogg', '.m4a'],
+            'pdf': ['.pdf'],
+            'video': ['.mp4', '.avi', '.mov', '.wmv'],
+            'documento': ['.doc', '.docx', '.txt', '.rtf']
+        }
+        
+        extensao = os.path.splitext(arquivo.name)[1].lower()
+        if extensao not in extensoes_permitidas.get(tipo, []):
+            return JsonResponse({
+                'status': 'error', 
+                'message': f'Tipo de arquivo não permitido para {tipo}.'
+            })
+        
+        # Criar a mídia
+        midia = MidiaParte.objects.create(
+            parte=parte,
+            arquivo=arquivo,
+            tipo=tipo,
+            descricao=descricao,
+            ordem=ordem
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Mídia adicionada com sucesso!',
+            'midia_id': midia.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'Erro ao adicionar mídia: {str(e)}'
+        }, status=500)
+
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def excluirMidiaParte(request, midia_id):
+    """Exclui uma mídia de uma parte"""
+    try:
+        midia = get_object_or_404(MidiaParte, id=midia_id)
+        
+        # Verificar se o usuário é o autor do problema
+        if midia.parte.problema.tema.usuario != request.user:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Você não tem permissão para excluir esta mídia.'
+            }, status=403)
+        
+        midia.delete()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Mídia excluída com sucesso!'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'Erro ao excluir mídia: {str(e)}'
+        }, status=500)
