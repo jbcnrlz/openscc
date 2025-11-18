@@ -1,6 +1,7 @@
-from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista
+from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista, AplicacaoProva
 from django import forms
 from django.core.validators import FileExtensionValidator
+from django.contrib.auth.models import User
 
 class TemaForm(forms.ModelForm):
     class Meta:
@@ -259,4 +260,21 @@ class ResponderFeedbackForm(forms.ModelForm):
         }
         labels = {
             'resposta_autor': 'Sua Resposta'
+        }
+
+class AplicacaoProvaForm(forms.ModelForm):
+    alunos = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(groups__name='Aluno'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        required=True
+    )
+    
+    class Meta:
+        model = AplicacaoProva
+        fields = ['data_disponivel', 'data_limite', 'tempo_limite', 'disponivel', 'alunos']
+        widgets = {
+            'data_disponivel': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'data_limite': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'tempo_limite': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'HH:MM:SS'}),
+            'disponivel': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }

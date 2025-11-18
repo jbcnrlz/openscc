@@ -127,7 +127,7 @@ def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
                 textos_por_lote.append(texto_lote)
                 
     except Exception as e:
-        textos_por_lote.append(f"Erro ao processar {fp[1]}: {str(e)}")
+        textos_por_lote.append(f"Erro ao processar {file_path}: {str(e)}")
     
     return textos_por_lote
 
@@ -162,7 +162,7 @@ def getQuestionsFromSource(file_path,qtPerguntas,infoExtras):
         # Extrair texto do PDF
         completoTudo = ''
         for fp in file_path:
-            conteudo_extraido = processar_pdf_em_lotes(fp[0],fp[1])
+            conteudo_extraido = extrair_texto_pdf(fp[0])
             texto_completo = "\n".join(conteudo_extraido)
             completoTudo += f"FONTE - {fp[1]}\n" + texto_completo + "\n\n"
         

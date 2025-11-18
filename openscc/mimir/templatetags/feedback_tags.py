@@ -1,5 +1,5 @@
 from django import template
-
+import os
 register = template.Library()
 
 @register.filter
@@ -31,3 +31,13 @@ def has_gabarito(value):
     if not value:
         return False
     return '---GABARITO---' in value
+
+@register.filter
+def get_item(dictionary, key):
+    """Retorna o valor de um dicionário para uma chave específica"""
+    return dictionary.get(key)
+
+@register.filter
+def basename(value):
+    """Retorna o nome do arquivo de um path"""
+    return os.path.basename(value)

@@ -1,0 +1,131 @@
+<!-- templates/mimir/criar_aplicacao_prova.html -->
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>Criar Nova Aplicação de Prova
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>Prova: {{ prova.titulo }}</h5>
+                        <p class="text-muted mb-0">{{ prova.descricao }}</p>
+                        <small class="text-muted">Assunto: {{ prova.assunto.nome }}</small>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_disponivel.id_for_label }}" class="form-label">
+                                    <i class="fas fa-calendar-plus me-1"></i>Data de Início
+                                </label>
+                                {{ form.data_disponivel }}
+                                {% if form.data_disponivel.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.data_disponivel.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_limite.id_for_label }}" class="form-label">
+                                    <i class="fas fa-calendar-times me-1"></i>Data Limite
+                                </label>
+                                {{ form.data_limite }}
+                                {% if form.data_limite.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.data_limite.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.tempo_limite.id_for_label }}" class="form-label">
+                                <i class="fas fa-clock me-1"></i>Tempo Limite
+                            </label>
+                            {{ form.tempo_limite }}
+                            <div class="form-text">
+                                Formato: HH:MM:SS (ex: 02:00:00 para 2 horas)
+                            </div>
+                            {% if form.tempo_limite.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.tempo_limite.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                {{ form.disponivel }}
+                                <label class="form-check-label" for="{{ form.disponivel.id_for_label }}">
+                                    Disponível para os alunos
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.alunos.id_for_label }}" class="form-label">
+                                <i class="fas fa-users me-1"></i>Selecionar Alunos
+                            </label>
+                            {{ form.alunos }}
+                            {% if form.alunos.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.alunos.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Mantenha Ctrl pressionado para selecionar múltiplos alunos.
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Criar Aplicação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+</style>
+{% endblock %}

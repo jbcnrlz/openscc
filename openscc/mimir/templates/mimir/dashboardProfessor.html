@@ -1,72 +1,308 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <h2>Dashboard do professor</h2>
-    <div class="row mt-4">
-        <div class="col-md-4 mb-2">
-            <div class="card">
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-primary">Dashboard do Professor</h1>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-primary-subtle text-primary me-3">
+                <i class="fas fa-user-circle me-1"></i> Professor
+            </span>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100 py-2">
                 <div class="card-body">
-                    <h5 class="card-title">Fontes</h5>
-                    <p class="card-text">Gerencie suas fontes. Faça upload e remova fontes desnecessárias. Elas podem ser usadas para geração de problemas e para geração de questões</p>
-                    <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-primary">Gerenciar fontes</a>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Fontes Ativas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">24</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2">
                 <div class="card-body">
-                    <h5 class="card-title">Templates</h5>
-                    <p class="card-text">Crie e gerencie templates de problemas.</p>
-                    <a href="#" class="btn btn-primary">Gerenciar templates</a>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Problemas Criados
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">18</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2">
                 <div class="card-body">
-                    <h5 class="card-title">Perguntas</h5>
-                    <p class="card-text">Gerencie seu banco de questões. Gere novas questões, remova questões antigas</p>
-                    <a href="{% url 'mimir:visualizarPerguntas'%}" class="btn btn-primary">Gerenciar Questões</a>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                Questões Geradas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">124</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-question-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100 py-2">
                 <div class="card-body">
-                    <h5 class="card-title">Problemas</h5>
-                    <p class="card-text">Gerencie e gere novos problemas</p>
-                    <a href="{% url 'mimir:problemaList' %}" class="btn btn-primary">Gerenciar problemas</a>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Provas Criadas
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">7</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Provas</h5>
-                    <p class="card-text">Crie e imprima provas, gabaritos e folhas de resposta</p>
-                    <a href="{% url 'mimir:listarProvas' %}" class="btn btn-primary">Gerenciar provas</a>
+    </div>
+
+    <!-- Cards de Funcionalidades -->
+    <div class="row">
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-purple bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-clipboard-list text-purple"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Aplicações de Prova</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerencie as aplicações de prova para seus alunos. Crie, edite e acompanhe o progresso das avaliações.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-purple text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar Aplicações
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Temas</h5>
-                    <p class="card-text">Gerencie os temas que definem quais os itens para trabalhar nos problemas</p>
-                    <a href="{% url 'mimir:listarTemas' %}" class="btn btn-primary">Gerenciar temas</a>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-file-alt text-primary"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Fontes</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerencie suas fontes. Faça upload e remova fontes desnecessárias. Elas podem ser usadas para geração de problemas e questões.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-primary">
+                            <i class="fas fa-cog me-1"></i> Gerenciar fontes
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Feedbacks</h5>
-                    <p class="card-text">Verificar os feedbacks</p>
-                    <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-primary">Gerenciar feedbacks</a>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-layer-group text-success"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Templates</h5>
+                    </div>
+                    <p class="card-text text-muted">Crie e gerencie templates de problemas para agilizar a criação de conteúdo.</p>
+                    <div class="mt-3">
+                        <a href="#" class="btn btn-success">
+                            <i class="fas fa-cog me-1"></i> Gerenciar templates
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-warning bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-question-circle text-warning"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Perguntas</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerencie seu banco de questões. Gere novas questões, remova questões antigas.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:visualizarPerguntas'%}" class="btn btn-warning text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar Questões
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-info bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-tasks text-info"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Problemas</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerencie e gere novos problemas para suas atividades e avaliações.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:problemaList' %}" class="btn btn-info text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar problemas
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-purple bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-clipboard-list text-purple"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Provas</h5>
+                    </div>
+                    <p class="card-text text-muted">Crie e imprima provas, gabaritos e folhas de resposta personalizadas.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:listarProvas' %}" class="btn btn-purple text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar provas
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-teal bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-palette text-teal"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Temas</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerencie os temas que definem quais os itens para trabalhar nos problemas.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:listarTemas' %}" class="btn btn-teal text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar temas
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-orange bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-comments text-orange"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Feedbacks</h5>
+                    </div>
+                    <p class="card-text text-muted">Verificar e responder aos feedbacks recebidos de alunos e colegas.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-orange text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar feedbacks
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    :root {
+        --bs-purple: #6f42c1;
+        --bs-teal: #20c997;
+        --bs-orange: #fd7e14;
+    }
+    
+    .bg-purple {
+        background-color: var(--bs-purple) !important;
+    }
+    
+    .bg-teal {
+        background-color: var(--bs-teal) !important;
+    }
+    
+    .bg-orange {
+        background-color: var(--bs-orange) !important;
+    }
+    
+    .text-purple {
+        color: var(--bs-purple) !important;
+    }
+    
+    .text-teal {
+        color: var(--bs-teal) !important;
+    }
+    
+    .text-orange {
+        color: var(--bs-orange) !important;
+    }
+    
+    .btn-purple {
+        background-color: var(--bs-purple);
+        border-color: var(--bs-purple);
+    }
+    
+    .btn-teal {
+        background-color: var(--bs-teal);
+        border-color: var(--bs-teal);
+    }
+    
+    .btn-orange {
+        background-color: var(--bs-orange);
+        border-color: var(--bs-orange);
+    }
+    
+    .feature-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .feature-icon {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .btn-outline-purple {
+        color: #6f42c1;
+        border-color: #6f42c1;
+    }
+
+    .btn-outline-purple:hover {
+        color: #fff;
+        background-color: #6f42c1;
+        border-color: #6f42c1;
+    }
+</style>
 {% endblock %}
