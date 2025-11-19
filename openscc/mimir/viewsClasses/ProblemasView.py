@@ -33,7 +33,7 @@ class ProblemaDetailView(LoginRequiredMixin, DetailView):
         
         # Verifica as permissões
         user = self.request.user
-        eh_autor = obj.assunto.usuario == user
+        eh_autor = obj.assunto.user == user
         tem_feedback = obj.partes.filter(feedbacks__especialista=user).exists()
         
         if not (eh_autor or tem_feedback):            
