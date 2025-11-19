@@ -4,7 +4,7 @@ from django.views.generic import ListView, DetailView, CreateView, View, DeleteV
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from ..models import Problema, Parte
+from ..models import Problema, Parte, Assunto
 from ..forms import ProblemaForm, GerarProblemaForm, RegerarParteForm
 from commons.services import criarPromptParaParte, chamarApiLLM, extrair_texto_pdf, regerarParte
 from django.contrib.auth.models import User
@@ -16,7 +16,7 @@ class ProblemaListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return Problema.objects.filter(tema__usuario=self.request.user)
+        return Problema.objects.filter(assunto__user=self.request.user)
 
 class ProblemaDetailView(LoginRequiredMixin, DetailView):
     model = Problema
