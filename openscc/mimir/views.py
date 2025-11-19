@@ -16,6 +16,7 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from django.db.models import Count, Avg, Q
 from .decorators import acesso_mimir_requerido, grupo_requerido
+from django.contrib.auth.models import User
 
 def acessoNegado(request):
     """View para página de acesso negado"""
@@ -247,9 +248,24 @@ def generateQuestions(request):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def dashboardProfessor(request):
-    if request.user.isAluno():
-        return redirect('mimir:dashboardAluno')
-    return render(request, "mimir/dashboardProfessor.html")
+    # Obter estatísticas do banco de dados
+    fontes_ativas = Fontes.objects.filter(user=request.user).count()
+    problemas_criados = Problema.objects.filter(assunto__user=request.user).count()
+    
+    # Contar questões geradas (supondo que Pergunta tenha relação com usuário)
+    questoes_geradas = Pergunta.objects.filter(assunto__user=request.user).count()
+    
+    # Contar provas criadas
+    provas_criadas = Prova.objects.filter(assunto__user=request.user).count()
+    
+    context = {
+        'fontes_ativas': fontes_ativas,
+        'problemas_criados': problemas_criados,
+        'questoes_geradas': questoes_geradas,
+        'provas_criadas': provas_criadas
+    }
+    
+    return render(request, "mimir/dashboardProfessor.html", context)
 
 @login_required(login_url='/login')
 @acesso_mimir_requerido
@@ -694,9 +710,10 @@ def editarProva(request, prova_id):
     pergunta_form.fields['tipoDePergunta'].queryset = TiposDePergunta.objects.all()
     
     # Obter lista de especialistas para feedback
-    from django.contrib.auth.models import User
+    
     especialistas = User.objects.filter(
-        is_active=True
+        is_active=True,
+        groups__name='Especialista'
     ).exclude(
         id=request.user.id
     ).order_by('first_name', 'last_name')
@@ -901,7 +918,8 @@ def solicitarFeedback(request, problema_id, parte_ordem):
     # Obter lista de especialistas (usuários com permissão específica ou todos os usuários ativos)
     # Aqui você pode ajustar a lógica para selecionar especialistas específicos
     especialistas = User.objects.filter(
-        is_active=True
+        is_active=True,
+        groups__name='Especialista'
     ).exclude(
         id=request.user.id
     ).order_by('first_name', 'last_name')
@@ -1229,7 +1247,8 @@ def solicitarFeedbackPergunta(request, prova_id, pergunta_id):
     
     # Obter lista de especialistas
     especialistas = User.objects.filter(
-        is_active=True
+        is_active=True,
+        groups__name='Especialista'
     ).exclude(
         id=request.user.id
     ).order_by('first_name', 'last_name')

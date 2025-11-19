@@ -7,7 +7,8 @@ from django.contrib import messages
 from ..models import Problema, Parte
 from ..forms import ProblemaForm, GerarProblemaForm, RegerarParteForm
 from commons.services import criarPromptParaParte, chamarApiLLM, extrair_texto_pdf, regerarParte
-
+from django.contrib.auth.models import User
+from django.http import Http404
 class ProblemaListView(LoginRequiredMixin, ListView):
     model = Problema
     template_name = 'mimir/problemaList.html'
@@ -17,22 +18,6 @@ class ProblemaListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return Problema.objects.filter(tema__usuario=self.request.user)
 
-'''
-class ProblemaDetailView(LoginRequiredMixin, DetailView):
-    model = Problema
-    template_name = 'mimir/problemaDetail.html'
-    context_object_name = 'problema'
-
-    def get_queryset(self):
-        return Problema.objects.filter(tema__usuario=self.request.user)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        partes = Parte.objects.filter(problema=self.object).order_by('ordem')
-        context['partes'] = partes        
-        context['regerar_form'] = RegerarParteForm(max_partes=partes.count())
-        return context
-'''
 class ProblemaDetailView(LoginRequiredMixin, DetailView):
     model = Problema
     template_name = 'mimir/problemaDetail.html'
@@ -51,8 +36,7 @@ class ProblemaDetailView(LoginRequiredMixin, DetailView):
         eh_autor = obj.tema.usuario == user
         tem_feedback = obj.partes.filter(feedbacks__especialista=user).exists()
         
-        if not (eh_autor or tem_feedback):
-            from django.http import Http404
+        if not (eh_autor or tem_feedback):            
             raise Http404("Problema não encontrado ou você não tem permissão para visualizá-lo.")
             
         return obj
@@ -69,9 +53,9 @@ class ProblemaDetailView(LoginRequiredMixin, DetailView):
         eh_autor = problema.assunto.user == user
         
         # Obter lista de especialistas (apenas para autores)
-        from django.contrib.auth.models import User
         especialistas = User.objects.filter(
-            is_active=True
+            is_active=True,
+            groups__name='Especialista'
         ).exclude(
             id=user.id
         ).order_by('first_name', 'last_name') if eh_autor else User.objects.none()
