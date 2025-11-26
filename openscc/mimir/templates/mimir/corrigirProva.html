@@ -1,0 +1,849 @@
+{% extends "mimirBase.html" %}
+{% load static %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <!-- Cabeçalho da Correção -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">Corrigir Prova</h4>
+                    <p class="mb-0">{{ prova_aluno.aplicacao_prova.prova.titulo }}</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-light text-dark fs-6">{{ prova_aluno.status|title }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-2">
+                        <strong>Aluno:</strong> 
+                        {{ prova_aluno.aluno.get_full_name|default:prova_aluno.aluno.username }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Assunto:</strong> 
+                        {{ prova_aluno.aplicacao_prova.prova.assunto.nome }}
+                    </p>
+                    <p class="mb-0">
+                        <strong>Iniciada em:</strong> 
+                        {{ prova_aluno.data_inicio|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-2">
+                        <strong>Concluída em:</strong> 
+                        {% if prova_aluno.data_conclusao %}
+                            {{ prova_aluno.data_conclusao|date:"d/m/Y H:i" }}
+                        {% else %}
+                            <span class="text-muted">Não concluída</span>
+                        {% endif %}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Tempo decorrido:</strong> 
+                        {{ prova_aluno.tempo_decorrido }}
+                    </p>
+                    <p class="mb-0">
+                        <strong>Nota atual:</strong> 
+                        {% if prova_aluno.nota_final %}
+                            <span class="badge bg-success fs-6">{{ prova_aluno.nota_final|floatformat:1 }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6">Não corrigida</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo de Correção -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Resumo da Correção</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-3 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-primary mb-1">{{ prova_aluno.aplicacao_prova.prova.perguntas.count }}</h3>
+                        <small class="text-muted">Total de Questões</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-success mb-1" id="total-respondidas">0</h3>
+                        <small class="text-muted">Respondidas</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-warning mb-1" id="total-corrigidas">0</h3>
+                        <small class="text-muted">Corrigidas</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-info mb-1" id="nota-projetada">0.0</h3>
+                        <small class="text-muted">Nota Projetada</small>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="fas fa-robot me-2"></i>
+                        <strong>Correção Automática:</strong> 
+                        Questões de múltipla escolha são corrigidas automaticamente. 
+                        Use o botão "Corrigir com IA" para questões dissertativas.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário de Correção -->
+    <form method="post" id="formCorrecao">
+        {% csrf_token %}
+        
+        {% for pergunta in perguntas_com_respostas %}
+        {% with tipo_pergunta=pergunta.pergunta.tipoDePergunta.descricao|lower %}
+        <div class="card shadow-sm mb-4 questao-correcao" id="questao-{{ forloop.counter }}">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Questão {{ forloop.counter }}</h5>
+                <div>
+                    <span class="badge bg-secondary me-2">{{ pergunta.pergunta.tipoDePergunta.descricao }}</span>
+                    <span class="badge" id="status-correcao-{{ pergunta.pergunta.id }}">
+                        {% if pergunta.resposta and pergunta.resposta.nota is not None %}
+                        <i class="fas fa-check text-success"></i> Corrigida
+                        {% else %}
+                        <i class="fas fa-clock text-warning"></i> Pendente
+                        {% endif %}
+                    </span>
+                    {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+                    <span class="badge bg-info ms-2">
+                        <i class="fas fa-robot me-1"></i>Automática
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <!-- Enunciado da Questão -->
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">Enunciado:</h6>
+                    <div class="enunciado-questao bg-light p-3 rounded">
+                        {{ pergunta.pergunta.pergunta|linebreaks }}
+                    </div>
+                    
+                    <!-- Imagens da questão -->
+                    {% for imagem in pergunta.pergunta.imagens.all %}
+                    <div class="text-center my-3">
+                        <img src="{{ imagem.imagem.url }}" alt="Imagem da questão {{ forloop.parentloop.counter }}" 
+                             class="img-fluid rounded shadow-sm" style="max-height: 300px;">
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Gabarito Oficial -->
+                <div class="mb-4">
+                    <h6 class="text-success mb-3">Gabarito Oficial:</h6>
+                    <div class="gabarito-oficial bg-success bg-opacity-10 p-3 rounded border border-success">
+                        {{ pergunta.pergunta.gabarito|linebreaks }}
+                    </div>
+                </div>
+
+                <!-- Resposta do Aluno -->
+                <div class="mb-4">
+                    <h6 class="text-info mb-3">Resposta do Aluno:</h6>
+                    <div class="resposta-aluno bg-info bg-opacity-10 p-3 rounded border border-info">
+                        {% if pergunta.resposta and pergunta.resposta.resposta_texto %}
+                            {{ pergunta.resposta.resposta_texto|linebreaks }}
+                        {% else %}
+                            <p class="text-muted fst-italic">Aluno não respondeu esta questão.</p>
+                        {% endif %}
+                        
+                        <!-- Arquivo anexado pelo aluno -->
+                        {% if pergunta.resposta and pergunta.resposta.resposta_arquivo %}
+                        <div class="mt-3">
+                            <strong>Arquivo anexado:</strong>
+                            <a href="{{ pergunta.resposta.resposta_arquivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                                <i class="fas fa-download me-1"></i>Baixar
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Área de Correção -->
+                <div class="correcao-area">
+                    <h6 class="text-warning mb-3">Correção:</h6>
+                    
+                    <!-- Para questões de múltipla escolha - Correção Automática -->
+                    {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+                    <div class="mb-4">
+                        <div class="alert {% if pergunta.correta %}alert-success{% else %}alert-danger{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas {% if pergunta.correta %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
+                                    <strong>
+                                        {% if pergunta.correta %}
+                                        Resposta Correta
+                                        {% else %}
+                                        Resposta Incorreta
+                                        {% endif %}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span class="badge bg-{% if pergunta.correta %}success{% else %}danger{% endif %} fs-6">
+                                        {% if pergunta.correta %}10.0{% else %}0.0{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            {% if not pergunta.correta and pergunta.resposta and pergunta.resposta.resposta_texto %}
+                            <div class="mt-2">
+                                <small>
+                                    <strong>Resposta do aluno:</strong> {{ pergunta.resposta.resposta_texto }}<br>
+                                    <strong>Gabarito correto:</strong> {{ pergunta.pergunta.gabarito }}
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Campo oculto para a nota automática -->
+                        <input type="hidden" 
+                               class="nota-questao" 
+                               id="nota-{{ pergunta.pergunta.id }}" 
+                               name="nota_{{ pergunta.pergunta.id }}"
+                               value="{% if pergunta.correta %}10{% else %}0{% endif %}"
+                               data-pergunta-id="{{ pergunta.pergunta.id }}"
+                               data-automatica="true">
+                    </div>
+                    
+                    <!-- Para outros tipos de questão - Correção Manual com IA -->
+                    {% else %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="nota-{{ pergunta.pergunta.id }}" class="form-label fw-bold">
+                                Nota (0-10):
+                            </label>
+                            <div class="input-group" style="max-width: 200px;">
+                                <input type="number" 
+                                       class="form-control nota-questao" 
+                                       id="nota-{{ pergunta.pergunta.id }}" 
+                                       name="nota_{{ pergunta.pergunta.id }}"
+                                       min="0" 
+                                       max="10" 
+                                       step="0.1"
+                                       value="{% if pergunta.resposta and pergunta.resposta.nota %}{{ pergunta.resposta.nota }}{% else %}0{% endif %}"
+                                       data-pergunta-id="{{ pergunta.pergunta.id }}"
+                                       data-automatica="false">
+                                <button type="button" 
+                                        class="btn btn-outline-primary correcao-ia-btn"
+                                        data-pergunta-id="{{ pergunta.pergunta.id }}"
+                                        title="Corrigir automaticamente com IA">
+                                    <i class="fas fa-robot"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Peso da Questão:</label>
+                            <div class="d-flex align-items-center">
+                                <input type="range" 
+                                       class="form-range peso-questao" 
+                                       id="peso-{{ pergunta.pergunta.id }}"
+                                       name="peso_{{ pergunta.pergunta.id }}"
+                                       min="1" 
+                                       max="5" 
+                                       value="{% if pergunta.resposta and pergunta.resposta.peso %}{{ pergunta.resposta.peso }}{% else %}1{% endif %}"
+                                       data-pergunta-id="{{ pergunta.pergunta.id }}"
+                                       style="max-width: 200px;">
+                                <span class="badge bg-primary ms-2" id="peso-valor-{{ pergunta.pergunta.id }}">
+                                    {% if pergunta.resposta and pergunta.resposta.peso %}{{ pergunta.resposta.peso }}{% else %}1{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Feedback do Professor -->
+                    <div class="mb-3">
+                        <label for="feedback-{{ pergunta.pergunta.id }}" class="form-label fw-bold">
+                            Feedback para o aluno:
+                        </label>
+                        <div class="position-relative">
+                            <textarea class="form-control feedback-questao" 
+                                      id="feedback-{{ pergunta.pergunta.id }}" 
+                                      name="feedback_{{ pergunta.pergunta.id }}"
+                                      rows="4" 
+                                      placeholder="Digite seu feedback para esta resposta..."
+                                      data-pergunta-id="{{ pergunta.pergunta.id }}">{% if pergunta.resposta and pergunta.resposta.feedback_professor %}{{ pergunta.resposta.feedback_professor }}{% endif %}</textarea>
+                            
+                            <!-- Botão de correção com IA para questões dissertativas -->
+                            {% if not "múltipla escolha" in tipo_pergunta and not "multipla escolha" in tipo_pergunta and not "multiple choice" in tipo_pergunta %}
+                            <div class="mt-2">
+                                <button type="button" 
+                                        class="btn btn-outline-info btn-sm correcao-ia-completa-btn"
+                                        data-pergunta-id="{{ pergunta.pergunta.id }}">
+                                    <i class="fas fa-robot me-1"></i>Corrigir com IA
+                                </button>
+                                <small class="text-muted ms-2">
+                                    Preenche automaticamente nota e feedback
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Sugestão de feedback automático para múltipla escolha -->
+                        {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <strong>Sugestão:</strong> 
+                                {% if pergunta.correta %}
+                                "Resposta correta! Parabéns pelo acerto."
+                                {% else %}
+                                "Resposta incorreta. A alternativa correta era {{ pergunta.pergunta.gabarito }}."
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Status de Correção -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted" id="status-salvamento-{{ pergunta.pergunta.id }}">
+                            {% if pergunta.resposta and pergunta.resposta.nota is not None %}
+                            <i class="fas fa-check text-success"></i> Correção salva
+                            {% else %}
+                                {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+                                <i class="fas fa-robot text-info"></i> Correção automática
+                                {% else %}
+                                <i class="fas fa-sync text-secondary"></i> Alterações não salvas
+                                {% endif %}
+                            {% endif %}
+                        </small>
+                        <small class="text-muted">
+                            Questão {{ forloop.counter }} de {{ perguntas_com_respostas|length }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+
+        <!-- Botões de Ação -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted" id="resumo-correcao">
+                            <strong id="questoes-corrigidas">0</strong> de {{ perguntas_com_respostas|length }} questões corrigidas
+                        </span>
+                        <br>
+                        <small class="text-muted" id="resumo-automatico">
+                            <span id="questoes-automaticas">0</span> correções automáticas
+                        </small>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-info me-2" id="btn-corrigir-todas-ia">
+                            <i class="fas fa-robot me-1"></i>Corrigir Todas com IA
+                        </button>
+                        <button type="button" class="btn btn-secondary me-2" onclick="salvarRascunho()">
+                            <i class="fas fa-save me-1"></i>Salvar Rascunho
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check-circle me-1"></i>Finalizar Correção
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="confirmacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Finalizar Correção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja finalizar a correção desta prova?</p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Resumo da Correção:</strong>
+                    <div class="mt-2">
+                        <div><strong>Questões corrigidas:</strong> <span id="modal-corrigidas">0</span> de {{ perguntas_com_respostas|length }}</div>
+                        <div><strong>Correções automáticas:</strong> <span id="modal-automaticas">0</span></div>
+                        <div><strong>Nota final:</strong> <span id="modal-nota-final">0.0</span></div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning" id="alert-questoes-pendentes" style="display: none;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Atenção!</strong> Existem questões pendentes de correção manual.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continuar Corrigindo</button>
+                <button type="button" class="btn btn-success" id="btn-confirmar-correcao">
+                    <i class="fas fa-check-circle me-1"></i>Confirmar Correção
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Carregamento IA -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Processando...</span>
+                </div>
+                <h6 class="text-primary">Corrigindo com IA</h6>
+                <p class="text-muted small mb-0">Analisando resposta do aluno...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== VARIÁVEIS GLOBAIS =====
+let questoesCorrigidas = new Set();
+let notasPorQuestao = {};
+let pesosPorQuestao = {};
+let questoesAutomaticas = new Set();
+
+// ===== FUNÇÕES DE CORREÇÃO COM IA =====
+function corrigirComIA(perguntaId) {
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadingModal.show();
+    
+    // Coletar dados da questão
+    const enunciado = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .enunciado-questao`).textContent;
+    const gabarito = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .gabarito-oficial`).textContent;
+    const respostaAluno = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .resposta-aluno`).textContent;
+    
+    // Fazer requisição para o backend
+    fetch("{% url 'mimir:corrigirComIA' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            pergunta_id: perguntaId,
+            enunciado: enunciado,
+            gabarito: gabarito,
+            resposta_aluno: respostaAluno
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erro na requisição');
+        }
+        return response.json();
+    })
+    .then(data => {
+        loadingModal.hide();
+        
+        if (data.success) {
+            // Preencher automaticamente os campos
+            const notaInput = document.getElementById(`nota-${perguntaId}`);
+            const feedbackInput = document.getElementById(`feedback-${perguntaId}`);
+            
+            if (notaInput && feedbackInput) {
+                notaInput.value = data.nota;
+                feedbackInput.value = data.feedback;
+                
+                // Atualizar variáveis globais
+                notasPorQuestao[perguntaId] = parseFloat(data.nota);
+                if (data.nota > 0) {
+                    questoesCorrigidas.add(parseInt(perguntaId));
+                }
+                
+                atualizarStatusQuestao(perguntaId);
+                atualizarResumoCorrecao();
+                
+                // Mostrar mensagem de sucesso
+                showToast('success', 'Correção com IA realizada com sucesso!');
+            }
+        } else {
+            showToast('error', data.message || 'Erro na correção automática');
+        }
+    })
+    .catch(error => {
+        loadingModal.hide();
+        console.error('Erro:', error);
+        showToast('error', 'Erro ao conectar com o serviço de IA');
+    });
+}
+
+function corrigirTodasComIA() {
+    const questõesDissertativas = Array.from(document.querySelectorAll('.correcao-ia-completa-btn'));
+    
+    if (questõesDissertativas.length === 0) {
+        showToast('info', 'Não há questões dissertativas para corrigir');
+        return;
+    }
+    
+    if (!confirm(`Deseja corrigir automaticamente ${questõesDissertativas.length} questão(ões) dissertativa(s) com IA?`)) {
+        return;
+    }
+    
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadingModal.show();
+    
+    // Corrigir cada questão sequencialmente
+    let currentIndex = 0;
+    
+    function processNext() {
+        if (currentIndex >= questõesDissertativas.length) {
+            loadingModal.hide();
+            showToast('success', 'Todas as questões foram corrigidas com IA!');
+            return;
+        }
+        
+        const btn = questõesDissertativas[currentIndex];
+        const perguntaId = btn.dataset.perguntaId;
+        
+        corrigirComIA(perguntaId);
+        
+        // Aguardar um pouco antes da próxima para não sobrecarregar
+        setTimeout(() => {
+            currentIndex++;
+            processNext();
+        }, 2000);
+    }
+    
+    processNext();
+}
+
+// ===== FUNÇÕES AUXILIARES =====
+function showToast(type, message) {
+    // Criar toast dinamicamente
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0`;
+    toast.setAttribute('role', 'alert');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    document.body.appendChild(toastContainer);
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remover após fechar
+    toast.addEventListener('hidden.bs.toast', () => {
+        toastContainer.remove();
+    });
+}
+
+// ===== FUNÇÕES DE INICIALIZAÇÃO =====
+function inicializarCorrecao() {
+    // Inicializar contadores
+    {% for item in perguntas_com_respostas %}
+        {% with tipo_pergunta=item.pergunta.tipoDePergunta.descricao|lower %}
+        {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+            // Questão de múltipla escolha - correção automática
+            {% if item.correta %}
+            notasPorQuestao[{{ item.pergunta.id }}] = 10;
+            {% else %}
+            notasPorQuestao[{{ item.pergunta.id }}] = 0;
+            {% endif %}
+            pesosPorQuestao[{{ item.pergunta.id }}] = 1;
+            questoesCorrigidas.add({{ item.pergunta.id }});
+            questoesAutomaticas.add({{ item.pergunta.id }});
+        {% else %}
+            // Questão manual
+            {% if item.resposta and item.resposta.nota is not None %}
+            questoesCorrigidas.add({{ item.pergunta.id }});
+            notasPorQuestao[{{ item.pergunta.id }}] = {% if item.resposta.nota %}{{ item.resposta.nota }}{% else %}0{% endif %};
+            {% else %}
+            notasPorQuestao[{{ item.pergunta.id }}] = 0;
+            {% endif %}
+            pesosPorQuestao[{{ item.pergunta.id }}] = {% if item.resposta and item.resposta.peso %}{{ item.resposta.peso }}{% else %}1{% endif %};
+        {% endif %}
+        {% endwith %}
+    {% endfor %}
+
+    atualizarResumoCorrecao();
+
+    // Event listeners para botões de correção com IA
+    document.querySelectorAll('.correcao-ia-completa-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const perguntaId = this.dataset.perguntaId;
+            corrigirComIA(perguntaId);
+        });
+    });
+
+    // Event listener para botão "Corrigir Todas com IA"
+    document.getElementById('btn-corrigir-todas-ia').addEventListener('click', corrigirTodasComIA);
+
+    // Event listeners para questões manuais
+    document.querySelectorAll('.nota-questao[data-automatica="false"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const perguntaId = this.dataset.perguntaId;
+            const nota = parseFloat(this.value) || 0;
+            notasPorQuestao[perguntaId] = nota;
+            
+            if (nota > 0) {
+                questoesCorrigidas.add(parseInt(perguntaId));
+            } else {
+                questoesCorrigidas.delete(parseInt(perguntaId));
+            }
+            
+            atualizarStatusQuestao(perguntaId);
+            atualizarResumoCorrecao();
+        });
+    });
+
+    // Event listeners para sliders de peso
+    document.querySelectorAll('.peso-questao').forEach(slider => {
+        const perguntaId = slider.dataset.perguntaId;
+        const valorDisplay = document.getElementById(`peso-valor-${perguntaId}`);
+        
+        slider.addEventListener('input', function() {
+            pesosPorQuestao[perguntaId] = parseInt(this.value);
+            if (valorDisplay) {
+                valorDisplay.textContent = this.value;
+            }
+            atualizarResumoCorrecao();
+        });
+    });
+
+    // Event listeners para feedback
+    document.querySelectorAll('.feedback-questao').forEach(textarea => {
+        textarea.addEventListener('blur', function() {
+            const perguntaId = this.dataset.perguntaId;
+            salvarQuestaoIndividual(perguntaId);
+        });
+    });
+
+    // Prevenir envio duplo do formulário
+    document.getElementById('formCorrecao').addEventListener('submit', function(e) {
+        e.preventDefault();
+        mostrarModalConfirmacao();
+    });
+}
+
+// ... (o restante das funções permanece igual - atualizarStatusQuestao, atualizarResumoCorrecao, etc.)
+
+function atualizarStatusQuestao(perguntaId) {
+    const statusElement = document.getElementById(`status-correcao-${perguntaId}`);
+    const salvaElement = document.getElementById(`status-salvamento-${perguntaId}`);
+    const nota = notasPorQuestao[perguntaId] || 0;
+    
+    if (nota > 0 || questoesAutomaticas.has(parseInt(perguntaId))) {
+        if (statusElement) {
+            statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Corrigida';
+            statusElement.className = 'badge bg-success';
+        }
+        if (salvaElement) {
+            if (questoesAutomaticas.has(parseInt(perguntaId))) {
+                salvaElement.innerHTML = '<i class="fas fa-robot text-info"></i> Correção automática';
+            } else {
+                salvaElement.innerHTML = '<i class="fas fa-check text-success"></i> Correção salva';
+            }
+        }
+    } else {
+        if (statusElement) {
+            statusElement.innerHTML = '<i class="fas fa-clock text-warning"></i> Pendente';
+            statusElement.className = 'badge bg-warning';
+        }
+        if (salvaElement) {
+            salvaElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Alterações não salvas';
+        }
+    }
+}
+
+function atualizarResumoCorrecao() {
+    const totalQuestoes = {{ perguntas_com_respostas|length }};
+    const corrigidas = questoesCorrigidas.size;
+    const automaticas = questoesAutomaticas.size;
+    const manuaisCorrigidas = corrigidas - automaticas;
+    
+    // Atualizar contadores
+    const totalRespondidas = document.getElementById('total-respondidas');
+    const totalCorrigidas = document.getElementById('total-corrigidas');
+    const questoesCorrigidasElement = document.getElementById('questoes-corrigidas');
+    const modalCorrigidas = document.getElementById('modal-corrigidas');
+    const questoesAutomaticasElement = document.getElementById('questoes-automaticas');
+    const modalAutomaticas = document.getElementById('modal-automaticas');
+    
+    if (totalRespondidas) totalRespondidas.textContent = totalQuestoes;
+    if (totalCorrigidas) totalCorrigidas.textContent = corrigidas;
+    if (questoesCorrigidasElement) questoesCorrigidasElement.textContent = corrigidas;
+    if (modalCorrigidas) modalCorrigidas.textContent = corrigidas;
+    if (questoesAutomaticasElement) questoesAutomaticasElement.textContent = automaticas;
+    if (modalAutomaticas) modalAutomaticas.textContent = automaticas;
+    
+    // Calcular nota projetada
+    let somaNotas = 0;
+    let somaPesos = 0;
+    
+    for (const perguntaId in notasPorQuestao) {
+        const nota = notasPorQuestao[perguntaId] || 0;
+        const peso = pesosPorQuestao[perguntaId] || 1;
+        somaNotas += nota * peso;
+        somaPesos += peso;
+    }
+    
+    const notaProjetada = somaPesos > 0 ? (somaNotas / somaPesos) : 0;
+    
+    const notaProjetadaElement = document.getElementById('nota-projetada');
+    const modalNotaFinal = document.getElementById('modal-nota-final');
+    
+    if (notaProjetadaElement) notaProjetadaElement.textContent = notaProjetada.toFixed(1);
+    if (modalNotaFinal) modalNotaFinal.textContent = notaProjetada.toFixed(1);
+    
+    // Mostrar alerta se houver questões pendentes (apenas manuais)
+    const alertPendentes = document.getElementById('alert-questoes-pendentes');
+    if (alertPendentes) {
+        const pendentes = totalQuestoes - corrigidas;
+        alertPendentes.style.display = (pendentes > 0) ? 'block' : 'none';
+    }
+}
+
+function salvarQuestaoIndividual(perguntaId) {
+    const statusElement = document.getElementById(`status-salvamento-${perguntaId}`);
+    if (statusElement && !questoesAutomaticas.has(parseInt(perguntaId))) {
+        statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Alterações salvas';
+        
+        setTimeout(() => {
+            statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Correção salva';
+        }, 2000);
+    }
+}
+
+function salvarRascunho() {
+    // Salvar todas as questões manuais
+    document.querySelectorAll('.nota-questao[data-automatica="false"]').forEach(input => {
+        const perguntaId = input.dataset.perguntaId;
+        salvarQuestaoIndividual(perguntaId);
+    });
+    
+    // Feedback visual
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check me-1"></i>Salvo!';
+    btn.disabled = true;
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }, 2000);
+}
+
+function mostrarModalConfirmacao() {
+    atualizarResumoCorrecao();
+    const modal = new bootstrap.Modal(document.getElementById('confirmacaoModal'));
+    modal.show();
+}
+
+// Configurar botão de confirmação no modal
+document.addEventListener('DOMContentLoaded', function() {
+    const btnConfirmar = document.getElementById('btn-confirmar-correcao');
+    if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', function() {
+            // Desabilitar botão para evitar múltiplos cliques
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
+            
+            // Enviar formulário
+            document.getElementById('formCorrecao').submit();
+        });
+    }
+    
+    inicializarCorrecao();
+});
+</script>
+
+<style>
+.questao-correcao {
+    border-left: 4px solid #6c757d;
+}
+
+.questao-correcao .card-header {
+    background-color: #f8f9fa !important;
+}
+
+.enunciado-questao, .gabarito-oficial, .resposta-aluno {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.gabarito-oficial {
+    border-left: 3px solid #198754 !important;
+}
+
+.resposta-aluno {
+    border-left: 3px solid #0dcaf0 !important;
+}
+
+.nota-questao:focus, .feedback-questao:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+.peso-questao {
+    accent-color: #0d6efd;
+}
+
+.correcao-area {
+    background-color: #fff9e6;
+    padding: 1.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid #ffeaa7;
+}
+
+.form-range::-webkit-slider-thumb {
+    background-color: #0d6efd;
+}
+
+.form-range::-moz-range-thumb {
+    background-color: #0d6efd;
+}
+
+/* Destaque para questões corrigidas automaticamente */
+.questao-correcao .bg-info {
+    background-color: #0dcaf0 !important;
+}
+
+/* Botões de IA */
+.correcao-ia-btn, .correcao-ia-completa-btn {
+    transition: all 0.3s ease;
+}
+
+.correcao-ia-btn:hover, .correcao-ia-completa-btn:hover {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: white;
+}
+
+/* Loading spinner personalizado */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,488 @@
+{% extends "mimirBase.html" %}
+{% load static %}
+
+{% block mainContent %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">
+                        <i class="fas fa-book me-2"></i>Meus Assuntos
+                    </h4>
+                    <p class="mb-0 mt-1">Gerencie os assuntos e vincule alunos</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-light text-dark fs-6">
+                        {{ assuntos.count }} assunto(s)
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Total de Assuntos
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ assuntos.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-book fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Alunos Vinculados
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ total_alunos_vinculados }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                Vínculos Ativos
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ total_vinculos_ativos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-link fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Ano Atual
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ ano_atual }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Assuntos -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-primary">
+                <i class="fas fa-list me-2"></i>Lista de Assuntos
+            </h5>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFiltrar">
+                    <i class="fas fa-filter me-1"></i>Filtrar
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt me-1"></i>Atualizar
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if assuntos %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabelaAssuntos">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome do Assunto</th>
+                            <th>Alunos Vinculados</th>
+                            <th>Vínculos Ativos</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for assunto in assuntos %}
+                        <tr class="assunto-item" data-assunto-id="{{ assunto.id }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                                        <i class="fas fa-book text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">{{ assunto.nome }}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2">
+                                        {{ assunto.alunos_vinculados.count }}
+                                    </span>
+                                    <small class="text-muted">aluno(s)</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-info me-2">
+                                        {{ assunto.get_vinculos_ativos.count }}
+                                    </span>
+                                    <small class="text-muted">vínculo(s)</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a href="{% url 'mimir:gerenciarVinculosAssunto' assunto.id %}" 
+                                       class="btn btn-success btn-sm"
+                                       data-bs-toggle="tooltip"
+                                       title="Gerenciar alunos vinculados">
+                                        <i class="fas fa-link me-1"></i>Vincular Alunos
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Filtros (inicialmente ocultos) -->
+            <div class="card mt-4 d-none" id="cardFiltros">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filtros
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Buscar por nome:</label>
+                            <input type="text" class="form-control" id="filtroNome" placeholder="Digite o nome do assunto...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Ordenar por:</label>
+                            <select class="form-select" id="filtroOrdenacao">
+                                <option value="nome">Nome (A-Z)</option>
+                                <option value="-nome">Nome (Z-A)</option>
+                                <option value="-alunos_vinculados">Mais alunos</option>
+                                <option value="alunos_vinculados">Menos alunos</option>
+                                <option value="-dataAtualizacao">Mais recente</option>
+                                <option value="dataAtualizacao">Mais antigo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Mostrar:</label>
+                            <select class="form-select" id="filtroQuantidade">
+                                <option value="10">10 assuntos</option>
+                                <option value="25">25 assuntos</option>
+                                <option value="50">50 assuntos</option>
+                                <option value="100">100 assuntos</option>
+                                <option value="0">Todos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary btn-sm" id="btnAplicarFiltros">
+                                <i class="fas fa-check me-1"></i>Aplicar Filtros
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltros">
+                                <i class="fas fa-times me-1"></i>Limpar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <!-- Estado Vazio -->
+            <div class="text-center py-5">
+                <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">Nenhum assunto encontrado</h4>
+                <p class="text-muted mb-4">
+                    Você ainda não criou nenhum assunto. Crie um assunto para começar a vincular alunos.
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="#" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Criar Primeiro Assunto
+                    </a>
+                    <a href="#" class="btn btn-outline-primary">
+                        <i class="fas fa-question-circle me-1"></i>Como Funciona
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+<!-- Modal de Informações Rápidas -->
+<div class="modal fade" id="modalInfoAssunto" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalTitulo">Informações do Assunto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalConteudo">
+                <!-- Conteúdo será preenchido via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <a href="#" class="btn btn-primary" id="btnGerenciarVinculos">
+                    <i class="fas fa-link me-1"></i>Gerenciar Vínculos
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== INICIALIZAÇÃO =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Configurar filtros
+    document.getElementById('btnFiltrar').addEventListener('click', function() {
+        const cardFiltros = document.getElementById('cardFiltros');
+        cardFiltros.classList.toggle('d-none');
+        
+        if (!cardFiltros.classList.contains('d-none')) {
+            this.innerHTML = '<i class="fas fa-times me-1"></i>Ocultar Filtros';
+            this.classList.remove('btn-outline-secondary');
+            this.classList.add('btn-secondary');
+        } else {
+            this.innerHTML = '<i class="fas fa-filter me-1"></i>Filtrar';
+            this.classList.remove('btn-secondary');
+            this.classList.add('btn-outline-secondary');
+        }
+    });
+
+    // Configurar eventos dos filtros
+    document.getElementById('filtroNome').addEventListener('input', filtrarAssuntos);
+    document.getElementById('filtroOrdenacao').addEventListener('change', filtrarAssuntos);
+    document.getElementById('filtroQuantidade').addEventListener('change', filtrarAssuntos);
+
+    document.getElementById('btnAplicarFiltros').addEventListener('click', function() {
+        filtrarAssuntos();
+        document.getElementById('cardFiltros').classList.add('d-none');
+        document.getElementById('btnFiltrar').innerHTML = '<i class="fas fa-filter me-1"></i>Filtrar';
+        document.getElementById('btnFiltrar').classList.remove('btn-secondary');
+        document.getElementById('btnFiltrar').classList.add('btn-outline-secondary');
+    });
+
+    document.getElementById('btnLimparFiltros').addEventListener('click', function() {
+        document.getElementById('filtroNome').value = '';
+        document.getElementById('filtroOrdenacao').value = 'nome';
+        document.getElementById('filtroQuantidade').value = '10';
+        filtrarAssuntos();
+    });
+
+    // Configurar eventos dos botões de visualização
+    document.querySelectorAll('.btn-outline-primary[title="Ver detalhes do assunto"]').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const assuntoItem = this.closest('.assunto-item');
+            const assuntoId = assuntoItem.dataset.assuntoId;
+            mostrarInformacoesAssunto(assuntoId);
+        });
+    });
+});
+
+// ===== FUNÇÕES DE FILTRO =====
+function filtrarAssuntos() {
+    const filtroNome = document.getElementById('filtroNome').value.toLowerCase();
+    const filtroQuantidade = parseInt(document.getElementById('filtroQuantidade').value);
+    
+    const linhas = document.querySelectorAll('.assunto-item');
+    let linhasVisiveis = 0;
+    
+    linhas.forEach(linha => {
+        const nomeAssunto = linha.querySelector('h6').textContent.toLowerCase();
+        const matchNome = !filtroNome || nomeAssunto.includes(filtroNome);
+        
+        if (matchNome && (filtroQuantidade === 0 || linhasVisiveis < filtroQuantidade)) {
+            linha.style.display = '';
+            linhasVisiveis++;
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+}
+
+// ===== FUNÇÕES DE MODAL =====
+function mostrarInformacoesAssunto(assuntoId) {
+    // Aqui você pode fazer uma requisição AJAX para buscar informações detalhadas
+    // Por enquanto, vou mostrar informações básicas
+    
+    const assuntoItem = document.querySelector(`.assunto-item[data-assunto-id="${assuntoId}"]`);
+    const nomeAssunto = assuntoItem.querySelector('h6').textContent;
+    const alunosVinculados = assuntoItem.querySelector('.badge.bg-success').textContent;
+    const vinculosAtivos = assuntoItem.querySelector('.badge.bg-info').textContent;
+    const dataCriacao = assuntoItem.querySelector('small.text-muted').textContent.replace('Criado em: ', '');
+    
+    const modalConteudo = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informações Básicas</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Nome:</strong> ${nomeAssunto}</li>
+                    <li><strong>Alunos vinculados:</strong> ${alunosVinculados}</li>
+                    <li><strong>Vínculos ativos:</strong> ${vinculosAtivos}</li>
+                    <li><strong>Criado em:</strong> ${dataCriacao}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Ações Disponíveis</h6>
+                <div class="d-grid gap-2">
+                    <a href="/mimir/assunto/${assuntoId}/vinculos/" class="btn btn-success">
+                        <i class="fas fa-link me-1"></i>Gerenciar Vínculos
+                    </a>
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-chart-bar me-1"></i>Ver Estatísticas
+                    </button>
+                    <button class="btn btn-outline-warning">
+                        <i class="fas fa-edit me-1"></i>Editar Assunto
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Dica:</strong> Use a funcionalidade "Gerenciar Vínculos" para adicionar ou remover alunos deste assunto.
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('modalTitulo').textContent = `Assunto: ${nomeAssunto}`;
+    document.getElementById('modalConteudo').innerHTML = modalConteudo;
+    document.getElementById('btnGerenciarVinculos').href = `/mimir/assunto/${assuntoId}/vinculos/`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalInfoAssunto'));
+    modal.show();
+}
+
+// ===== FUNÇÕES DE ORDENAÇÃO =====
+function ordenarTabela(campo, direcao) {
+    // Implementação básica de ordenação - pode ser melhorada
+    const tbody = document.querySelector('#tabelaAssuntos tbody');
+    const linhas = Array.from(tbody.querySelectorAll('tr'));
+    
+    linhas.sort((a, b) => {
+        let valorA, valorB;
+        
+        switch(campo) {
+            case 'nome':
+                valorA = a.querySelector('h6').textContent.toLowerCase();
+                valorB = b.querySelector('h6').textContent.toLowerCase();
+                break;
+            case 'alunos_vinculados':
+                valorA = parseInt(a.querySelector('.badge.bg-success').textContent);
+                valorB = parseInt(b.querySelector('.badge.bg-success').textContent);
+                break;
+            case 'dataAtualizacao':
+                // Implementar lógica para datas se necessário
+                return 0;
+        }
+        
+        if (direcao === 'asc') {
+            return valorA < valorB ? -1 : valorA > valorB ? 1 : 0;
+        } else {
+            return valorA > valorB ? -1 : valorA < valorB ? 1 : 0;
+        }
+    });
+    
+    // Reordenar as linhas na tabela
+    linhas.forEach(linha => tbody.appendChild(linha));
+}
+</script>
+
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.assunto-item {
+    transition: all 0.3s ease;
+}
+
+.assunto-item:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+.btn-sm {
+    border-radius: 0.375rem;
+}
+
+.border-start {
+    border-left-width: 4px !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+    }
+    
+    .d-flex.gap-2 {
+        flex-direction: column;
+    }
+    
+    .d-flex.gap-2 .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+{% endblock %}

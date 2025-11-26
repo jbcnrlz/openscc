@@ -1,4 +1,5 @@
 {% extends "mimirBase.html" %}
+{% load feedback_tags %}
 
 {% block mainContent %}
 <div class="container py-4">
@@ -150,12 +151,25 @@
                             <td>
                                 <div class="progress" style="height: 8px;">
                                     {% if aplicacao.total_alunos > 0 %}
-                                    {% widthratio aplicacao.alunos_concluidos aplicacao.total_alunos 100 as progress_width %}
-                                    <div class="progress-bar bg-success" style="width: {{ progress_width }}%">
-                                    </div>
+                                        {% with percentual=aplicacao.alunos_concluidos|default_zero|percentage:aplicacao.total_alunos %}
+                                        <div class="progress-bar bg-success" 
+                                            style="width: {{ percentual }}%;"
+                                            role="progressbar" 
+                                            aria-valuenow="{{ aplicacao.alunos_concluidos|default_zero }}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="{{ aplicacao.total_alunos }}">
+                                        </div>
+                                        {% endwith %}
+                                    {% else %}
+                                        <div class="progress-bar bg-secondary" style="width: 0%"></div>
                                     {% endif %}
                                 </div>
-                                <small>{{ aplicacao.alunos_concluidos }}/{{ aplicacao.total_alunos }} concluíram</small>
+                                <small>
+                                    {{ aplicacao.alunos_concluidos|default_zero }}/{{ aplicacao.total_alunos|default:0 }} concluíram
+                                    {% if aplicacao.total_alunos > 0 %}
+                                        ({{ aplicacao.alunos_concluidos|default_zero|percentage:aplicacao.total_alunos|floatformat:0 }}%)
+                                    {% endif %}
+                                </small>
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">

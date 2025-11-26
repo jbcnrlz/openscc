@@ -87,13 +87,37 @@
 
                 <!-- Área de resposta -->
                 <div class="mb-3">
-                    <label for="resposta-{{ pergunta.id }}" class="form-label fw-bold">Sua resposta:</label>
-                    <textarea class="form-control resposta-texto" 
-                              id="resposta-{{ pergunta.id }}" 
-                              name="resposta-{{ pergunta.id }}"
-                              rows="6" 
-                              placeholder="Digite sua resposta aqui..."
-                              data-pergunta-id="{{ pergunta.id }}">{% if resposta_existente %}{{ resposta_existente.resposta_texto }}{% endif %}</textarea>
+                    <label class="form-label fw-bold">Sua resposta:</label>
+                    
+                    {% if pergunta.tipoDePergunta.descricao|lower == "múltipla escolha" or pergunta.tipoDePergunta.descricao|lower == "multipla escolha" or pergunta.tipoDePergunta.descricao|lower == "multiple choice" %}
+                        <!-- Renderização para múltipla escolha -->
+                        <div class="alternativas-container" id="alternativas-{{ pergunta.id }}">
+                            {% with alternativas=pergunta.pergunta|extrair_alternativas %}
+                            {% for letra, texto in alternativas.items %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input alternativa-radio" 
+                                       type="radio" 
+                                       name="resposta-{{ pergunta.id }}" 
+                                       id="alt-{{ pergunta.id }}-{{ letra }}"
+                                       value="{{ letra }}"
+                                       data-pergunta-id="{{ pergunta.id }}"
+                                       {% if resposta_existente and resposta_existente.resposta_texto == letra %}checked{% endif %}>
+                                <label class="form-check-label" for="alt-{{ pergunta.id }}-{{ letra }}">
+                                    <strong>{{ letra }})</strong> {{ texto }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            {% endwith %}
+                        </div>
+                    {% else %}
+                        <!-- Renderização padrão (textarea) -->
+                        <textarea class="form-control resposta-texto" 
+                                  id="resposta-{{ pergunta.id }}" 
+                                  name="resposta-{{ pergunta.id }}"
+                                  rows="6" 
+                                  placeholder="Digite sua resposta aqui..."
+                                  data-pergunta-id="{{ pergunta.id }}">{% if resposta_existente %}{{ resposta_existente.resposta_texto }}{% endif %}</textarea>
+                    {% endif %}
                 </div>
 
                 <!-- Status de salvamento -->
@@ -225,8 +249,23 @@ function finalizarProvaAutomaticamente() {
 }
 
 // Salvar resposta via AJAX
-function salvarResposta(perguntaId) {
-    const respostaTexto = document.getElementById(`resposta-${perguntaId}`).value;
+function salvarResposta(perguntaId, respostaTexto = null) {
+    // Se não foi passada a resposta, buscar do elemento apropriado
+    if (respostaTexto === null) {
+        const textarea = document.getElementById(`resposta-${perguntaId}`);
+        const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
+        
+        if (radioSelecionado) {
+            // É uma pergunta de múltipla escolha
+            respostaTexto = radioSelecionado.value;
+        } else if (textarea) {
+            // É uma pergunta de resposta aberta
+            respostaTexto = textarea.value;
+        } else {
+            respostaTexto = '';
+        }
+    }
+    
     const statusElement = document.getElementById(`status-${perguntaId}`);
     const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
     
@@ -285,15 +324,33 @@ function salvarResposta(perguntaId) {
         console.error('Erro ao salvar resposta:', error);
         statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao salvar';
         
-        // Tentar novamente após 5 segundos se ainda houver texto
-        if (document.getElementById(`resposta-${perguntaId}`).value.trim()) {
+        // Tentar novamente após 5 segundos se ainda houver resposta
+        const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
+        const textarea = document.getElementById(`resposta-${perguntaId}`);
+        if ((radioSelecionado && radioSelecionado.value.trim()) || (textarea && textarea.value.trim())) {
             setTimeout(() => salvarResposta(perguntaId), 5000);
         }
     });
 }
 
 // Função auxiliar para salvar resposta individual (usada no salvamento em lote)
-function salvarRespostaIndividual(perguntaId, respostaTexto) {
+function salvarRespostaIndividual(perguntaId) {
+    let respostaTexto = '';
+    
+    // Verificar se é múltipla escolha ou resposta aberta
+    const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
+    const textarea = document.getElementById(`resposta-${perguntaId}`);
+    
+    if (radioSelecionado) {
+        respostaTexto = radioSelecionado.value;
+    } else if (textarea) {
+        respostaTexto = textarea.value.trim();
+    }
+    
+    if (!respostaTexto) {
+        return Promise.resolve({status: 'empty'});
+    }
+    
     return fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
         method: 'POST',
         headers: {
@@ -325,22 +382,23 @@ function salvarRespostaIndividual(perguntaId, respostaTexto) {
 // Salvar todas as respostas antes de finalizar
 function salvarTodasRespostas() {
     const promises = [];
-    const textareas = document.querySelectorAll('.resposta-texto');
+    const perguntaIds = new Set();
     
-    textareas.forEach(textarea => {
-        const perguntaId = textarea.dataset.perguntaId;
-        const respostaTexto = textarea.value.trim();
-        
-        if (respostaTexto) {
-            promises.push(
-                salvarRespostaIndividual(perguntaId, respostaTexto)
-                    .catch(error => {
-                        console.error(`Erro ao salvar questão ${perguntaId}:`, error);
-                        // Continua mesmo com erro, mas marca como não salvo
-                        return {status: 'error', perguntaId: perguntaId};
-                    })
-            );
-        }
+    // Coletar todas as perguntas
+    {% for pergunta in perguntas %}
+        perguntaIds.add({{ pergunta.id }});
+    {% endfor %}
+    
+    // Para cada pergunta, tentar salvar
+    perguntaIds.forEach(perguntaId => {
+        promises.push(
+            salvarRespostaIndividual(perguntaId)
+                .catch(error => {
+                    console.error(`Erro ao salvar questão ${perguntaId}:`, error);
+                    // Continua mesmo com erro, mas marca como não salvo
+                    return {status: 'error', perguntaId: perguntaId};
+                })
+        );
     });
     
     return Promise.allSettled(promises);
@@ -457,8 +515,19 @@ function inicializarProva() {
         });
     });
 
+    // Adicionar event listeners para os radio buttons
+    document.querySelectorAll('.alternativa-radio').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const perguntaId = this.dataset.perguntaId;
+            // Salvar imediatamente quando selecionar uma alternativa
+            salvarResposta(perguntaId);
+        });
+    });
+
     // Auto-save periódico
     setInterval(() => {
+        // Para questões de múltipla escolha, não precisa salvar periodicamente pois já salvam automaticamente
+        // Apenas para questões de resposta aberta
         document.querySelectorAll('.resposta-texto').forEach(textarea => {
             if (textarea.value.trim()) {
                 const perguntaId = textarea.dataset.perguntaId;
@@ -482,4 +551,22 @@ document.addEventListener('DOMContentLoaded', function() {
     inicializarProva();
 });
 </script>
+
+<style>
+.alternativas-container {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.form-check-label {
+    cursor: pointer;
+    margin-left: 0.5rem;
+}
+</style>
 {% endblock %}

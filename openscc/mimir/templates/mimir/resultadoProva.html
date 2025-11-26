@@ -41,9 +41,17 @@
 
     <!-- Respostas e Gabaritos -->
     {% for pergunta in perguntas %}
+    {% with resposta_aluno=respostas|get_item:pergunta.id %}
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Questão {{ forloop.counter }}</h5>
+            {% if prova_aluno.status == 'corrigida' and resposta_aluno and resposta_aluno.nota is not None %}
+            <div class="d-flex align-items-center">
+                <span class="badge {% if resposta_aluno.nota >= 6 %}bg-success{% elif resposta_aluno.nota >= 4 %}bg-warning{% else %}bg-danger{% endif %} me-2">
+                    Nota: {{ resposta_aluno.nota|floatformat:1 }}
+                </span>
+            </div>
+            {% endif %}
         </div>
         <div class="card-body">
             <!-- Enunciado -->
@@ -65,45 +73,171 @@
             <!-- Resposta do Aluno -->
             <div class="mb-4">
                 <h6>Sua resposta:</h6>
-                <div class="p-3 rounded {% if respostas|get_item:pergunta.id %}border{% else %}border-warning{% endif %}">
-                    {% with resposta_aluno=respostas|get_item:pergunta.id %}
-                        {% if resposta_aluno and resposta_aluno.resposta_texto %}
-                            {{ resposta_aluno.resposta_texto|linebreaks }}
-                        {% else %}
-                            <em class="text-muted">Nenhuma resposta fornecida</em>
-                        {% endif %}
-                    {% endwith %}
+                <div class="p-3 rounded {% if resposta_aluno and resposta_aluno.resposta_texto %}border{% else %}border-warning bg-warning bg-opacity-10{% endif %}">
+                    {% if resposta_aluno and resposta_aluno.resposta_texto %}
+                        {{ resposta_aluno.resposta_texto|linebreaks }}
+                    {% else %}
+                        <em class="text-muted">Nenhuma resposta fornecida</em>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Gabarito (se a prova foi corrigida) -->
+            <!-- Se a prova foi corrigida, mostrar gabarito e feedback -->
             {% if prova_aluno.status == 'corrigida' %}
-            <div class="mb-3">
-                <h6>Gabarito:</h6>
-                <div class="p-3 bg-light rounded">
+            <!-- Gabarito Oficial -->
+            <div class="mb-4">
+                <h6 class="text-success">
+                    <i class="fas fa-check-circle me-1"></i>Gabarito Oficial:
+                </h6>
+                <div class="p-3 bg-success bg-opacity-10 rounded border border-success">
                     {{ pergunta.gabarito|linebreaks }}
                 </div>
             </div>
 
             <!-- Feedback do Professor -->
             {% if resposta_aluno and resposta_aluno.feedback_professor %}
-            <div class="mt-3">
-                <h6>Feedback do Professor:</h6>
-                <div class="p-3 bg-info bg-opacity-10 rounded">
+            <div class="mb-4">
+                <h6 class="text-info">
+                    <i class="fas fa-comment-dots me-1"></i>Feedback do Professor:
+                </h6>
+                <div class="p-3 bg-info bg-opacity-10 rounded border border-info">
                     {{ resposta_aluno.feedback_professor|linebreaks }}
                 </div>
             </div>
+            {% else %}
+            <div class="mb-4">
+                <h6 class="text-secondary">
+                    <i class="fas fa-comment me-1"></i>Feedback:
+                </h6>
+                <div class="p-3 bg-light rounded">
+                    <em class="text-muted">Nenhum feedback específico fornecido para esta questão.</em>
+                </div>
+            </div>
             {% endif %}
+
+            <!-- Análise da Resposta -->
+            <div class="mt-4 p-3 rounded {% if resposta_aluno and resposta_aluno.nota >= 6 %}bg-success bg-opacity-10 border border-success{% elif resposta_aluno and resposta_aluno.nota >= 4 %}bg-warning bg-opacity-10 border border-warning{% else %}bg-danger bg-opacity-10 border border-danger{% endif %}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">
+                        {% if resposta_aluno and resposta_aluno.nota >= 8 %}
+                        <i class="fas fa-star text-success me-1"></i>Excelente!
+                        {% elif resposta_aluno and resposta_aluno.nota >= 6 %}
+                        <i class="fas fa-thumbs-up text-success me-1"></i>Bom trabalho!
+                        {% elif resposta_aluno and resposta_aluno.nota >= 4 %}
+                        <i class="fas fa-exclamation-triangle text-warning me-1"></i>Pode melhorar!
+                        {% else %}
+                        <i class="fas fa-times-circle text-danger me-1"></i>Precisa de atenção!
+                        {% endif %}
+                    </h6>
+                    {% if resposta_aluno and resposta_aluno.nota is not None %}
+                    <span class="badge {% if resposta_aluno.nota >= 6 %}bg-success{% elif resposta_aluno.nota >= 4 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                        {{ resposta_aluno.nota|floatformat:1 }}/10
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="mb-0 small">
+                    {% if resposta_aluno and resposta_aluno.nota >= 8 %}
+                    Sua resposta demonstra excelente compreensão do conteúdo!
+                    {% elif resposta_aluno and resposta_aluno.nota >= 6 %}
+                    Você compreendeu bem o conceito, continue assim!
+                    {% elif resposta_aluno and resposta_aluno.nota >= 4 %}
+                    Revise os conceitos para melhorar seu desempenho.
+                    {% else %}
+                    Recomendo estudar novamente este conteúdo.
+                    {% endif %}
+                </p>
+            </div>
             {% endif %}
         </div>
     </div>
+    {% endwith %}
     {% endfor %}
 
-    <!-- Botão Voltar -->
+    <!-- Resumo Final -->
+    {% if prova_aluno.status == 'corrigida' %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-bar me-2"></i>Resumo do Desempenho
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-primary mb-1">{{ perguntas|length }}</h3>
+                        <small class="text-muted">Total de Questões</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-success mb-1">{{ questoes_respondidas }}</h3>
+                        <small class="text-muted">Questões Respondidas</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-info mb-1">{{ prova_aluno.nota_final|floatformat:1 }}</h3>
+                        <small class="text-muted">Nota Final</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Barra de Progresso da Nota -->
+            <div class="mt-3">
+                <label class="form-label fw-bold">Desempenho Geral:</label>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar 
+                        {% if prova_aluno.nota_final >= 7 %}bg-success
+                        {% elif prova_aluno.nota_final >= 5 %}bg-warning
+                        {% else %}bg-danger{% endif %}" 
+                        style="width: {{ prova_aluno.nota_final|multiply:10 }}%">
+                        <span class="fw-bold">{{ prova_aluno.nota_final|floatformat:1 }}/10</span>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mt-1">
+                    <small class="text-muted">0</small>
+                    <small class="text-muted">10</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Botões de Ação -->
     <div class="text-center mt-4">
-        <a href="{% url 'mimir:dashboardAluno' %}" class="btn btn-primary">
+        <a href="{% url 'mimir:dashboardAluno' %}" class="btn btn-primary me-2">
             <i class="fas fa-arrow-left me-1"></i>Voltar ao Dashboard
         </a>
+        {% if prova_aluno.status == 'corrigida' %}
+        <button type="button" class="btn btn-outline-info" onclick="window.print()">
+            <i class="fas fa-print me-1"></i>Imprimir Resultado
+        </button>
+        {% endif %}
     </div>
 </div>
+
+<style>
+.enunciado-questao, .resposta-aluno, .gabarito-oficial {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.badge {
+    font-size: 0.8rem;
+}
+</style>
 {% endblock %}
