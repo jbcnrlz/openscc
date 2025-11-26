@@ -1,10 +1,10 @@
-import os, json
+import os, json, re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from .models import *
-from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm, AplicacaoProvaForm
+from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm, AplicacaoProvaForm, VincularMultiplosAlunosForm
 from django.contrib import messages
-from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto
+from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
@@ -1585,25 +1585,19 @@ def finalizarProva(request, prova_aluno_id):
 @acesso_mimir_requerido
 @grupo_requerido('Aluno')
 def verResultadoProva(request, prova_aluno_id):
-    """Exibe o resultado da prova para o aluno"""
     prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
     
-    # Carrega perguntas e respostas
-    perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all().prefetch_related('imagens')
-    respostas = {
-        resposta.pergunta_id: resposta 
-        for resposta in RespostaAluno.objects.filter(
-            aluno=request.user, 
-            prova_aluno=prova_aluno
-        )
-    }
+    # Calcular questões respondidas
+    questoes_respondidas = RespostaAluno.objects.filter(
+        prova_aluno=prova_aluno
+    ).exclude(resposta_texto='').count()
     
     context = {
         'prova_aluno': prova_aluno,
-        'perguntas': perguntas,
-        'respostas': respostas,
+        'perguntas': prova_aluno.aplicacao_prova.prova.perguntas.all(),
+        'respostas': {r.pergunta_id: r for r in RespostaAluno.objects.filter(prova_aluno=prova_aluno)},
+        'questoes_respondidas': questoes_respondidas,
     }
-    
     return render(request, 'mimir/resultadoProva.html', context)
 
 @login_required
@@ -1631,10 +1625,12 @@ def listarAplicacoesProva(request):
     
     aplicacoes = AplicacaoProva.objects.filter(
         prova__user=request.user
-    ).select_related('prova').prefetch_related('alunos').annotate(
-        total_alunos=Count('alunos'),
-        alunos_concluidos=Count('provas_alunos', filter=Q(provas_alunos__status='concluida'))
-    )
+    ).select_related('prova', 'prova__assunto').prefetch_related(
+        'alunos', 'provas_alunos'
+    ).annotate(
+        total_alunos=Count('alunos', distinct=True),
+        alunos_concluidos=Count('provas_alunos', filter=Q(provas_alunos__status='concluida') | Q(provas_alunos__status='corrigida'), distinct=True)
+    ).order_by('-criado_em')
     
     # Verificar se o professor tem provas criadas
     tem_provas = Prova.objects.filter(user=request.user).exists()
@@ -1646,15 +1642,15 @@ def listarAplicacoesProva(request):
     total_concluidas_geral = 0
     
     for aplicacao in aplicacoes:
-        total_alunos_geral += aplicacao.total_alunos
-        total_concluidas_geral += aplicacao.alunos_concluidos
+        total_alunos_geral += aplicacao.total_alunos or 0
+        total_concluidas_geral += aplicacao.alunos_concluidos or 0
     
     context = {
         'aplicacoes': aplicacoes,
         'aplicacoes_ativas': aplicacoes_ativas,
         'total_alunos_geral': total_alunos_geral,
         'total_concluidas_geral': total_concluidas_geral,
-        'tem_provas': tem_provas,  # Para saber se pode criar aplicação
+        'tem_provas': tem_provas,
     }
     
     return render(request, 'mimir/listarAplicacoesProva.html', context)
@@ -1682,6 +1678,22 @@ def criarAplicacaoProva(request, prova_id):
     # Garantir que a prova pertence ao professor
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
     
+    # Buscar assuntos do professor com contagem de alunos vinculados
+    assuntos_professor = Assunto.objects.filter(user=request.user)
+    
+    # Preparar os assuntos com a contagem de alunos
+    assuntos_com_contagem = []
+    for assunto in assuntos_professor:
+        contagem_alunos = assunto.get_alunos_vinculados_ativos().count()
+        assuntos_com_contagem.append({
+            'assunto': assunto,
+            'contagem_alunos': contagem_alunos
+        })
+    
+    # Anos disponíveis para filtro
+    from datetime import datetime
+    anos_disponiveis = [(year, str(year)) for year in range(2020, datetime.now().year + 2)]
+    
     if request.method == 'POST':
         form = AplicacaoProvaForm(request.POST)
         if form.is_valid():
@@ -1689,12 +1701,38 @@ def criarAplicacaoProva(request, prova_id):
             aplicacao.prova = prova
             aplicacao.save()
             
-            # Adicionar alunos selecionados
-            alunos_selecionados = form.cleaned_data['alunos']
-            for aluno in alunos_selecionados:
+            # Processar alunos - por assunto ou seleção manual
+            assunto_id = request.POST.get('assunto')
+            ano = request.POST.get('ano')
+            semestre = request.POST.get('semestre')
+            alunos_selecionados_manual = form.cleaned_data['alunos']
+            
+            alunos_para_vincular = set()
+            
+            # Se foi selecionado um assunto, buscar todos os alunos vinculados
+            if assunto_id:
+                assunto = get_object_or_404(Assunto, id=assunto_id, user=request.user)
+                vinculos = assunto.alunos_vinculados.filter(ativo=True)
+                
+                # Aplicar filtros de período se fornecidos
+                if ano:
+                    vinculos = vinculos.filter(ano=int(ano))
+                if semestre:
+                    vinculos = vinculos.filter(semestre=int(semestre))
+                
+                # Adicionar alunos do assunto
+                for vinculo in vinculos:
+                    alunos_para_vincular.add(vinculo.aluno)
+            
+            # Adicionar alunos selecionados manualmente (se houver)
+            for aluno in alunos_selecionados_manual:
+                alunos_para_vincular.add(aluno)
+            
+            # Vincular todos os alunos selecionados
+            for aluno in alunos_para_vincular:
                 aplicacao.adicionar_aluno(aluno)
             
-            messages.success(request, 'Aplicação de prova criada com sucesso!')
+            messages.success(request, f'Aplicação de prova criada com sucesso! {len(alunos_para_vincular)} aluno(s) vinculado(s).')
             return redirect('mimir:detalhesAplicacaoProva', aplicacao_id=aplicacao.id)
     else:
         form = AplicacaoProvaForm()
@@ -1702,6 +1740,8 @@ def criarAplicacaoProva(request, prova_id):
     context = {
         'prova': prova,
         'form': form,
+        'assuntos_professor': assuntos_com_contagem,  # Usar a lista com contagem
+        'anos_disponiveis': anos_disponiveis,
     }
     
     return render(request, 'mimir/criarAplicacaoProva.html', context)
@@ -1813,33 +1853,83 @@ def excluirAplicacaoProva(request, aplicacao_id):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def corrigirProvaAluno(request, prova_aluno_id):
-    
     prova_aluno = get_object_or_404(
         ProvaAluno, 
         id=prova_aluno_id,
         aplicacao_prova__prova__user=request.user
     )
     
+    # Preparar perguntas com suas respostas e correção automática
+    perguntas_com_respostas = []
+    for pergunta in prova_aluno.aplicacao_prova.prova.perguntas.all():
+        resposta = RespostaAluno.objects.filter(
+            pergunta=pergunta,
+            prova_aluno=prova_aluno
+        ).first()
+        
+        # Verificar se é múltipla escolha e calcular correção automática
+        tipo_pergunta = pergunta.tipoDePergunta.descricao.lower()
+        is_multipla_escolha = any(termo in tipo_pergunta for termo in ["múltipla escolha", "multipla escolha", "multiple choice"])
+        
+        correta = False
+        if is_multipla_escolha and resposta and resposta.resposta_texto:
+            # Comparar resposta do aluno com gabarito (apenas a letra)
+            resposta_aluno = resposta.resposta_texto.strip().upper()
+            gabarito_correto = pergunta.gabarito.strip().upper()
+            # Considerar apenas a primeira letra para comparação
+            correta = resposta_aluno and gabarito_correto and resposta_aluno[0] == gabarito_correto[0]
+        
+        perguntas_com_respostas.append({
+            'pergunta': pergunta,
+            'resposta': resposta,
+            'correta': correta,
+            'is_multipla_escolha': is_multipla_escolha
+        })
+    
     if request.method == 'POST':
-        # Processar correção
+        total_notas = 0
+        total_pesos = 0
+        
         for pergunta in prova_aluno.aplicacao_prova.prova.perguntas.all():
             nota_pergunta = request.POST.get(f'nota_{pergunta.id}')
             feedback_pergunta = request.POST.get(f'feedback_{pergunta.id}')
+            peso_pergunta = request.POST.get(f'peso_{pergunta.id}', 1)
             
-            if nota_pergunta or feedback_pergunta:
+            if nota_pergunta is not None:
                 resposta, created = RespostaAluno.objects.get_or_create(
                     aluno=prova_aluno.aluno,
                     pergunta=pergunta,
                     prova_aluno=prova_aluno,
-                    defaults={
-                        'resposta_texto': ''  # Ou buscar resposta existente
-                    }
+                    defaults={'resposta_texto': ''}
                 )
                 
-                # Aqui você pode adicionar campos para nota por questão e feedback
-                # resposta.nota = nota_pergunta
-                # resposta.feedback_professor = feedback_pergunta
-                # resposta.save()
+                # Para questões de múltipla escolha, usar a nota automática
+                tipo_pergunta = pergunta.tipoDePergunta.descricao.lower()
+                is_multipla_escolha = any(termo in tipo_pergunta for termo in ["múltipla escolha", "multipla escolha", "multiple choice"])
+                
+                if is_multipla_escolha:
+                    # Recalcular se a resposta está correta
+                    resposta_aluno = resposta.resposta_texto.strip().upper() if resposta.resposta_texto else ""
+                    gabarito_correto = pergunta.gabarito.strip().upper()
+                    correta = resposta_aluno and gabarito_correto and resposta_aluno[0] == gabarito_correto[0]
+                    nota_final = 10.0 if correta else 0.0
+                else:
+                    nota_final = float(nota_pergunta) if nota_pergunta else 0
+                
+                # Atualizar campos de correção
+                resposta.nota = nota_final
+                resposta.feedback_professor = feedback_pergunta
+                resposta.peso = int(peso_pergunta)
+                resposta.save()
+                
+                # Calcular contribuição para nota final
+                if resposta.nota is not None:
+                    total_notas += resposta.nota * resposta.peso
+                    total_pesos += resposta.peso
+        
+        # Calcular nota final
+        if total_pesos > 0:
+            prova_aluno.nota_final = total_notas / total_pesos
         
         # Marcar como corrigida
         prova_aluno.status = 'corrigida'
@@ -1848,23 +1938,12 @@ def corrigirProvaAluno(request, prova_aluno_id):
         messages.success(request, f'Prova de {prova_aluno.aluno.get_full_name()} corrigida com sucesso!')
         return redirect('mimir:detalhesAplicacaoProva', aplicacao_id=prova_aluno.aplicacao_prova.id)
     
-    # Carregar perguntas e respostas
-    perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all().prefetch_related('imagens')
-    respostas = {
-        resposta.pergunta_id: resposta 
-        for resposta in RespostaAluno.objects.filter(
-            aluno=prova_aluno.aluno, 
-            prova_aluno=prova_aluno
-        )
-    }
-    
+    # GET request - mostrar template de correção
     context = {
         'prova_aluno': prova_aluno,
-        'perguntas': perguntas,
-        'respostas': respostas,
+        'perguntas_com_respostas': perguntas_com_respostas,
     }
-    
-    return render(request, 'mimir/corrigirProvaAluno.html', context)
+    return render(request, 'mimir/corrigirProva.html', context)
 
 @login_required
 @require_POST
@@ -1876,7 +1955,7 @@ def editarParte(request, parte_id):
         parte = get_object_or_404(Parte, id=parte_id)
         
         # Verificar se o usuário é o autor do problema
-        if parte.problema.tema.usuario != request.user:
+        if parte.problema.assunto.user != request.user:
             return JsonResponse({
                 'status': 'error', 
                 'message': 'Você não tem permissão para editar esta parte.'
@@ -1998,3 +2077,157 @@ def excluirMidiaParte(request, midia_id):
             'status': 'error', 
             'message': f'Erro ao excluir mídia: {str(e)}'
         }, status=500)
+    
+@require_POST
+@csrf_exempt
+def corrigirComIA(request):
+    try:
+        data = json.loads(request.body)
+        pergunta_id = data.get('pergunta_id')
+        enunciado = data.get('enunciado')
+        gabarito = data.get('gabarito')
+        resposta_aluno = data.get('resposta_aluno')
+        
+        # Aqui você integra com seu modelo de IA
+        # Esta é uma implementação de exemplo - substitua pela sua lógica real
+        
+        # Simulação de processamento com IA
+        retornoModelo = fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno)
+
+        json_match = re.search(r'\{.*\}', retornoModelo, re.DOTALL)
+        if json_match:
+            json_match = json.loads(json_match.group())
+        else:
+            json_match = None
+            
+        return JsonResponse({
+            'success': True,
+            'nota': json_match.get('nota', 0) if json_match else 0,
+            'feedback': json_match.get('justificativa', "") if json_match else "",
+            'pergunta_id': pergunta_id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Erro na correção automática: {str(e)}'
+        })
+    
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def gerenciarVinculosAssunto(request, assunto_id):
+    """
+    View para gerenciar alunos vinculados a um assunto
+    """
+    assunto = get_object_or_404(Assunto, id=assunto_id, user=request.user)
+    
+    vinculos_ativos = assunto.get_vinculos_ativos().select_related('aluno')
+    
+    # Calcular estatísticas
+    total_por_ano = {}
+    total_por_semestre = {}
+    
+    for vinculo in vinculos_ativos:
+        total_por_ano[vinculo.ano] = total_por_ano.get(vinculo.ano, 0) + 1
+        total_por_semestre[vinculo.semestre] = total_por_semestre.get(vinculo.semestre, 0) + 1
+    
+    # Anos disponíveis para filtro
+    anos_disponiveis = VinculoAlunoAssunto.ANO_CHOICES
+    
+    if request.method == 'POST':
+        form = VincularMultiplosAlunosForm(request.POST, user=request.user)
+        if form.is_valid():
+            alunos = form.cleaned_data['alunos']
+            ano = int(form.cleaned_data['ano'])
+            semestre = int(form.cleaned_data['semestre'])
+            
+            count = 0
+            for aluno in alunos:
+                try:
+                    assunto.vincular_aluno(aluno, ano, semestre)
+                    count += 1
+                except ValidationError as e:
+                    messages.error(request, f"Erro ao vincular {aluno.get_full_name()}: {e}")
+            
+            if count > 0:
+                messages.success(request, f'{count} aluno(s) vinculado(s) com sucesso!')
+                return redirect('mimir:gerenciarVinculosAssunto', assunto_id=assunto_id)
+    else:
+        # Inicializar o formulário com o assunto atual
+        form = VincularMultiplosAlunosForm(user=request.user, initial={'assunto': assunto})
+    
+    context = {
+        'assunto': assunto,
+        'vinculos_ativos': vinculos_ativos,
+        'form': form,
+        'total_por_ano': total_por_ano,
+        'total_por_semestre': total_por_semestre,
+        'anos_disponiveis': anos_disponiveis,
+    }
+    return render(request, 'mimir/gerenciarVinculosAssunto.html', context)
+
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def removerVinculo(request, vinculo_id):
+    """
+    View para remover um vínculo via AJAX
+    """
+    vinculo = get_object_or_404(
+        VinculoAlunoAssunto, 
+        id=vinculo_id, 
+        assunto__user=request.user
+    )
+    
+    try:
+        vinculo.ativo = False
+        vinculo.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Vínculo removido com sucesso!'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Erro ao remover vínculo: {str(e)}'
+        })
+    
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def listarAssuntosVinculos(request):
+    """
+    View para listar todos os assuntos do professor com estatísticas de vínculos
+    """
+    # Buscar assuntos do usuário atual (professor)
+    assuntos = Assunto.objects.filter(user=request.user).annotate(
+        total_alunos=Count('alunos_vinculados', filter=models.Q(alunos_vinculados__ativo=True)),
+        total_vinculos=Count('alunos_vinculados', filter=models.Q(alunos_vinculados__ativo=True))
+    ).order_by('nome')
+    
+    # Calcular estatísticas gerais
+    total_alunos_vinculados = User.objects.filter(
+        vinculos_assuntos__assunto__user=request.user,
+        vinculos_assuntos__ativo=True
+    ).distinct().count()
+    
+    total_vinculos_ativos = VinculoAlunoAssunto.objects.filter(
+        assunto__user=request.user,
+        ativo=True
+    ).count()
+    
+    # Ano atual para referência
+    ano_atual = timezone.now().year
+    
+    context = {
+        'assuntos': assuntos,
+        'total_alunos_vinculados': total_alunos_vinculados,
+        'total_vinculos_ativos': total_vinculos_ativos,
+        'ano_atual': ano_atual,
+    }
+    
+    return render(request, 'mimir/listarAssuntosVinculos.html', context)

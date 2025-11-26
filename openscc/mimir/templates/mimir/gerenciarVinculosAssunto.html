@@ -1,0 +1,581 @@
+{% extends "mimirBase.html" %}
+{% load static %}
+
+{% block mainContent %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">
+                        <i class="fas fa-link me-2"></i>Gerenciar Alunos Vinculados
+                    </h4>
+                    <p class="mb-0 mt-1">Assunto: {{ assunto.nome }}</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-light text-dark fs-6">
+                        {{ vinculos_ativos.count }} aluno(s) vinculado(s)
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulário para Vincular Novos Alunos -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-plus me-2"></i>Vincular Novos Alunos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="formVincularAlunos">
+                        {% csrf_token %}
+                        
+                        <!-- Assunto Travado (apenas exibição) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Assunto:
+                            </label>
+                            <div class="p-3 bg-light rounded border">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-book text-primary me-2"></i>
+                                    <strong>{{ assunto.nome }}</strong>
+                                </div>
+                            </div>
+                            <input type="hidden" name="assunto" value="{{ assunto.id }}">
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.ano.id_for_label }}" class="form-label fw-bold">
+                                    Ano:
+                                </label>
+                                {{ form.ano }}
+                                {% if form.ano.errors %}
+                                <div class="text-danger small">
+                                    {{ form.ano.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.semestre.id_for_label }}" class="form-label fw-bold">
+                                    Semestre:
+                                </label>
+                                {{ form.semestre }}
+                                {% if form.semestre.errors %}
+                                <div class="text-danger small">
+                                    {{ form.semestre.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.alunos.id_for_label }}" class="form-label fw-bold">
+                                Selecionar Alunos:
+                            </label>
+                            {{ form.alunos }}
+                            {% if form.alunos.errors %}
+                            <div class="text-danger small">
+                                {{ form.alunos.errors }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Mantenha Ctrl pressionado para selecionar múltiplos alunos.
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-link me-1"></i>Vincular Alunos Selecionados
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Ações Rápidas -->
+                    <div class="mt-4">
+                        <h6 class="text-muted mb-3">Ações Rápidas:</h6>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnSelecionarTodos">
+                                <i class="fas fa-check-double me-1"></i>Selecionar Todos os Alunos
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparSelecao">
+                                <i class="fas fa-times me-1"></i>Limpar Seleção
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Informações do Assunto -->
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="text-muted mb-2">
+                            <i class="fas fa-info-circle me-1"></i>Informações:
+                        </h6>
+                        <ul class="list-unstyled small text-muted">
+                            <li><i class="fas fa-calendar me-1"></i> Criado em: {{ assunto.dataCriacao|date:"d/m/Y" }}</li>
+                            {% if assunto.dataAtualizacao %}
+                            <li><i class="fas fa-sync me-1"></i> Atualizado em: {{ assunto.dataAtualizacao|date:"d/m/Y" }}</li>
+                            {% endif %}
+                            <li><i class="fas fa-users me-1"></i> Total de alunos: {{ vinculos_ativos.count }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Alunos Vinculados -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>Alunos Vinculados
+                    </h5>
+                    <span class="badge bg-light text-dark">{{ vinculos_ativos.count }}</span>
+                </div>
+                <div class="card-body">
+                    {% if vinculos_ativos %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Aluno</th>
+                                    <th>Período</th>
+                                    <th>Data do Vínculo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vinculo in vinculos_ativos %}
+                                <tr id="vinculo-{{ vinculo.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                                                <span class="text-white fw-bold">
+                                                    {{ vinculo.aluno.first_name|first|upper }}{{ vinculo.aluno.last_name|first|upper }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ vinculo.aluno.get_full_name|default:vinculo.aluno.username }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ vinculo.aluno.username }}</small>
+                                                {% if vinculo.aluno.email %}
+                                                <br>
+                                                <small class="text-muted">{{ vinculo.aluno.email }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ vinculo.ano }}/{{ vinculo.semestre }}º
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ vinculo.data_vinculo|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" 
+                                                    class="btn btn-outline-danger btn-remover-vinculo"
+                                                    data-vinculo-id="{{ vinculo.id }}"
+                                                    data-aluno-nome="{{ vinculo.aluno.get_full_name|default:vinculo.aluno.username }}"
+                                                    data-bs-toggle="tooltip"
+                                                    title="Remover vínculo">
+                                                <i class="fas fa-unlink"></i>
+                                            </button>
+                                            {% if vinculo.aluno.email %}
+                                            <a href="mailto:{{ vinculo.aluno.email }}" 
+                                               class="btn btn-outline-primary"
+                                               data-bs-toggle="tooltip"
+                                               title="Enviar email">
+                                                <i class="fas fa-envelope"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Estatísticas -->
+                    <div class="row mt-4 text-center">
+                        <div class="col-md-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-primary mb-1">{{ total_por_ano.2024|default:0 }}</h4>
+                                <small class="text-muted">2024</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-success mb-1">{{ total_por_ano.2025|default:0 }}</h4>
+                                <small class="text-muted">2025</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-warning mb-1">{{ total_por_ano.2026|default:0 }}</h4>
+                                <small class="text-muted">2026</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-info mb-1">{{ total_por_semestre.1|default:0 }}</h4>
+                                <small class="text-muted">1º Semestre</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <!-- Estado Vazio -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">Nenhum aluno vinculado</h4>
+                        <p class="text-muted mb-4">
+                            Use o formulário ao lado para vincular alunos a este assunto.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Filtros e Busca -->
+            {% if vinculos_ativos %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filtrar Alunos
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Filtrar por Ano:</label>
+                            <select class="form-select form-select-sm" id="filtroAno">
+                                <option value="">Todos os anos</option>
+                                {% for ano_value, ano_label in anos_disponiveis %}
+                                <option value="{{ ano_value }}">{{ ano_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Filtrar por Semestre:</label>
+                            <select class="form-select form-select-sm" id="filtroSemestre">
+                                <option value="">Todos os semestres</option>
+                                <option value="1">1º Semestre</option>
+                                <option value="2">2º Semestre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Buscar Aluno:</label>
+                            <input type="text" class="form-control form-control-sm" id="buscarAluno" placeholder="Nome ou usuário...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Botão Voltar -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'mimir:listarAssuntosVinculos' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar para Lista de Assuntos
+                </a>
+                {% if vinculos_ativos %}
+                <button type="button" class="btn btn-outline-info" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i>Imprimir Lista
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para Remover Vínculo -->
+<div class="modal fade" id="modalConfirmarRemocao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Confirmar Remoção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja remover o vínculo com o aluno <strong id="nomeAlunoRemocao"></strong>?</p>
+                <p class="text-muted small">
+                    O aluno perderá acesso aos recursos específicos deste assunto.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarRemocao">
+                    <i class="fas fa-unlink me-1"></i>Remover Vínculo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast de Notificação -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="liveToast" class="toast" role="alert">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Sucesso</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">
+            Operação realizada com sucesso!
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== VARIÁVEIS GLOBAIS =====
+let vinculoParaRemover = null;
+
+// ===== FUNÇÕES DE INICIALIZAÇÃO =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Configurar botões de seleção
+    document.getElementById('btnSelecionarTodos').addEventListener('click', function() {
+        const selectAlunos = document.getElementById('{{ form.alunos.id_for_label }}');
+        for (let i = 0; i < selectAlunos.options.length; i++) {
+            selectAlunos.options[i].selected = true;
+        }
+    });
+
+    document.getElementById('btnLimparSelecao').addEventListener('click', function() {
+        const selectAlunos = document.getElementById('{{ form.alunos.id_for_label }}');
+        for (let i = 0; i < selectAlunos.options.length; i++) {
+            selectAlunos.options[i].selected = false;
+        }
+    });
+
+    // Configurar filtros
+    document.getElementById('filtroAno').addEventListener('change', filtrarTabela);
+    document.getElementById('filtroSemestre').addEventListener('change', filtrarTabela);
+    document.getElementById('buscarAluno').addEventListener('input', filtrarTabela);
+
+    // Configurar botões de remoção
+    document.querySelectorAll('.btn-remover-vinculo').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const vinculoId = this.dataset.vinculoId;
+            const alunoNome = this.dataset.alunoNome;
+            
+            mostrarModalRemocao(vinculoId, alunoNome);
+        });
+    });
+
+    // Configurar modal de remoção
+    document.getElementById('btnConfirmarRemocao').addEventListener('click', confirmarRemocao);
+});
+
+// ===== FUNÇÕES DE FILTRO =====
+function filtrarTabela() {
+    const filtroAno = document.getElementById('filtroAno').value;
+    const filtroSemestre = document.getElementById('filtroSemestre').value;
+    const busca = document.getElementById('buscarAluno').value.toLowerCase();
+    
+    const linhas = document.querySelectorAll('tbody tr');
+    
+    linhas.forEach(linha => {
+        const ano = linha.querySelector('td:nth-child(2) .badge').textContent.split('/')[0];
+        const semestre = linha.querySelector('td:nth-child(2) .badge').textContent.includes('1º') ? '1' : '2';
+        const nomeAluno = linha.querySelector('td:nth-child(1)').textContent.toLowerCase();
+        
+        const matchAno = !filtroAno || ano === filtroAno;
+        const matchSemestre = !filtroSemestre || semestre === filtroSemestre;
+        const matchBusca = !busca || nomeAluno.includes(busca);
+        
+        if (matchAno && matchSemestre && matchBusca) {
+            linha.style.display = '';
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+}
+
+// ===== FUNÇÕES DE REMOÇÃO =====
+function mostrarModalRemocao(vinculoId, alunoNome) {
+    vinculoParaRemover = vinculoId;
+    document.getElementById('nomeAlunoRemocao').textContent = alunoNome;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfirmarRemocao'));
+    modal.show();
+}
+
+function confirmarRemocao() {
+    if (!vinculoParaRemover) return;
+    
+    const btn = document.getElementById('btnConfirmarRemocao');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Removendo...';
+    
+    // Fazer requisição AJAX para remover o vínculo
+    fetch(`/mimir/vinculo/${vinculoParaRemover}/remover/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error('Erro na requisição');
+    })
+    .then(data => {
+        if (data.success) {
+            // Remover a linha da tabela
+            const linha = document.getElementById(`vinculo-${vinculoParaRemover}`);
+            if (linha) {
+                linha.remove();
+            }
+            
+            // Atualizar contador
+            const contador = document.querySelector('.card-header .badge');
+            if (contador) {
+                const count = parseInt(contador.textContent) - 1;
+                contador.textContent = count;
+                
+                if (count === 0) {
+                    location.reload(); // Recarregar para mostrar estado vazio
+                }
+            }
+            
+            mostrarToast('success', 'Vínculo removido com sucesso!');
+        } else {
+            throw new Error(data.message || 'Erro ao remover vínculo');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        mostrarToast('error', 'Erro ao remover vínculo. Tente novamente.');
+    })
+    .finally(() => {
+        // Fechar modal e resetar estado
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarRemocao'));
+        modal.hide();
+        
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-unlink me-1"></i>Remover Vínculo';
+        vinculoParaRemover = null;
+    });
+}
+
+// ===== FUNÇÕES AUXILIARES =====
+function mostrarToast(type, message) {
+    const toast = new bootstrap.Toast(document.getElementById('liveToast'));
+    const toastTitle = document.getElementById('toastTitle');
+    const toastMessage = document.getElementById('toastMessage');
+    
+    // Configurar cores baseadas no tipo
+    if (type === 'success') {
+        toastTitle.textContent = 'Sucesso';
+        toastTitle.className = 'me-auto text-success';
+    } else {
+        toastTitle.textContent = 'Erro';
+        toastTitle.className = 'me-auto text-danger';
+    }
+    
+    toastMessage.textContent = message;
+    toast.show();
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.form-select, .form-control {
+    border-radius: 0.375rem;
+}
+
+/* Animações suaves */
+.table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+/* Estilo para o assunto travado */
+.bg-light.rounded.border {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+    }
+    
+    .row.text-center .col-md-3 {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

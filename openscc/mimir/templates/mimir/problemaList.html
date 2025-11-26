@@ -106,13 +106,37 @@
             </div>
         </div>
         {% empty %}
-        <div class="col-12">
-            <div class="alert alert-info text-center">
-                <i class="fas fa-info-circle fa-2x mb-3"></i>
-                <h4>Nenhum problema encontrado</h4>
-                <p class="mb-0">Comece gerando um problema com IA ou criando um manualmente.</p>
-                <div class="mt-3">
-                    <a href="{% url 'mimir:gerarProblema' %}" class="btn btn-primary me-2">Gerar com IA</a>
+        <div class="col-md-12">
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-question fa-4x text-muted mb-4"></i>
+                <h4 class="text-muted mb-3">Nenhum problema encontrado</h4>
+                <p class="text-muted mb-4">Crie seu primeiro problema para utilizá-lo em provas e exercícios.</p>
+                
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card border-dashed mb-4">
+                            <div class="card-body text-center p-4">
+                                <i class="fas fa-robot fa-2x text-primary mb-3"></i>
+                                <h5 class="text-primary">Gere problemas com IA</h5>
+                                <p class="text-muted small">
+                                    Utilize nossa inteligência artificial para criar problemas personalizados automaticamente.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <a href="{% url 'mimir:gerarProblema' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-robot me-2"></i>Gerar Problema com IA
+                    </a>
+                </div>
+                
+                <div class="mt-4">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Os problemas gerados podem ser utilizados na criação de provas e exercícios.
+                    </small>
                 </div>
             </div>
         </div>

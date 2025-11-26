@@ -186,6 +186,7 @@ def getQuestionsFromSource(file_path,qtPerguntas,infoExtras):
         - NÃO UTILIZE NENHUMA TAG HTML
         - AO GERAR AS ALTERNATIVAS, UTILIZE LETRAS PARA IDENTIFICAR CADA ALTERNATIVA
         - AS LETRAS NÃO DEVEM SER CHAVES DO JSON, APENAS O TEXTO DA ALTERNATIVA
+        - AS ALTERNATIVAS SEMPRE DEVEM CONTER O SEGUINTE FORMATO: "A) texto da alternativa\n B) texto da alternativa\n C) texto da alternativa\n D) texto da alternativa\n E) texto da alternativa"
         - A CHAVE "alternativas", EM CASO DE QUESTÃO QUE AS TENHAM, NO JSON SEMPRE DEVE SER UM ARRAY E NUNCA UM OBJETO
         - O PADRÃO DE RESPOSTA E O GABARITO DE ALTERNATIVAS DEVEM FICAR NA CHAVE "resposta"
         - CONTEMPLE TODOS OS MATERIAIS PARA A GERAÇÃO DAS QUESTÕES, OU SEJA, PELO MENOS UMA QUESTÃO DE CADA TEMA SOLICITADO
@@ -240,10 +241,52 @@ def construirTextoPerguntaCompleto(enunciado, tipo_pergunta, pergunta_id, post_d
         if alternativas:
             texto_pergunta = enunciado + "\n\n"
             for j, alternativa in enumerate(alternativas, 1):
-                letra = chr(64 + j)  # A, B, C, D, E...
-                texto_pergunta += f"{letra}. {alternativa}\n"
+                texto_pergunta += f"{alternativa}\n"
             
             return texto_pergunta.strip()
     
     # Para outros tipos, retornar apenas o enunciado
     return enunciado
+
+def fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno):
+    try:
+        # Configurar API do Gemini
+        client = genai.Client(api_key=settings.GEMINI_API_KEY) # Recomendado: usar settings
+        
+        # Criar prompt
+        prompt = f"""
+        FAÇA O PAPEL DE UM PROFESSOR DOUTOR NO TEMA DA PERGUNTA, DADA A SEGUINTE PERGUNTA:
+        {enunciado}
+
+        UTILIZE O SEGUINTE PADRÃO DE RESPOSTA / GABARITO PARA A CORREÇÃO:             
+        {gabarito}
+
+        PARA A CORREÇÃO DA RESPOSTA DO ALUNO ABAIXO:
+        {resposta_aluno}
+
+        #INSTRUÇÕES FINAIS        
+        - AVALIE A RESPOSTA DO ALUNO COM BASE NO GABARITO FORNECIDO. 
+        - SEJA CRITERIONOSO E JUSTO.
+        - FORNEÇA UMA NOTA DE 0 A 10, CONSIDERANDO A COMPLETUDE E CORREÇÃO DA RESPOSTA.
+        - Justificativa deve analisar a qualidade técnica da resposta
+        - Compare com o gabarito oficial
+        - Identifique acertos, erros e omissões
+        - Seja construtivo e educativo
+        - Retorne APENAS um JSON no formato:
+        {{
+          "nota": 0-10,
+          "justificativa": "análise detalhada"
+        }}
+        - NÃO UTILIZE NENHUMA TAG HTML
+        - TRATE O ALUNO NA SEGUNDA PESSOA DO SINGULAR (VOCÊ)
+        """
+        
+        # Gerar conteúdo
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )             
+        return response.text
+        
+    except Exception as e:
+        return f"Erro ao gerar questões: {str(e)}"
