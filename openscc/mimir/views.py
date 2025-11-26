@@ -4,7 +4,7 @@ from django.conf import settings
 from .models import *
 from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm, AplicacaoProvaForm, VincularMultiplosAlunosForm
 from django.contrib import messages
-from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo
+from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo, corrigirRespostaMultimodal
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
@@ -1522,50 +1522,173 @@ def iniciarProva(request, prova_aluno_id):
 @acesso_mimir_requerido
 @grupo_requerido('Aluno')
 def salvarResposta(request, prova_aluno_id):
-    """Salva uma resposta do aluno (AJAX)"""
-    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        try:
-            prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
-            
-            # Verifica se a prova ainda está em andamento
-            if prova_aluno.status != 'em_andamento':
-                return JsonResponse({'status': 'error', 'message': 'Prova não está em andamento'}, status=400)
-            
-            data = json.loads(request.body)
-            pergunta_id = data.get('pergunta_id')
-            resposta_texto = data.get('resposta_texto', '')
-            
-            pergunta = get_object_or_404(Pergunta, id=pergunta_id)
-            
-            # Verifica se a pergunta pertence à prova
-            if not prova_aluno.aplicacao_prova.prova.perguntas.filter(id=pergunta_id).exists():
-                return JsonResponse({'status': 'error', 'message': 'Pergunta não pertence a esta prova'}, status=400)
-            
-            # Salva ou atualiza a resposta
-            resposta, created = RespostaAluno.objects.get_or_create(
-                aluno=request.user,
-                pergunta=pergunta,
-                prova_aluno=prova_aluno,
-                defaults={'resposta_texto': resposta_texto}
-            )
-            
-            if not created:
-                resposta.resposta_texto = resposta_texto
-                resposta.save()
-            
-            return JsonResponse({
-                'status': 'success', 
-                'salvo_em': resposta.atualizado_em.isoformat(),
-                'created': created,
-                'pergunta_id': pergunta_id
-            })
+    """Salva uma resposta do aluno (AJAX) - Suporta texto e upload de arquivo"""
+    try:
+        prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
         
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': 'Dados JSON inválidos'}, status=400)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': f'Erro interno: {str(e)}'}, status=500)
+        # ===== VALIDAÇÕES INICIAIS =====
+        # Verifica se a prova ainda está em andamento
+        if prova_aluno.status != 'em_andamento':
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Prova não está em andamento'
+            }, status=400)
+        
+        # ===== DETECTAR TIPO DE REQUISIÇÃO =====
+        if 'multipart/form-data' in request.content_type:
+            return _processar_upload_arquivo(request, prova_aluno)
+        else:
+            return _processar_resposta_texto(request, prova_aluno)
     
-    return JsonResponse({'status': 'error', 'message': 'Requisição inválida'}, status=400)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Dados JSON inválidos'
+        }, status=400)
+    
+    except Exception as e:        
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'Erro interno do servidor: {str(e)}'
+        }, status=500)
+
+def _processar_upload_arquivo(request, prova_aluno):
+    """Processa upload de arquivo de resposta"""
+    pergunta_id = request.POST.get('pergunta_id')
+    arquivo_resposta = request.FILES.get('arquivo_resposta')
+    
+    if not pergunta_id or not arquivo_resposta:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Dados incompletos para upload de arquivo'
+        }, status=400)
+    
+    pergunta = get_object_or_404(Pergunta, id=pergunta_id)
+    
+    # Verifica se a pergunta pertence à prova
+    if not prova_aluno.aplicacao_prova.prova.perguntas.filter(id=pergunta_id).exists():
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Pergunta não pertence a esta prova'
+        }, status=400)
+    
+    # Verifica se a pergunta aceita upload de arquivo
+    if not pergunta.aceita_upload_resposta:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Esta pergunta não aceita upload de arquivo'
+        }, status=400)
+    
+    # Validar tamanho do arquivo (10MB)
+    if arquivo_resposta.size > 10 * 1024 * 1024:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Arquivo muito grande. Tamanho máximo: 10MB'
+        }, status=400)
+    
+    # Validar tipo de arquivo
+    tipos_permitidos = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'text/plain'
+    ]
+    
+    if arquivo_resposta.content_type not in tipos_permitidos:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Tipo de arquivo não permitido. Use PDF, Word, imagem ou texto.'
+        }, status=400)
+    
+    # Validar nome do arquivo (evitar caracteres especiais)
+    import re
+    nome_valido = re.match(r'^[\w\-. ]+$', arquivo_resposta.name)
+    if not nome_valido:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Nome do arquivo contém caracteres inválidos'
+        }, status=400)
+    
+    # Buscar ou criar resposta
+    resposta, created = RespostaAluno.objects.get_or_create(
+        aluno=request.user,
+        pergunta=pergunta,
+        prova_aluno=prova_aluno
+    )
+    
+    # Remove arquivo anterior se existir
+    if resposta.arquivo_resposta:
+        resposta.arquivo_resposta.delete(save=False)
+    
+    # Remove texto se existir e salva o arquivo
+    resposta.resposta_texto = ''
+    resposta.arquivo_resposta = arquivo_resposta
+    resposta.save()
+       
+    return JsonResponse({
+        'status': 'success', 
+        'salvo_em': resposta.atualizado_em.isoformat(),
+        'created': created,
+        'pergunta_id': pergunta_id,
+        'nome_arquivo': arquivo_resposta.name,
+        'tamanho_arquivo': arquivo_resposta.size,
+        'tipo_resposta': 'arquivo'
+    })
+
+def _processar_resposta_texto(request, prova_aluno):
+    """Processa resposta em texto"""
+    data = json.loads(request.body)
+    pergunta_id = data.get('pergunta_id')
+    resposta_texto = data.get('resposta_texto', '')
+    
+    if not pergunta_id:
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'ID da pergunta é obrigatório'
+        }, status=400)
+    
+    pergunta = get_object_or_404(Pergunta, id=pergunta_id)
+    
+    # Verifica se a pergunta pertence à prova
+    if not prova_aluno.aplicacao_prova.prova.perguntas.filter(id=pergunta_id).exists():
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'Pergunta não pertence a esta prova'
+        }, status=400)
+    
+    # Para perguntas de múltipla escolha, validar se a resposta é uma das alternativas
+    if pergunta.tipoDePergunta.descricao.lower() in ['múltipla escolha', 'multipla escolha', 'multiple choice']:
+        alternativas = pergunta.pergunta  # Aqui você precisaria extrair as alternativas
+        # Adicione validação específica para múltipla escolha se necessário
+    
+    # Buscar ou criar resposta
+    resposta, created = RespostaAluno.objects.get_or_create(
+        aluno=request.user,
+        pergunta=pergunta,
+        prova_aluno=prova_aluno
+    )
+    
+    if not created:
+        # Se está salvando texto, remove o arquivo se existir
+        if resposta.arquivo_resposta:
+            resposta.arquivo_resposta.delete(save=False)
+            resposta.arquivo_resposta = None
+    
+    # Salva o texto da resposta
+    resposta.resposta_texto = resposta_texto
+    resposta.save()
+   
+    return JsonResponse({
+        'status': 'success', 
+        'salvo_em': resposta.atualizado_em.isoformat(),
+        'created': created,
+        'pergunta_id': pergunta_id,
+        'tipo_resposta': 'texto',
+        'tamanho_texto': len(resposta_texto)
+    })
 
 @login_required
 @acesso_mimir_requerido
@@ -1587,17 +1710,59 @@ def finalizarProva(request, prova_aluno_id):
 def verResultadoProva(request, prova_aluno_id):
     prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
     
-    # Calcular questões respondidas
-    questoes_respondidas = RespostaAluno.objects.filter(
-        prova_aluno=prova_aluno
-    ).exclude(resposta_texto='').count()
+    # Buscar todas as perguntas da prova
+    perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all()
+    
+    # Buscar todas as respostas do aluno para esta prova
+    respostas = RespostaAluno.objects.filter(prova_aluno=prova_aluno)
+    respostas_dict = {resposta.pergunta_id: resposta for resposta in respostas}
+    
+    # Calcular estatísticas
+    questoes_respondidas = 0
+    questoes_com_arquivo = 0
+    respostas_texto = 0
+    respostas_arquivo = 0
+    
+    for resposta in respostas_dict.values():
+        # Considera respondida se tem texto OU arquivo
+        if resposta.resposta_texto or resposta.arquivo_resposta:
+            questoes_respondidas += 1
+            
+            # Contagem por tipo de resposta
+            if resposta.arquivo_resposta:
+                questoes_com_arquivo += 1
+                respostas_arquivo += 1
+            elif resposta.resposta_texto.strip():  # Só conta se não for texto vazio
+                respostas_texto += 1
+    
+    # Estatísticas de notas (apenas se a prova foi corrigida)
+    notas_acima_7 = 0
+    notas_entre_5_7 = 0
+    notas_abaixo_5 = 0
+    
+    if prova_aluno.status == 'corrigida':
+        for resposta in respostas_dict.values():
+            if resposta.nota is not None:
+                if resposta.nota >= 7:
+                    notas_acima_7 += 1
+                elif resposta.nota >= 5:
+                    notas_entre_5_7 += 1
+                else:
+                    notas_abaixo_5 += 1
     
     context = {
         'prova_aluno': prova_aluno,
-        'perguntas': prova_aluno.aplicacao_prova.prova.perguntas.all(),
-        'respostas': {r.pergunta_id: r for r in RespostaAluno.objects.filter(prova_aluno=prova_aluno)},
+        'perguntas': perguntas,
+        'respostas': respostas_dict,
         'questoes_respondidas': questoes_respondidas,
+        'questoes_com_arquivo': questoes_com_arquivo,
+        'respostas_texto': respostas_texto,
+        'respostas_arquivo': respostas_arquivo,
+        'notas_acima_7': notas_acima_7,
+        'notas_entre_5_7': notas_entre_5_7,
+        'notas_abaixo_5': notas_abaixo_5,
     }
+    
     return render(request, 'mimir/resultadoProva.html', context)
 
 @login_required
@@ -2087,27 +2252,62 @@ def corrigirComIA(request):
         enunciado = data.get('enunciado')
         gabarito = data.get('gabarito')
         resposta_aluno = data.get('resposta_aluno')
+        tipo_resposta = data.get('tipo_resposta', 'texto')  # 'texto' ou 'arquivo'
         
-        # Aqui você integra com seu modelo de IA
-        # Esta é uma implementação de exemplo - substitua pela sua lógica real
+        # Buscar a pergunta para obter informações das imagens
+        pergunta = Pergunta.objects.get(id=pergunta_id)
         
-        # Simulação de processamento com IA
-        retornoModelo = fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno)
-
-        json_match = re.search(r'\{.*\}', retornoModelo, re.DOTALL)
-        if json_match:
-            json_match = json.loads(json_match.group())
+        # Preparar informações sobre imagens da pergunta
+        imagens_pergunta = []
+        for imagem in pergunta.imagens.all():
+            imagens_pergunta.append({
+                'url': imagem.imagem.url,
+                'nome': imagem.imagem.name,
+                'caminho_absoluto': imagem.imagem.path
+            })
+        
+        # Buscar a resposta do aluno para verificar se tem arquivo
+        resposta = RespostaAluno.objects.filter(pergunta_id=pergunta_id).first()
+        arquivo_resposta = None
+        
+        if resposta and resposta.arquivo_resposta:
+            arquivo_resposta = {
+                'url': resposta.arquivo_resposta.url,
+                'nome': resposta.arquivo_resposta.name,
+                'caminho_absoluto': resposta.arquivo_resposta.path,
+                'tipo': resposta.arquivo_resposta.name.split('.')[-1].lower()
+            }
+            tipo_resposta = 'arquivo'
+        
+        # Se a resposta for um arquivo de imagem, processar com a função multimodal
+        if tipo_resposta == 'arquivo' and arquivo_resposta and arquivo_resposta['tipo'] in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
+            resultado = corrigirRespostaMultimodal(
+                enunciado=enunciado,
+                gabarito=gabarito,
+                resposta_aluno=arquivo_resposta['caminho_absoluto'],  # Caminho do arquivo
+                imagens_pergunta=imagens_pergunta
+            )
         else:
-            json_match = None
+            # Para respostas em texto ou outros tipos de arquivo
+            resultado = fazerCorrecaoComModelo(
+                enunciado=enunciado,
+                gabarito=gabarito,
+                resposta_aluno=resposta_aluno
+            )
+        
+        # Processar o retorno do modelo
+        print(resultado)
+        nota, feedback = parse_gemini_response(resultado)
             
         return JsonResponse({
             'success': True,
-            'nota': json_match.get('nota', 0) if json_match else 0,
-            'feedback': json_match.get('justificativa', "") if json_match else "",
-            'pergunta_id': pergunta_id
+            'nota': nota,
+            'feedback': feedback,
+            'pergunta_id': pergunta_id,
+            'tipo_processamento': 'multimodal' if tipo_resposta == 'arquivo' else 'textual'
         })
         
-    except Exception as e:
+    except Exception as e:        
         return JsonResponse({
             'success': False,
             'message': f'Erro na correção automática: {str(e)}'
@@ -2231,3 +2431,55 @@ def listarAssuntosVinculos(request):
     }
     
     return render(request, 'mimir/listarAssuntosVinculos.html', context)
+
+def parse_gemini_response(resultado):
+    """
+    Tenta parsear a resposta do Gemini de forma robusta
+    """
+    # Primeira tentativa: buscar JSON com regex
+    json_match = re.search(r'\{.*\}', resultado, re.DOTALL)
+    if not json_match:
+        return 0, "Não foi possível extrair JSON da resposta."
+    
+    json_str = json_match.group()
+    
+    # Tentativas de parse em sequência
+    attempts = [
+        # Tentativa 1: Parse direto
+        lambda: json.loads(json_str),
+        
+        # Tentativa 2: Sanitizar caracteres de controle
+        lambda: json.loads(re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', json_str)),
+        
+        # Tentativa 3: Corrigir problemas de escape
+        lambda: json.loads(json_str.replace('\\n', '\\\\n').replace('\\t', '\\\\t')),
+        
+        # Tentativa 4: Remover BOM e caracteres problemáticos
+        lambda: json.loads(json_str.replace('\ufeff', '').replace('\u2028', '').replace('\u2029', '')),
+    ]
+    
+    for i, attempt in enumerate(attempts):
+        try:
+            resultado_json = attempt()
+            nota = resultado_json.get('nota', 0)
+            feedback = resultado_json.get('justificativa', "")
+            return nota, feedback
+        except json.JSONDecodeError as e:
+            continue
+    
+    # Última tentativa: parsing manual
+    try:
+        # Extrair nota manualmente
+        nota_match = re.search(r'"nota"\s*:\s*(\d+(?:\.\d+)?)', json_str)
+        nota = float(nota_match.group(1)) if nota_match else 0
+        
+        # Extrair justificativa manualmente
+        just_match = re.search(r'"justificativa"\s*:\s*"([^"]*)"', json_str, re.DOTALL)
+        if not just_match:
+            just_match = re.search(r'"justificativa"\s*:\s*"([^"]*(?:"[^"]*)*)"', json_str)
+        
+        feedback = just_match.group(1) if just_match else "Justificativa não encontrada."
+        
+        return nota, feedback
+    except Exception as e:
+        return 0, "Erro crítico no processamento da resposta."

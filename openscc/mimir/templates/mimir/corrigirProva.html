@@ -96,7 +96,7 @@
                         <i class="fas fa-robot me-2"></i>
                         <strong>Correção Automática:</strong> 
                         Questões de múltipla escolha são corrigidas automaticamente. 
-                        Use o botão "Corrigir com IA" para questões dissertativas.
+                        Use o botão "Corrigir com IA" para questões dissertativas e respostas com imagens.
                     </div>
                 </div>
             </div>
@@ -126,6 +126,11 @@
                         <i class="fas fa-robot me-1"></i>Automática
                     </span>
                     {% endif %}
+                    {% if pergunta.pergunta.aceita_upload_resposta %}
+                    <span class="badge bg-warning ms-2" data-bs-toggle="tooltip" title="Aceita upload de arquivo">
+                        <i class="fas fa-file-upload me-1"></i>Upload
+                    </span>
+                    {% endif %}
                 </div>
             </div>
             
@@ -140,8 +145,14 @@
                     <!-- Imagens da questão -->
                     {% for imagem in pergunta.pergunta.imagens.all %}
                     <div class="text-center my-3">
-                        <img src="{{ imagem.imagem.url }}" alt="Imagem da questão {{ forloop.parentloop.counter }}" 
-                             class="img-fluid rounded shadow-sm" style="max-height: 300px;">
+                        <img src="{{ imagem.imagem.url }}" 
+                             alt="Imagem da questão {{ forloop.parentloop.counter }}" 
+                             class="img-fluid rounded shadow-sm" 
+                             style="max-height: 300px; cursor: pointer;"
+                             onclick="ampliarImagem(this)">
+                        <div class="mt-1">
+                            <small class="text-muted">Imagem {{ forloop.counter }} do enunciado</small>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -159,21 +170,51 @@
                     <h6 class="text-info mb-3">Resposta do Aluno:</h6>
                     <div class="resposta-aluno bg-info bg-opacity-10 p-3 rounded border border-info">
                         {% if pergunta.resposta and pergunta.resposta.resposta_texto %}
-                            {{ pergunta.resposta.resposta_texto|linebreaks }}
+                            <div class="resposta-texto">
+                                {{ pergunta.resposta.resposta_texto|linebreaks }}
+                            </div>
                         {% else %}
                             <p class="text-muted fst-italic">Aluno não respondeu esta questão.</p>
                         {% endif %}
                         
                         <!-- Arquivo anexado pelo aluno -->
-                        {% if pergunta.resposta and pergunta.resposta.resposta_arquivo %}
+                        {% if pergunta.resposta and pergunta.resposta.arquivo_resposta %}
                         <div class="mt-3">
                             <strong>Arquivo anexado:</strong>
-                            <a href="{{ pergunta.resposta.resposta_arquivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                            <a href="{{ pergunta.resposta.arquivo_resposta.url }}" 
+                               target="_blank" 
+                               class="btn btn-sm btn-outline-primary ms-2"
+                               data-bs-toggle="tooltip" 
+                               title="Baixar arquivo de resposta">
                                 <i class="fas fa-download me-1"></i>Baixar
                             </a>
+                            <span class="ms-2 text-muted">{{ pergunta.resposta.arquivo_resposta.name }}</span>
+                            
+                            <!-- Preview para imagens -->
+                            {% if pergunta.resposta.arquivo_resposta.name|lower|slice:'-4:' in '.jpg' or pergunta.resposta.arquivo_resposta.name|lower|slice:'-5:' in '.jpeg' or pergunta.resposta.arquivo_resposta.name|lower|slice:'-4:' in '.png' or pergunta.resposta.arquivo_resposta.name|lower|slice:'-4:' in '.gif' or pergunta.resposta.arquivo_resposta.name|lower|slice:'-4:' in '.bmp' %}
+                            <div class="mt-3">
+                                <h6>Preview da resposta:</h6>
+                                <img src="{{ pergunta.resposta.arquivo_resposta.url }}" 
+                                     alt="Resposta do aluno em imagem" 
+                                     class="img-thumbnail" 
+                                     style="max-height: 400px; max-width: 100%; cursor: pointer;"
+                                     onclick="ampliarImagem(this)">
+                                <div class="mt-1">
+                                    <small class="text-muted">Clique para ampliar</small>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
+                    
+                    <!-- Indicador do tipo de resposta para IA -->
+                    {% if pergunta.resposta and pergunta.resposta.arquivo_resposta %}
+                    <input type="hidden" 
+                           id="tipo-resposta-{{ pergunta.pergunta.id }}" 
+                           value="arquivo"
+                           data-tipo-arquivo="{{ pergunta.resposta.arquivo_resposta.name|lower|slice:'-4:' }}">
+                    {% endif %}
                 </div>
 
                 <!-- Área de Correção -->
@@ -289,7 +330,11 @@
                                     <i class="fas fa-robot me-1"></i>Corrigir com IA
                                 </button>
                                 <small class="text-muted ms-2">
+                                    {% if pergunta.resposta and pergunta.resposta.arquivo_resposta %}
+                                    Processa imagem da resposta automaticamente
+                                    {% else %}
                                     Preenche automaticamente nota e feedback
+                                    {% endif %}
                                 </small>
                             </div>
                             {% endif %}
@@ -345,6 +390,10 @@
                         <small class="text-muted" id="resumo-automatico">
                             <span id="questoes-automaticas">0</span> correções automáticas
                         </small>
+                        <br>
+                        <small class="text-muted" id="resumo-arquivos">
+                            <span id="questoes-com-arquivo">0</span> respostas com arquivo
+                        </small>
                     </div>
                     <div>
                         <button type="button" class="btn btn-outline-info me-2" id="btn-corrigir-todas-ia">
@@ -380,6 +429,7 @@
                     <div class="mt-2">
                         <div><strong>Questões corrigidas:</strong> <span id="modal-corrigidas">0</span> de {{ perguntas_com_respostas|length }}</div>
                         <div><strong>Correções automáticas:</strong> <span id="modal-automaticas">0</span></div>
+                        <div><strong>Respostas com arquivo:</strong> <span id="modal-arquivos">0</span></div>
                         <div><strong>Nota final:</strong> <span id="modal-nota-final">0.0</span></div>
                     </div>
                 </div>
@@ -407,8 +457,8 @@
                 <div class="spinner-border text-primary mb-3" role="status">
                     <span class="visually-hidden">Processando...</span>
                 </div>
-                <h6 class="text-primary">Corrigindo com IA</h6>
-                <p class="text-muted small mb-0">Analisando resposta do aluno...</p>
+                <h6 class="text-primary" id="loading-title">Corrigindo com IA</h6>
+                <p class="text-muted small mb-0" id="loading-message">Analisando resposta do aluno...</p>
             </div>
         </div>
     </div>
@@ -420,16 +470,46 @@ let questoesCorrigidas = new Set();
 let notasPorQuestao = {};
 let pesosPorQuestao = {};
 let questoesAutomaticas = new Set();
+let questoesComArquivo = new Set();
 
 // ===== FUNÇÕES DE CORREÇÃO COM IA =====
 function corrigirComIA(perguntaId) {
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    
+    // Atualizar mensagem de loading baseada no tipo de resposta
+    const tipoRespostaInput = document.getElementById(`tipo-resposta-${perguntaId}`);
+    const temArquivo = tipoRespostaInput && tipoRespostaInput.value === 'arquivo';
+    
+    if (temArquivo) {
+        document.getElementById('loading-title').textContent = 'Processando Imagem';
+        document.getElementById('loading-message').textContent = 'Analisando resposta em imagem...';
+    } else {
+        document.getElementById('loading-title').textContent = 'Corrigindo com IA';
+        document.getElementById('loading-message').textContent = 'Analisando resposta do aluno...';
+    }
+    
     loadingModal.show();
     
     // Coletar dados da questão
-    const enunciado = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .enunciado-questao`).textContent;
-    const gabarito = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .gabarito-oficial`).textContent;
-    const respostaAluno = document.querySelector(`#questao-${Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1} .resposta-aluno`).textContent;
+    const cardIndex = Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => 
+        card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1;
+    
+    const enunciado = document.querySelector(`#questao-${cardIndex} .enunciado-questao`).textContent;
+    const gabarito = document.querySelector(`#questao-${cardIndex} .gabarito-oficial`).textContent;
+    
+    let respostaAluno = '';
+    let tipoResposta = 'texto';
+    
+    if (temArquivo) {
+        tipoResposta = 'arquivo';
+        // Para arquivos, enviaremos apenas a referência - o backend irá buscar o arquivo
+        respostaAluno = "Resposta em arquivo - processamento multimodal necessário";
+    } else {
+        respostaAluno = document.querySelector(`#questao-${cardIndex} .resposta-aluno .resposta-texto`).textContent;
+        if (!respostaAluno.trim()) {
+            respostaAluno = document.querySelector(`#questao-${cardIndex} .resposta-aluno`).textContent;
+        }
+    }
     
     // Fazer requisição para o backend
     fetch("{% url 'mimir:corrigirComIA' %}", {
@@ -443,7 +523,8 @@ function corrigirComIA(perguntaId) {
             pergunta_id: perguntaId,
             enunciado: enunciado,
             gabarito: gabarito,
-            resposta_aluno: respostaAluno
+            resposta_aluno: respostaAluno,
+            tipo_resposta: tipoResposta
         })
     })
     .then(response => {
@@ -474,7 +555,11 @@ function corrigirComIA(perguntaId) {
                 atualizarResumoCorrecao();
                 
                 // Mostrar mensagem de sucesso
-                showToast('success', 'Correção com IA realizada com sucesso!');
+                let mensagem = 'Correção com IA realizada com sucesso!';
+                if (data.tipo_processamento === 'multimodal') {
+                    mensagem = 'Correção multimodal (imagem) realizada com sucesso!';
+                }
+                showToast('success', mensagem);
             }
         } else {
             showToast('error', data.message || 'Erro na correção automática');
@@ -495,7 +580,19 @@ function corrigirTodasComIA() {
         return;
     }
     
-    if (!confirm(`Deseja corrigir automaticamente ${questõesDissertativas.length} questão(ões) dissertativa(s) com IA?`)) {
+    // Contar questões com arquivo
+    const questõesComArquivo = questõesDissertativas.filter(btn => {
+        const perguntaId = btn.dataset.perguntaId;
+        const tipoRespostaInput = document.getElementById(`tipo-resposta-${perguntaId}`);
+        return tipoRespostaInput && tipoRespostaInput.value === 'arquivo';
+    }).length;
+    
+    let mensagemConfirmacao = `Deseja corrigir automaticamente ${questõesDissertativas.length} questão(ões) dissertativa(s) com IA?`;
+    if (questõesComArquivo > 0) {
+        mensagemConfirmacao += `\n\n${questõesComArquivo} delas contêm imagens que serão processadas multimodalmente.`;
+    }
+    
+    if (!confirm(mensagemConfirmacao)) {
         return;
     }
     
@@ -504,24 +601,29 @@ function corrigirTodasComIA() {
     
     // Corrigir cada questão sequencialmente
     let currentIndex = 0;
+    let processadasComSucesso = 0;
     
     function processNext() {
         if (currentIndex >= questõesDissertativas.length) {
             loadingModal.hide();
-            showToast('success', 'Todas as questões foram corrigidas com IA!');
+            showToast('success', `${processadasComSucesso}/${questõesDissertativas.length} questões corrigidas com IA!`);
             return;
         }
         
         const btn = questõesDissertativas[currentIndex];
         const perguntaId = btn.dataset.perguntaId;
         
+        // Atualizar mensagem de progresso
+        document.getElementById('loading-title').textContent = `Processando (${currentIndex + 1}/${questõesDissertativas.length})`;
+        
         corrigirComIA(perguntaId);
         
         // Aguardar um pouco antes da próxima para não sobrecarregar
         setTimeout(() => {
             currentIndex++;
+            processadasComSucesso++;
             processNext();
-        }, 2000);
+        }, 3000);
     }
     
     processNext();
@@ -558,6 +660,35 @@ function showToast(type, message) {
     });
 }
 
+function ampliarImagem(imgElement) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Visualização Ampliada</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="${imgElement.src}" class="img-fluid" style="max-height: 80vh;">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    modal.addEventListener('hidden.bs.modal', function () {
+        document.body.removeChild(modal);
+    });
+}
+
 // ===== FUNÇÕES DE INICIALIZAÇÃO =====
 function inicializarCorrecao() {
     // Inicializar contadores
@@ -583,6 +714,11 @@ function inicializarCorrecao() {
             {% endif %}
             pesosPorQuestao[{{ item.pergunta.id }}] = {% if item.resposta and item.resposta.peso %}{{ item.resposta.peso }}{% else %}1{% endif %};
         {% endif %}
+        
+        // Verificar se tem arquivo
+        {% if item.resposta and item.resposta.arquivo_resposta %}
+        questoesComArquivo.add({{ item.pergunta.id }});
+        {% endif %}
         {% endwith %}
     {% endfor %}
 
@@ -590,6 +726,14 @@ function inicializarCorrecao() {
 
     // Event listeners para botões de correção com IA
     document.querySelectorAll('.correcao-ia-completa-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const perguntaId = this.dataset.perguntaId;
+            corrigirComIA(perguntaId);
+        });
+    });
+
+    // Event listeners para botões pequenos de IA
+    document.querySelectorAll('.correcao-ia-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const perguntaId = this.dataset.perguntaId;
             corrigirComIA(perguntaId);
@@ -644,9 +788,13 @@ function inicializarCorrecao() {
         e.preventDefault();
         mostrarModalConfirmacao();
     });
-}
 
-// ... (o restante das funções permanece igual - atualizarStatusQuestao, atualizarResumoCorrecao, etc.)
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
 
 function atualizarStatusQuestao(perguntaId) {
     const statusElement = document.getElementById(`status-correcao-${perguntaId}`);
@@ -680,6 +828,7 @@ function atualizarResumoCorrecao() {
     const totalQuestoes = {{ perguntas_com_respostas|length }};
     const corrigidas = questoesCorrigidas.size;
     const automaticas = questoesAutomaticas.size;
+    const comArquivo = questoesComArquivo.size;
     const manuaisCorrigidas = corrigidas - automaticas;
     
     // Atualizar contadores
@@ -689,6 +838,8 @@ function atualizarResumoCorrecao() {
     const modalCorrigidas = document.getElementById('modal-corrigidas');
     const questoesAutomaticasElement = document.getElementById('questoes-automaticas');
     const modalAutomaticas = document.getElementById('modal-automaticas');
+    const questoesComArquivoElement = document.getElementById('questoes-com-arquivo');
+    const modalArquivos = document.getElementById('modal-arquivos');
     
     if (totalRespondidas) totalRespondidas.textContent = totalQuestoes;
     if (totalCorrigidas) totalCorrigidas.textContent = corrigidas;
@@ -696,6 +847,8 @@ function atualizarResumoCorrecao() {
     if (modalCorrigidas) modalCorrigidas.textContent = corrigidas;
     if (questoesAutomaticasElement) questoesAutomaticasElement.textContent = automaticas;
     if (modalAutomaticas) modalAutomaticas.textContent = automaticas;
+    if (questoesComArquivoElement) questoesComArquivoElement.textContent = comArquivo;
+    if (modalArquivos) modalArquivos.textContent = comArquivo;
     
     // Calcular nota projetada
     let somaNotas = 0;
@@ -844,6 +997,38 @@ document.addEventListener('DOMContentLoaded', function() {
 .spinner-border {
     width: 3rem;
     height: 3rem;
+}
+
+/* Imagens clicáveis */
+img[onclick] {
+    transition: transform 0.2s ease;
+}
+
+img[onclick]:hover {
+    transform: scale(1.02);
+    cursor: pointer;
+}
+
+/* Badge para upload */
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .card-header .d-flex {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .card-header .badge {
+        margin-top: 0.25rem;
+    }
+    
+    .input-group {
+        max-width: 100% !important;
+    }
 }
 </style>
 {% endblock %}

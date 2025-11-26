@@ -64,6 +64,8 @@
                 <span class="badge" id="status-badge-{{ pergunta.id }}">
                     {% if resposta_existente and resposta_existente.resposta_texto %}
                     <i class="fas fa-check text-success"></i> Respondida
+                    {% elif resposta_existente and resposta_existente.arquivo_resposta %}
+                    <i class="fas fa-check text-success"></i> Respondida
                     {% else %}
                     <i class="fas fa-clock text-warning"></i> Pendente
                     {% endif %}
@@ -109,8 +111,85 @@
                             {% endfor %}
                             {% endwith %}
                         </div>
+                    
+                    {% elif pergunta.aceita_upload_resposta %}
+                        <!-- Renderização para perguntas que aceitam upload de arquivo -->
+                        <div class="upload-resposta-container" id="upload-container-{{ pergunta.id }}">
+                            
+                            <!-- Arquivo atual (se existir) -->
+                            {% if resposta_existente and resposta_existente.arquivo_resposta %}
+                            <div class="mb-3">
+                                <div class="alert alert-success">
+                                    <i class="fas fa-file me-2"></i>
+                                    <strong>Arquivo atual:</strong> 
+                                    <a href="{{ resposta_existente.arquivo_resposta.url }}" 
+                                       target="_blank" 
+                                       class="btn btn-sm btn-outline-primary ms-2">
+                                        <i class="fas fa-download me-1"></i>Baixar
+                                    </a>
+                                    <span class="ms-2 text-muted">{{ resposta_existente.arquivo_resposta.name }}</span>
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger ms-2" 
+                                            onclick="removerArquivoResposta({{ pergunta.id }})">
+                                        <i class="fas fa-trash me-1"></i>Remover
+                                    </button>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Área de upload -->
+                            <div class="border rounded p-3 bg-light">
+                                <div class="mb-3">
+                                    <label for="arquivo-{{ pergunta.id }}" class="form-label">
+                                        <strong>Enviar arquivo de resposta:</strong>
+                                    </label>
+                                    <input type="file" 
+                                           class="form-control arquivo-resposta" 
+                                           id="arquivo-{{ pergunta.id }}" 
+                                           name="arquivo-{{ pergunta.id }}"
+                                           data-pergunta-id="{{ pergunta.id }}"
+                                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                                    <div class="form-text">
+                                        Formatos aceitos: PDF, Word, imagens (JPG, PNG), texto. Máx: 10MB.
+                                    </div>
+                                </div>
+                                
+                                <!-- Preview do arquivo -->
+                                <div id="preview-arquivo-{{ pergunta.id }}" class="mt-3" style="display: none;">
+                                    <h6>Preview do arquivo:</h6>
+                                    <div id="info-arquivo-{{ pergunta.id }}" class="alert alert-secondary"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Alternativa: resposta em texto (opcional) -->
+                            <div class="mt-3">
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-secondary" 
+                                        onclick="toggleRespostaTexto({{ pergunta.id }})">
+                                    <i class="fas fa-edit me-1"></i>Prefiro digitar a resposta
+                                </button>
+                            </div>
+                            
+                            <!-- Campo de texto (inicialmente oculto) -->
+                            <div id="textarea-container-{{ pergunta.id }}" class="mt-3" style="display: none;">
+                                <textarea class="form-control resposta-texto" 
+                                          id="resposta-{{ pergunta.id }}" 
+                                          name="resposta-{{ pergunta.id }}"
+                                          rows="4" 
+                                          placeholder="Digite sua resposta aqui..."
+                                          data-pergunta-id="{{ pergunta.id }}"></textarea>
+                                <div class="mt-2">
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-secondary" 
+                                            onclick="toggleRespostaTexto({{ pergunta.id }})">
+                                        <i class="fas fa-upload me-1"></i>Voltar para upload de arquivo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    
                     {% else %}
-                        <!-- Renderização padrão (textarea) -->
+                        <!-- Renderização padrão (textarea) para outras perguntas -->
                         <textarea class="form-control resposta-texto" 
                                   id="resposta-{{ pergunta.id }}" 
                                   name="resposta-{{ pergunta.id }}"
@@ -125,6 +204,8 @@
                     <small class="text-muted" id="status-{{ pergunta.id }}">
                         {% if resposta_existente and resposta_existente.resposta_texto %}
                         <i class="fas fa-check text-success"></i> Resposta salva - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
+                        {% elif resposta_existente and resposta_existente.arquivo_resposta %}
+                        <i class="fas fa-check text-success"></i> Arquivo salvo - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
                         {% else %}
                         <i class="fas fa-sync text-secondary"></i> Não salvo
                         {% endif %}
@@ -248,7 +329,169 @@ function finalizarProvaAutomaticamente() {
     });
 }
 
-// Salvar resposta via AJAX
+// ===== FUNÇÕES PARA UPLOAD DE ARQUIVO =====
+
+// Alternar entre upload e texto
+function toggleRespostaTexto(perguntaId) {
+    const uploadContainer = document.getElementById(`upload-container-${perguntaId}`);
+    const textareaContainer = document.getElementById(`textarea-container-${perguntaId}`);
+    
+    if (textareaContainer.style.display === 'none') {
+        // Mostrar textarea, ocultar upload
+        textareaContainer.style.display = 'block';
+        uploadContainer.querySelector('.border').style.display = 'none';
+        uploadContainer.querySelector('.mt-3 button').style.display = 'none';
+    } else {
+        // Mostrar upload, ocultar textarea
+        textareaContainer.style.display = 'none';
+        uploadContainer.querySelector('.border').style.display = 'block';
+        uploadContainer.querySelector('.mt-3 button').style.display = 'block';
+    }
+}
+
+// Remover arquivo de resposta
+function removerArquivoResposta(perguntaId) {
+    if (confirm('Tem certeza que deseja remover este arquivo?')) {
+        const statusElement = document.getElementById(`status-${perguntaId}`);
+        statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Removendo...';
+        
+        fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                pergunta_id: perguntaId,
+                resposta_texto: '' // Resposta vazia remove o arquivo
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Recarregar a página para atualizar a interface
+                location.reload();
+            } else {
+                throw new Error(data.message || 'Erro ao remover arquivo');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao remover arquivo:', error);
+            statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao remover';
+        });
+    }
+}
+
+// Upload de arquivo
+function uploadArquivoResposta(perguntaId, arquivo) {
+    const statusElement = document.getElementById(`status-${perguntaId}`);
+    const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
+    
+    statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Enviando arquivo...';
+    
+    const formData = new FormData();
+    formData.append('pergunta_id', perguntaId);
+    formData.append('arquivo_resposta', arquivo);
+    
+    fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const agora = new Date(data.salvo_em);
+            const hora = agora.getHours().toString().padStart(2, '0');
+            const minuto = agora.getMinutes().toString().padStart(2, '0');
+            
+            statusElement.innerHTML = `<i class="fas fa-check text-success"></i> Arquivo salvo - ${hora}:${minuto}`;
+            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> Respondida';
+            badgeElement.className = 'badge bg-success';
+            respostasSalvas.add(perguntaId);
+            
+            atualizarContadores();
+            
+            // Recarregar após um tempo para mostrar o arquivo
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.message || 'Erro ao enviar arquivo');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao enviar arquivo:', error);
+        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao enviar';
+        
+        // Tentar novamente após 5 segundos
+        setTimeout(() => {
+            const inputArquivo = document.getElementById(`arquivo-${perguntaId}`);
+            if (inputArquivo.files.length > 0) {
+                uploadArquivoResposta(perguntaId, inputArquivo.files[0]);
+            }
+        }, 5000);
+    });
+}
+
+// Preview do arquivo selecionado
+function configurarPreviewArquivo(perguntaId) {
+    const inputArquivo = document.getElementById(`arquivo-${perguntaId}`);
+    const previewContainer = document.getElementById(`preview-arquivo-${perguntaId}`);
+    const infoArquivo = document.getElementById(`info-arquivo-${perguntaId}`);
+    
+    inputArquivo.addEventListener('change', function(e) {
+        if (this.files.length > 0) {
+            const file = this.files[0];
+            const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+            
+            // Validar tamanho
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Arquivo muito grande. Tamanho máximo: 10MB');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            // Validar tipo
+            const tiposPermitidos = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'image/jpeg',
+                'image/jpg',
+                'image/png',
+                'text/plain'
+            ];
+            
+            if (!tiposPermitidos.includes(file.type)) {
+                alert('Tipo de arquivo não permitido. Use PDF, Word, imagem ou texto.');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            infoArquivo.innerHTML = `
+                <i class="fas fa-file me-2"></i>
+                <strong>Nome:</strong> ${file.name}<br>
+                <strong>Tipo:</strong> ${file.type || 'Não identificado'}<br>
+                <strong>Tamanho:</strong> ${fileSize} MB
+            `;
+            previewContainer.style.display = 'block';
+            
+            // Upload automático após seleção
+            uploadArquivoResposta(perguntaId, file);
+        } else {
+            previewContainer.style.display = 'none';
+        }
+    });
+}
+
+// Salvar resposta via AJAX (texto)
 function salvarResposta(perguntaId, respostaTexto = null) {
     // Se não foi passada a resposta, buscar do elemento apropriado
     if (respostaTexto === null) {
@@ -440,6 +683,9 @@ function inicializarProva() {
         {% if resposta_existente and resposta_existente.resposta_texto.strip %}
         respostasSalvas.add({{ pergunta.id }});
         {% endif %}
+        {% if resposta_existente and resposta_existente.arquivo_resposta %}
+        respostasSalvas.add({{ pergunta.id }});
+        {% endif %}
         {% endwith %}
     {% endfor %}
 
@@ -448,6 +694,13 @@ function inicializarProva() {
         const tempoDecorrido = Math.floor((new Date().getTime() - new Date('{{ prova_aluno.data_inicio|date:"c" }}').getTime()) / 1000);
         tempoRestante = Math.max(0, {{ aplicacao.tempo_limite.total_seconds|default:7200|stringformat:"d" }} - tempoDecorrido);
     {% endif %}
+
+    // Configurar upload de arquivo para perguntas que aceitam
+    {% for pergunta in perguntas %}
+        {% if pergunta.aceita_upload_resposta %}
+        configurarPreviewArquivo({{ pergunta.id }});
+        {% endif %}
+    {% endfor %}
 
     atualizarContadores();
     iniciarTimer();
@@ -559,6 +812,12 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 1rem;
 }
 
+.upload-resposta-container {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
 .form-check-input:checked {
     background-color: #0d6efd;
     border-color: #0d6efd;
@@ -567,6 +826,23 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-check-label {
     cursor: pointer;
     margin-left: 0.5rem;
+}
+
+.arquivo-resposta:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Estilo para o preview de arquivo */
+.preview-arquivo {
+    transition: all 0.3s ease;
+}
+
+.sticky-bottom {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 1000;
 }
 </style>
 {% endblock %}

@@ -157,7 +157,11 @@ class Pergunta(models.Model):
     pergunta = models.TextField(blank=False, null=False)
     gabarito = models.TextField(blank=False, null=False)
     tipoDePergunta = models.ForeignKey(TiposDePergunta, on_delete=models.CASCADE,default=1)
-
+    aceita_upload_resposta = models.BooleanField(
+        default=False,
+        verbose_name='Aceita upload de arquivo como resposta'
+    )
+    
     @property
     def imagens(self):
         return self.imagempergunta_set.all()
@@ -564,7 +568,13 @@ class RespostaAluno(models.Model):
     nota = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     feedback_professor = models.TextField(blank=True, null=True)
     peso = models.IntegerField(default=1)
-    
+    arquivo_resposta = models.FileField(
+        upload_to='respostas_alunos/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        verbose_name='Arquivo de Resposta'
+    )
+
     class Meta:
         unique_together = ['aluno', 'pergunta', 'prova_aluno']
         verbose_name = 'Resposta do Aluno'
@@ -572,6 +582,15 @@ class RespostaAluno(models.Model):
 
     def __str__(self):
         return f"Resposta de {self.aluno.username} para {self.pergunta.id}"
+    
+    @property
+    def tipo_resposta(self):
+        if self.arquivo_resposta:
+            return 'arquivo'
+        elif self.resposta_texto:
+            return 'texto'
+        else:
+            return 'vazia'
 
 class AplicacaoProva(models.Model):
     """
