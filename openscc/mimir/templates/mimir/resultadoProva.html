@@ -45,13 +45,18 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Questão {{ forloop.counter }}</h5>
-            {% if prova_aluno.status == 'corrigida' and resposta_aluno and resposta_aluno.nota is not None %}
             <div class="d-flex align-items-center">
+                {% if pergunta.aceita_upload_resposta %}
+                <span class="badge bg-info me-2" data-bs-toggle="tooltip" title="Esta questão aceita upload de arquivo">
+                    <i class="fas fa-file-upload me-1"></i>Upload
+                </span>
+                {% endif %}
+                {% if prova_aluno.status == 'corrigida' and resposta_aluno and resposta_aluno.nota is not None %}
                 <span class="badge {% if resposta_aluno.nota >= 6 %}bg-success{% elif resposta_aluno.nota >= 4 %}bg-warning{% else %}bg-danger{% endif %} me-2">
                     Nota: {{ resposta_aluno.nota|floatformat:1 }}
                 </span>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
         <div class="card-body">
             <!-- Enunciado -->
@@ -73,13 +78,67 @@
             <!-- Resposta do Aluno -->
             <div class="mb-4">
                 <h6>Sua resposta:</h6>
-                <div class="p-3 rounded {% if resposta_aluno and resposta_aluno.resposta_texto %}border{% else %}border-warning bg-warning bg-opacity-10{% endif %}">
-                    {% if resposta_aluno and resposta_aluno.resposta_texto %}
-                        {{ resposta_aluno.resposta_texto|linebreaks }}
+                <div class="p-3 rounded {% if resposta_aluno and resposta_aluno.resposta_texto or resposta_aluno and resposta_aluno.arquivo_resposta %}border{% else %}border-warning bg-warning bg-opacity-10{% endif %}">
+                    {% if resposta_aluno and resposta_aluno.arquivo_resposta %}
+                        <!-- Resposta com arquivo -->
+                        <div class="arquivo-resposta-container">
+                            <div class="alert alert-info">
+                                <i class="fas fa-file me-2"></i>
+                                <strong>Arquivo enviado:</strong> 
+                                <a href="{{ resposta_aluno.arquivo_resposta.url }}" 
+                                   target="_blank" 
+                                   class="btn btn-sm btn-outline-primary ms-2">
+                                    <i class="fas fa-download me-1"></i>Baixar Arquivo
+                                </a>
+                                <span class="ms-2 text-muted">{{ resposta_aluno.arquivo_resposta.name }}</span>
+                                
+                                <!-- Preview para imagens -->
+                                {% if resposta_aluno.arquivo_resposta.name|lower|slice:'-4:' in '.jpg' or resposta_aluno.arquivo_resposta.name|lower|slice:'-5:' in '.jpeg' or resposta_aluno.arquivo_resposta.name|lower|slice:'-4:' in '.png' %}
+                                <div class="mt-3">
+                                    <h6>Preview da imagem:</h6>
+                                    <img src="{{ resposta_aluno.arquivo_resposta.url }}" 
+                                         alt="Resposta em imagem" 
+                                         class="img-thumbnail" 
+                                         style="max-height: 300px; max-width: 100%;">
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Texto adicional (se houver) -->
+                            {% if resposta_aluno.resposta_texto %}
+                            <div class="mt-3">
+                                <h6>Texto complementar:</h6>
+                                <div class="p-2 bg-light rounded">
+                                    {{ resposta_aluno.resposta_texto|linebreaks }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    
+                    {% elif resposta_aluno and resposta_aluno.resposta_texto %}
+                        <!-- Resposta em texto -->
+                        <div class="resposta-texto">
+                            {{ resposta_aluno.resposta_texto|linebreaks }}
+                        </div>
+                    
                     {% else %}
                         <em class="text-muted">Nenhuma resposta fornecida</em>
                     {% endif %}
                 </div>
+                
+                <!-- Indicador do tipo de resposta -->
+                {% if resposta_aluno %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        {% if resposta_aluno.arquivo_resposta %}
+                        Resposta enviada como arquivo
+                        {% elif resposta_aluno.resposta_texto %}
+                        Resposta em texto
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Se a prova foi corrigida, mostrar gabarito e feedback -->
@@ -110,7 +169,15 @@
                     <i class="fas fa-comment me-1"></i>Feedback:
                 </h6>
                 <div class="p-3 bg-light rounded">
-                    <em class="text-muted">Nenhum feedback específico fornecido para esta questão.</em>
+                    <em class="text-muted">
+                        {% if resposta_aluno and resposta_aluno.arquivo_resposta %}
+                        Resposta avaliada com base no arquivo enviado.
+                        {% elif resposta_aluno and resposta_aluno.resposta_texto %}
+                        Resposta avaliada com base no texto fornecido.
+                        {% else %}
+                        Nenhum feedback específico fornecido para esta questão.
+                        {% endif %}
+                    </em>
                 </div>
             </div>
             {% endif %}
@@ -137,15 +204,42 @@
                 </div>
                 <p class="mb-0 small">
                     {% if resposta_aluno and resposta_aluno.nota >= 8 %}
+                    {% if resposta_aluno.arquivo_resposta %}
+                    Seu arquivo demonstra excelente compreensão do conteúdo!
+                    {% else %}
                     Sua resposta demonstra excelente compreensão do conteúdo!
+                    {% endif %}
                     {% elif resposta_aluno and resposta_aluno.nota >= 6 %}
+                    {% if resposta_aluno.arquivo_resposta %}
+                    Seu arquivo mostra boa compreensão do conceito, continue assim!
+                    {% else %}
                     Você compreendeu bem o conceito, continue assim!
+                    {% endif %}
                     {% elif resposta_aluno and resposta_aluno.nota >= 4 %}
+                    {% if resposta_aluno.arquivo_resposta %}
+                    Revise os conceitos para melhorar a qualidade do arquivo enviado.
+                    {% else %}
                     Revise os conceitos para melhorar seu desempenho.
+                    {% endif %}
+                    {% else %}
+                    {% if resposta_aluno.arquivo_resposta %}
+                    Recomendo estudar novamente este conteúdo e revisar o arquivo enviado.
                     {% else %}
                     Recomendo estudar novamente este conteúdo.
                     {% endif %}
+                    {% endif %}
                 </p>
+                
+                <!-- Informações específicas sobre arquivos -->
+                {% if resposta_aluno and resposta_aluno.arquivo_resposta %}
+                <div class="mt-2 pt-2 border-top">
+                    <small class="text-muted">
+                        <i class="fas fa-file me-1"></i>
+                        <strong>Arquivo avaliado:</strong> {{ resposta_aluno.arquivo_resposta.name }}
+                        ({{ resposta_aluno.arquivo_resposta.size|filesizeformat }})
+                    </small>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -163,21 +257,27 @@
         </div>
         <div class="card-body">
             <div class="row text-center">
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="border rounded p-3">
                         <h3 class="text-primary mb-1">{{ perguntas|length }}</h3>
                         <small class="text-muted">Total de Questões</small>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="border rounded p-3">
                         <h3 class="text-success mb-1">{{ questoes_respondidas }}</h3>
                         <small class="text-muted">Questões Respondidas</small>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="border rounded p-3">
-                        <h3 class="text-info mb-1">{{ prova_aluno.nota_final|floatformat:1 }}</h3>
+                        <h3 class="text-info mb-1">{{ questoes_com_arquivo }}</h3>
+                        <small class="text-muted">Com Upload</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="border rounded p-3">
+                        <h3 class="text-warning mb-1">{{ prova_aluno.nota_final|floatformat:1 }}</h3>
                         <small class="text-muted">Nota Final</small>
                     </div>
                 </div>
@@ -200,6 +300,52 @@
                     <small class="text-muted">10</small>
                 </div>
             </div>
+            
+            <!-- Estatísticas de tipos de resposta -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Tipos de Resposta</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Respostas em texto:</span>
+                                <strong>{{ respostas_texto }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Respostas com arquivo:</span>
+                                <strong>{{ respostas_arquivo }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Questões sem resposta:</span>
+                                <strong>{{ perguntas|length|subtract:questoes_respondidas }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Distribuição de Notas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Acima de 7.0:</span>
+                                <strong class="text-success">{{ notas_acima_7 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Entre 5.0 e 7.0:</span>
+                                <strong class="text-warning">{{ notas_entre_5_7 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Abaixo de 5.0:</span>
+                                <strong class="text-danger">{{ notas_abaixo_5 }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -213,9 +359,45 @@
         <button type="button" class="btn btn-outline-info" onclick="window.print()">
             <i class="fas fa-print me-1"></i>Imprimir Resultado
         </button>
+        <button type="button" class="btn btn-outline-success" onclick="downloadTodosArquivos()">
+            <i class="fas fa-download me-1"></i>Baixar Todos os Arquivos
+        </button>
         {% endif %}
     </div>
 </div>
+
+<script>
+// Função para baixar todos os arquivos de resposta
+function downloadTodosArquivos() {
+    // Coletar todos os links de download de arquivo
+    const links = document.querySelectorAll('a[href*="/media/respostas_alunos/"]');
+    
+    if (links.length === 0) {
+        alert('Não há arquivos para download.');
+        return;
+    }
+    
+    // Para cada link, abrir em nova aba (download)
+    links.forEach(link => {
+        window.open(link.href, '_blank');
+    });
+    
+    // Feedback para o usuário
+    if (links.length === 1) {
+        alert('1 arquivo está sendo baixado.');
+    } else {
+        alert(`${links.length} arquivos estão sendo baixados em abas separadas.`);
+    }
+}
+
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
 
 <style>
 .enunciado-questao, .resposta-aluno, .gabarito-oficial {
@@ -238,6 +420,38 @@
 
 .badge {
     font-size: 0.8rem;
+}
+
+.arquivo-resposta-container .alert {
+    border-left: 4px solid #0dcaf0;
+}
+
+.resposta-texto {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.img-thumbnail {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+/* Estilos para impressão */
+@media print {
+    .btn {
+        display: none !important;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa !important;
+        color: #000 !important;
+    }
+    
+    .badge {
+        border: 1px solid #000;
+        background-color: #f8f9fa !important;
+        color: #000 !important;
+    }
 }
 </style>
 {% endblock %}
