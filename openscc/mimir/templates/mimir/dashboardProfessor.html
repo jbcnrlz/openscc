@@ -121,6 +121,7 @@
                 </div>
             </div>
         </div>
+        <!--
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -139,6 +140,7 @@
                 </div>
             </div>
         </div>
+    -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -229,6 +231,24 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-orange bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-comments text-orange"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Vinculos</h5>
+                    </div>
+                    <p class="card-text text-muted">Gerenciar os vínculos dos assuntos com os alunos.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:listarAssuntosVinculos' %}" class="btn btn-orange text-white">
+                            <i class="fas fa-cog me-1"></i> Gerenciar vínculos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -237,6 +257,7 @@
         --bs-purple: #6f42c1;
         --bs-teal: #20c997;
         --bs-orange: #fd7e14;
+        --bs-btn-hover-bg: #ccc;
     }
     
     .bg-purple {

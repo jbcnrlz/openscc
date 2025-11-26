@@ -4,7 +4,7 @@
 {% block mainContent %}
 <div class="container py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <h4 class="card-title mb-0">
@@ -85,20 +85,91 @@
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="{{ form.alunos.id_for_label }}" class="form-label">
-                                <i class="fas fa-users me-1"></i>Selecionar Alunos
-                            </label>
-                            {{ form.alunos }}
-                            {% if form.alunos.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.alunos.errors %}
-                                    {{ error }}
-                                {% endfor %}
+                        <!-- Nova Seção: Seleção de Alunos por Assunto -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-users me-1"></i>Seleção de Alunos
+                                </h6>
                             </div>
-                            {% endif %}
-                            <div class="form-text">
-                                Mantenha Ctrl pressionado para selecionar múltiplos alunos.
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="id_assunto" class="form-label fw-bold">
+                                            <i class="fas fa-book me-1"></i>Selecionar por Assunto
+                                        </label>
+                                        <select name="assunto" id="id_assunto" class="form-select">
+                                            <option value="">-- Selecione um assunto --</option>
+                                            {% for item in assuntos_professor %}
+                                            <option value="{{ item.assunto.id }}" 
+                                                    data-alunos-count="{{ item.contagem_alunos }}">
+                                                {{ item.assunto.nome }} ({{ item.contagem_alunos }} alunos)
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">
+                                            Selecione um assunto para aplicar a prova a todos os alunos vinculados
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">
+                                            <i class="fas fa-filter me-1"></i>Filtro por Período
+                                        </label>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <select name="ano" id="id_ano" class="form-select">
+                                                    <option value="">Todos os anos</option>
+                                                    {% for ano_value, ano_label in anos_disponiveis %}
+                                                    <option value="{{ ano_value }}">{{ ano_label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <select name="semestre" id="id_semestre" class="form-select">
+                                                    <option value="">Todos os semestres</option>
+                                                    <option value="1">1º Semestre</option>
+                                                    <option value="2">2º Semestre</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">
+                                            Filtre os alunos por ano e semestre
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Informações do Assunto Selecionado -->
+                                <div id="info-assunto" class="alert alert-info d-none">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong id="assunto-nome"></strong>
+                                            <br>
+                                            <small id="assunto-info"></small>
+                                        </div>
+                                        <div>
+                                            <span class="badge bg-success" id="assunto-alunos-count">0</span>
+                                            <span class="text-muted">aluno(s)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Seleção Manual de Alunos (como backup) -->
+                                <div class="mt-3">
+                                    <label for="{{ form.alunos.id_for_label }}" class="form-label fw-bold">
+                                        <i class="fas fa-user-check me-1"></i>Seleção Manual de Alunos (Opcional)
+                                    </label>
+                                    {{ form.alunos }}
+                                    {% if form.alunos.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.alunos.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Use esta opção para selecionar alunos individualmente, ou deixe em branco para usar a seleção por assunto.
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -117,6 +188,73 @@
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const assuntoSelect = document.getElementById('id_assunto');
+    const anoSelect = document.getElementById('id_ano');
+    const semestreSelect = document.getElementById('id_semestre');
+    const infoAssunto = document.getElementById('info-assunto');
+    const assuntoNome = document.getElementById('assunto-nome');
+    const assuntoInfo = document.getElementById('assunto-info');
+    const assuntoAlunosCount = document.getElementById('assunto-alunos-count');
+    const alunosSelect = document.getElementById('{{ form.alunos.id_for_label }}');
+
+    // Atualizar informações quando o assunto é selecionado
+    assuntoSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        
+        if (this.value) {
+            assuntoNome.textContent = selectedOption.text.split(' (')[0];
+            assuntoAlunosCount.textContent = selectedOption.dataset.alunosCount;
+            assuntoInfo.textContent = 'Assunto selecionado para aplicar a prova a todos os alunos vinculados';
+            infoAssunto.classList.remove('d-none');
+            
+            // Limpar seleção manual quando assunto é selecionado
+            for (let i = 0; i < alunosSelect.options.length; i++) {
+                alunosSelect.options[i].selected = false;
+            }
+        } else {
+            infoAssunto.classList.add('d-none');
+        }
+    });
+
+    // Limpar seleção de assunto quando alunos são selecionados manualmente
+    alunosSelect.addEventListener('change', function() {
+        if (this.selectedOptions.length > 0) {
+            assuntoSelect.value = '';
+            infoAssunto.classList.add('d-none');
+        }
+    });
+
+    // Atualizar contagem quando filtros de período mudam
+    function atualizarContagemAssunto() {
+        if (assuntoSelect.value) {
+            // Aqui você poderia fazer uma requisição AJAX para obter a contagem filtrada
+            // Por enquanto, vamos manter a contagem original
+            const selectedOption = assuntoSelect.options[assuntoSelect.selectedIndex];
+            assuntoAlunosCount.textContent = selectedOption.dataset.alunosCount;
+            
+            let filtroInfo = '';
+            if (anoSelect.value) {
+                filtroInfo += ` Ano: ${anoSelect.options[anoSelect.selectedIndex].text}`;
+            }
+            if (semestreSelect.value) {
+                filtroInfo += ` Semestre: ${semestreSelect.options[semestreSelect.selectedIndex].text}`;
+            }
+            
+            if (filtroInfo) {
+                assuntoInfo.textContent = `Assunto selecionado${filtroInfo}`;
+            } else {
+                assuntoInfo.textContent = 'Assunto selecionado para aplicar a prova a todos os alunos vinculados';
+            }
+        }
+    }
+
+    anoSelect.addEventListener('change', atualizarContagemAssunto);
+    semestreSelect.addEventListener('change', atualizarContagemAssunto);
+});
+</script>
+
 <style>
 .form-control:focus, .form-select:focus {
     border-color: #0d6efd;
@@ -126,6 +264,14 @@
 .form-check-input:checked {
     background-color: #0d6efd;
     border-color: #0d6efd;
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.badge {
+    font-size: 0.9rem;
 }
 </style>
 {% endblock %}

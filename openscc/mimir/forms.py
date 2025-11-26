@@ -1,8 +1,8 @@
-from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista, AplicacaoProva
+from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista, AplicacaoProva, VinculoAlunoAssunto
 from django import forms
 from django.core.validators import FileExtensionValidator
 from django.contrib.auth.models import User
-
+import datetime
 class TemaForm(forms.ModelForm):
     class Meta:
         model = Tema
@@ -39,7 +39,6 @@ class ProvaForm(forms.ModelForm):
             })
         }
 
-
 class PerguntaForm(forms.ModelForm):
     class Meta:
         model = Pergunta
@@ -75,7 +74,6 @@ class PerguntaForm(forms.ModelForm):
         # Filtrar assuntos apenas do usuário logado
         self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
         self.fields['tipoDePergunta'].queryset = TiposDePergunta.objects.all()
-
 
 class FontesForm(forms.ModelForm):
     class Meta:
@@ -262,11 +260,13 @@ class ResponderFeedbackForm(forms.ModelForm):
             'resposta_autor': 'Sua Resposta'
         }
 
+# forms.py
 class AplicacaoProvaForm(forms.ModelForm):
     alunos = forms.ModelMultipleChoiceField(
         queryset=User.objects.filter(groups__name='Aluno'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-        required=True
+        required=False,  # Tornar opcional
+        help_text="Selecione alunos individualmente (opcional)"
     )
     
     class Meta:
@@ -275,6 +275,66 @@ class AplicacaoProvaForm(forms.ModelForm):
         widgets = {
             'data_disponivel': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
             'data_limite': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
-            'tempo_limite': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'HH:MM:SS'}),
+            'tempo_limite': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '02:00:00'}),
             'disponivel': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        assunto_id = self.data.get('assunto')
+        alunos_selecionados = cleaned_data.get('alunos')
+        
+        # Validar que pelo menos uma forma de seleção foi usada
+        if not assunto_id and not alunos_selecionados:
+            raise forms.ValidationError(
+                "Selecione um assunto para aplicar a prova ou selecione alunos manualmente."
+            )
+        
+        return cleaned_data
+
+class VinculoAlunoAssuntoForm(forms.ModelForm):
+    class Meta:
+        model = VinculoAlunoAssunto
+        fields = ['aluno', 'assunto', 'ano', 'semestre']
+        widgets = {
+            'aluno': forms.Select(attrs={'class': 'form-select'}),
+            'assunto': forms.Select(attrs={'class': 'form-select'}),
+            'ano': forms.Select(attrs={'class': 'form-select'}),
+            'semestre': forms.Select(attrs={'class': 'form-select'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtrar apenas usuários que são alunos
+        self.fields['aluno'].queryset = User.objects.filter(groups__name='Aluno')
+        # Filtrar assuntos do usuário atual (professor)
+        if 'initial' in kwargs and 'user' in kwargs['initial']:
+            user = kwargs['initial']['user']
+            self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
+
+class VincularMultiplosAlunosForm(forms.Form):
+    assunto = forms.ModelChoiceField(
+        queryset=Assunto.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    ano = forms.ChoiceField(
+        choices=VinculoAlunoAssunto.ANO_CHOICES,
+        initial=int(datetime.date.today().year),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    semestre = forms.ChoiceField(
+        choices=VinculoAlunoAssunto.SEMESTRE_CHOICES,
+        initial=1,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    alunos = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(groups__name='Aluno'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        required=True
+    )
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user:
+            self.fields['assunto'].queryset = Assunto.objects.filter(user=user)

@@ -29,6 +29,36 @@ def isMembroAutorizado(self):
 
 User.add_to_class('isMembroAutorizado', isMembroAutorizado)
 
+def get_assuntos_vinculados(self, ano=None, semestre=None):
+    """
+    Retorna os assuntos vinculados a este aluno
+    """
+    if not self.isAluno():
+        return Assunto.objects.none()
+    
+    vinculos = self.vinculos_assuntos.filter(ativo=True)
+    
+    if ano:
+        vinculos = vinculos.filter(ano=ano)
+    if semestre:
+        vinculos = vinculos.filter(semestre=semestre)
+    
+    return Assunto.objects.filter(
+        id__in=vinculos.values_list('assunto_id', flat=True)
+    )
+
+def get_vinculos_ativos(self):
+    """
+    Retorna todos os vínculos ativos do aluno
+    """
+    if not self.isAluno():
+        return VinculoAlunoAssunto.objects.none()
+    
+    return self.vinculos_assuntos.filter(ativo=True)
+
+User.add_to_class('get_assuntos_vinculados', get_assuntos_vinculados)
+User.add_to_class('get_vinculos_ativos', get_vinculos_ativos)
+
 class Assunto(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     nome = models.CharField(max_length=200, blank=False, null=False)
@@ -36,6 +66,70 @@ class Assunto(models.Model):
 
     def __str__(self):
         return self.nome
+    
+    def get_alunos_vinculados(self, ano=None, semestre=None):
+        """
+        Retorna os alunos vinculados a este assunto
+        """
+        vinculos = self.alunos_vinculados.filter(ativo=True)
+        
+        if ano:
+            vinculos = vinculos.filter(ano=ano)
+        if semestre:
+            vinculos = vinculos.filter(semestre=semestre)
+            
+        return User.objects.filter(
+            id__in=vinculos.values_list('aluno_id', flat=True)
+        )
+    
+    def get_vinculos_ativos(self):
+        """
+        Retorna todos os vínculos ativos para este assunto
+        """
+        return self.alunos_vinculados.filter(ativo=True)
+    
+    def vincular_aluno(self, aluno, ano, semestre):
+        """
+        Método para vincular um aluno ao assunto
+        """
+        if not aluno.isAluno():
+            raise ValidationError('Somente alunos podem ser vinculados.')
+        
+        vinculo, created = VinculoAlunoAssunto.objects.get_or_create(
+            aluno=aluno,
+            assunto=self,
+            ano=ano,
+            semestre=semestre,
+            defaults={'ativo': True}
+        )
+        
+        if not created and not vinculo.ativo:
+            vinculo.ativo = True
+            vinculo.save()
+        
+        return vinculo
+    
+    def desvincular_aluno(self, aluno, ano=None, semestre=None):
+        """
+        Método para desvincular um aluno do assunto
+        """
+        vinculos = self.alunos_vinculados.filter(aluno=aluno, ativo=True)
+        
+        if ano:
+            vinculos = vinculos.filter(ano=ano)
+        if semestre:
+            vinculos = vinculos.filter(semestre=semestre)
+        
+        vinculos.update(ativo=False)
+        return vinculos.count()
+    
+    def get_alunos_vinculados_ativos(self):
+        """Retorna os alunos vinculados ativos a este assunto"""
+        return User.objects.filter(
+            vinculos_assuntos__assunto=self,
+            vinculos_assuntos__ativo=True
+        ).distinct()
+    
 
 class TiposDePergunta(models.Model):    
     descricao = models.CharField(max_length=200, blank=False, null=False)
@@ -467,6 +561,9 @@ class RespostaAluno(models.Model):
     resposta_arquivo = models.FileField(upload_to='respostas_alunos/', blank=True, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
+    nota = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    feedback_professor = models.TextField(blank=True, null=True)
+    peso = models.IntegerField(default=1)
     
     class Meta:
         unique_together = ['aluno', 'pergunta', 'prova_aluno']
@@ -516,3 +613,51 @@ class AplicacaoProva(models.Model):
     def remover_aluno(self, aluno):
         """Remove um aluno da aplicação da prova"""
         ProvaAluno.objects.filter(aplicacao_prova=self, aluno=aluno).delete()
+
+class VinculoAlunoAssunto(models.Model):
+    """
+    Model para vincular alunos a assuntos com ano e semestre
+    """
+    ANO_CHOICES = [ (year, str(year)) for year in range(2000, int(datetime.date.today().year) + 1) ]
+    
+    SEMESTRE_CHOICES = [
+        (1, '1º Semestre'),
+        (2, '2º Semestre'),
+    ]
+    
+    aluno = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='vinculos_assuntos',
+        limit_choices_to={'groups__name': 'Aluno'}  # Só permite alunos
+    )
+    assunto = models.ForeignKey(
+        Assunto, 
+        on_delete=models.CASCADE,
+        related_name='alunos_vinculados'
+    )
+    ano = models.IntegerField(choices=ANO_CHOICES, default=int(datetime.date.today().year))
+    semestre = models.IntegerField(choices=SEMESTRE_CHOICES, default=1)
+    data_vinculo = models.DateTimeField(auto_now_add=True)
+    ativo = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = 'Vínculo Aluno-Assunto'
+        verbose_name_plural = 'Vínculos Aluno-Assunto'
+        unique_together = ['aluno', 'assunto', 'ano', 'semestre']
+        ordering = ['-ano', '-semestre', 'assunto__nome']
+    
+    def __str__(self):
+        return f"{self.aluno.get_full_name()} - {self.assunto.nome} ({self.ano}/{self.semestre}º)"
+    
+    def clean(self):
+        """
+        Validação para garantir que o usuário é um aluno
+        """
+        if not self.aluno.isAluno():
+            raise ValidationError('Somente alunos podem ser vinculados a assuntos.')
+    
+    @property
+    def periodo(self):
+        """Property para obter o período formatado"""
+        return f"{self.ano}/{self.semestre}º"

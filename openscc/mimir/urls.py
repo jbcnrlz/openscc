@@ -86,6 +86,10 @@ urlpatterns = [
      path('parte/<int:parte_id>/editar/', views.editarParte, name='editarParte'),
      path('parte/<int:parte_id>/adicionar-midia/', views.adicionarMidiaParte, name='adicionarMidiaParte'),
      path('midia/<int:midia_id>/excluir/', views.excluirMidiaParte, name='excluirMidiaParte'),
-    path('acesso-negado/', views.acessoNegado, name='acessoNegado'),
-    path('redirecionar/', views.redirecionarPorGrupo, name='redirecionarPorGrupo'),
+     path('acesso-negado/', views.acessoNegado, name='acessoNegado'),
+     path('redirecionar/', views.redirecionarPorGrupo, name='redirecionarPorGrupo'),
+     path('corrigir-com-ia/', views.corrigirComIA, name='corrigirComIA'),
+     path('assunto/<int:assunto_id>/vinculos/', views.gerenciarVinculosAssunto, name='gerenciarVinculosAssunto'),
+     path('vinculo/<int:vinculo_id>/remover/', views.removerVinculo, name='removerVinculo'),
+     path('assuntos/vinculos/', views.listarAssuntosVinculos, name='listarAssuntosVinculos'),
 ]
