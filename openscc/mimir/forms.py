@@ -42,7 +42,7 @@ class ProvaForm(forms.ModelForm):
 class PerguntaForm(forms.ModelForm):
     class Meta:
         model = Pergunta
-        fields = ['assunto', 'pergunta', 'gabarito', 'tipoDePergunta']
+        fields = ['assunto', 'pergunta', 'gabarito', 'tipoDePergunta', 'aceita_upload_resposta']
         labels = {
             'assunto': 'Assunto',
             'pergunta': 'Enunciado da Pergunta',
@@ -61,7 +61,12 @@ class PerguntaForm(forms.ModelForm):
                 'class': 'form-control'
             }),
             'assunto': forms.Select(attrs={'class': 'form-select'}),
-            'tipoDePergunta': forms.Select(attrs={'class': 'form-select'})
+            'tipoDePergunta': forms.Select(attrs={'class': 'form-select'}),
+            'aceita_upload_resposta': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleUploadResposta()',
+                'id': 'aceita_upload_checkbox'
+            }),
         }
     
     def __init__(self, user, *args, **kwargs):

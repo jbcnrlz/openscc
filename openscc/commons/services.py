@@ -1,4 +1,5 @@
 from google import genai
+from PIL import Image
 from django.core.files.storage import default_storage
 from django.conf import settings
 import pdfplumber, json, re
@@ -290,3 +291,90 @@ def fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno):
         
     except Exception as e:
         return f"Erro ao gerar questões: {str(e)}"
+
+def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_pergunta=None):
+    """
+    Função para corrigir respostas que podem conter imagens
+    tanto na pergunta quanto na resposta do aluno
+    """
+    try:
+        # Configurar API do Gemini para multimodal
+        model = genai.Client(api_key=settings.GEMINI_API_KEY) # Recomendado: usar settings        
+        
+        conteudos = []
+        
+        # Adicionar prompt base
+        prompt_base = f"""
+        FAÇA O PAPEL DE UM PROFESSOR DOUTOR NO TEMA DA PERGUNTA, DADA A SEGUINTE PERGUNTA:
+
+        UTILIZE O SEGUINTE PADRÃO DE RESPOSTA / GABARITO PARA A CORREÇÃO:
+        {enunciado}
+
+        PARA A CORREÇÃO DA RESPOSTA DO ALUNO ABAIXO:
+        {gabarito}
+
+        ANALISE A RESPOSTA DO ALUNO (QUE PODE SER UMA IMAGEM CONTENDO TEXTO, DIAGRAMAS, GRÁFICOS, ETC.):
+        """
+        conteudos.append(prompt_base)
+        
+        # Adicionar imagens da pergunta (se houver)
+        if imagens_pergunta:
+            for imagem_info in imagens_pergunta:
+                try:
+                    imagem = Image.open(imagem_info['caminho_absoluto'])
+                    conteudos.append(f"IMAGEM DO ENUNCIADO: {imagem_info['nome']}")
+                    conteudos.append(imagem)
+                except Exception as e:
+                    print(f"Erro ao carregar imagem do enunciado {imagem_info['nome']}: {e}")
+        
+        # Adicionar resposta do aluno (imagem)
+        try:
+            if isinstance(resposta_aluno, str):  # Se for caminho de arquivo
+                imagem_resposta = Image.open(resposta_aluno)
+            else:  # Se já for um objeto de imagem
+                imagem_resposta = resposta_aluno
+                
+            conteudos.append("RESPOSTA DO ALUNO (IMAGEM):")
+            conteudos.append(imagem_resposta)
+        except Exception as e:
+            print(f"Erro ao carregar imagem da resposta: {e}")
+            return json.dumps({
+                "nota": 0,
+                "justificativa": f"Erro ao processar a imagem da resposta: {str(e)}"
+            })
+        
+        # Adicionar instruções finais
+        instrucoes_finais = """
+        #INSTRUÇÕES FINAIS        
+        - AVALIE A RESPOSTA DO ALUNO COM BASE NO GABARITO FORNECIDO. 
+        - SEJA CRITERIONOSO E JUSTO.
+        - FORNEÇA UMA NOTA DE 0 A 10, CONSIDERANDO A COMPLETUDE E CORREÇÃO DA RESPOSTA.
+        - Justificativa deve analisar a qualidade técnica da resposta
+        - Compare com o gabarito oficial
+        - Identifique acertos, erros e omissões
+        - Seja construtivo e educativo
+        - Retorne APENAS um JSON no formato:
+        {
+          "nota": 0-10,
+          "justificativa": "análise detalhada"
+        }
+        - NÃO UTILIZE NENHUMA TAG HTML
+        - TRATE O ALUNO NA SEGUNDA PESSOA DO SINGULAR (VOCÊ)
+        """
+        conteudos.append(instrucoes_finais)
+        
+        # Gerar correção
+        response = model.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=conteudos
+        ) 
+        
+        # Processar resposta
+        print(response.text)
+        return response.text
+        
+    except Exception as e:
+        return json.dumps({
+            "nota": 0,
+            "justificativa": f"Erro na correção multimodal: {str(e)}"
+        })

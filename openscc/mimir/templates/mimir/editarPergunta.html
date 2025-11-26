@@ -81,7 +81,20 @@
                         <div class="form-text">Tipo de resposta esperada</div>
                     </div>
                 </div>
-
+                <!-- Checkbox para controle de upload -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="form-check form-switch">
+                            {{ form.aceita_upload_resposta }}
+                            <label class="form-check-label" for="aceita_upload_checkbox">
+                                <strong>Esta pergunta aceita upload de arquivo como resposta</strong>
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Quando marcado, os alunos poderão enviar arquivos (PDF, Word, imagens) como resposta.
+                        </div>
+                    </div>
+                </div>
                 <!-- Enunciado -->
                 <div class="mb-4">
                     <label for="{{ form.pergunta.id_for_label }}" class="form-label">
@@ -229,6 +242,33 @@
 </div>
 
 <script>
+function toggleUploadResposta() {
+    const checkbox = document.getElementById('aceita_upload_checkbox');
+    const infoUpload = document.getElementById('info-upload-resposta');
+
+    if (checkbox.checked) {
+        // Criar ou mostrar informação sobre upload
+        if (!infoUpload) {
+            const divInfo = document.createElement('div');
+            divInfo.id = 'info-upload-resposta';
+            divInfo.className = 'alert alert-info mt-2';
+            divInfo.innerHTML = `
+                <i class="bi bi-info-circle"></i>
+                <strong>Upload habilitado:</strong> Os alunos poderão enviar arquivos como resposta. 
+                Formatos aceitos: PDF, Word, imagens (JPG, PNG), arquivos de texto.
+            `;
+            checkbox.closest('.col-md-12').appendChild(divInfo);
+        } else {
+            infoUpload.style.display = 'block';
+        }
+    } else {
+        // Ocultar informação
+        if (infoUpload) {
+            infoUpload.style.display = 'none';
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos do DOM
     const inputEnunciado = document.getElementById('{{ form.pergunta.id_for_label }}');
@@ -239,6 +279,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const contadorPalavras = document.getElementById('contador-palavras');
     const contadorGabarito = document.getElementById('contador-gabarito');
     const imagensRemovidas = new Set();
+    toggleUploadResposta();
+    
+    document.getElementById('aceita_upload_checkbox').addEventListener('change', toggleUploadResposta);
+    // Função para mostrar informações sobre upload (opcional)
 
     // Atualizar contadores e preview
     function atualizarContadores() {

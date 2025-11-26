@@ -81,3 +81,11 @@ def percentage(value, total):
 def default_zero(value):
     """Retorna 0 se o valor for None"""
     return value if value is not None else 0
+
+@register.filter
+def subtract(value, arg):
+    """Subtrai o argumento do valor"""
+    try:
+        return int(value) - int(arg)
+    except (ValueError, TypeError):
+        return 0
