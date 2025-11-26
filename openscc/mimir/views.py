@@ -1955,7 +1955,7 @@ def editarParte(request, parte_id):
         parte = get_object_or_404(Parte, id=parte_id)
         
         # Verificar se o usuário é o autor do problema
-        if parte.problema.tema.usuario != request.user:
+        if parte.problema.assunto.user != request.user:
             return JsonResponse({
                 'status': 'error', 
                 'message': 'Você não tem permissão para editar esta parte.'
