@@ -1,0 +1,225 @@
+{% extends "mimirBase.html" %}
+{% load static %}
+
+{% block mainContent %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <!-- Card de Erro -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-danger text-white text-center py-4">
+                    <div class="error-icon mb-3">
+                        <i class="fas fa-exclamation-triangle fa-4x"></i>
+                    </div>
+                    <h3 class="card-title mb-0">Não foi possível acessar a prova</h3>
+                </div>
+                
+                <div class="card-body text-center py-5">
+                    <!-- Ícone e Mensagem Principal -->
+                    <div class="mb-4">
+                        <i class="fas fa-ban fa-3x text-danger mb-3"></i>
+                        <h4 class="text-danger mb-3">{{ mensagem }}</h4>
+                        <p class="text-muted">
+                            Entre em contato com o professor caso acredite que isto seja um erro.
+                        </p>
+                    </div>
+
+                    <!-- Informações Adicionais (se disponíveis) -->
+                    {% if prova_aluno %}
+                    <div class="alert alert-info mt-4">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Informações da Prova
+                        </h6>
+                        <div class="row text-start mt-3">
+                            <div class="col-md-6">
+                                <small><strong>Prova:</strong> {{ prova_aluno.prova.titulo }}</small><br>
+                                <small><strong>Status:</strong> 
+                                    <span class="badge 
+                                        {% if prova_aluno.status == 'concluida' %}bg-success
+                                        {% elif prova_aluno.status == 'corrigida' %}bg-info
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ prova_aluno.get_status_display }}
+                                    </span>
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                {% if prova_aluno.data_conclusao %}
+                                <small><strong>Concluída em:</strong> {{ prova_aluno.data_conclusao|date:"d/m/Y H:i" }}</small><br>
+                                {% endif %}
+                                {% if prova_aluno.nota_final %}
+                                <small><strong>Nota:</strong> {{ prova_aluno.nota_final|floatformat:1 }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Informações do Período (se disponíveis) -->
+                    {% if aplicacao %}
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-calendar me-2"></i>Período da Prova
+                        </h6>
+                        <div class="row text-start mt-2">
+                            <div class="col-md-6">
+                                <small><strong>Início:</strong> {{ aplicacao.data_disponivel|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <div class="col-md-6">
+                                <small><strong>Término:</strong> {{ aplicacao.data_limite|date:"d/m/Y H:i" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Ações -->
+                    <div class="mt-5">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <a href="{% url 'mimir:dashboardAluno' %}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-home me-2"></i>Voltar ao Dashboard
+                            </a>
+                            <a href="{% url 'mimir:listarProvasAluno' %}" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-list me-2"></i>Ver Minhas Provas
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Ajuda -->
+                    <div class="mt-4">
+                        <div class="card bg-light">
+                            <div class="card-body py-3">
+                                <h6 class="card-title mb-2">
+                                    <i class="fas fa-question-circle me-2 text-primary"></i>Precisa de ajuda?
+                                </h6>
+                                <p class="card-text small text-muted mb-0">
+                                    Se você acredita que esta mensagem está incorreta, entre em contato com seu professor 
+                                    ou com o suporte técnico.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards Informativos Adicionais -->
+            <div class="row mt-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card border-start border-primary border-4 h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-clock text-primary fa-2x"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="card-title">Prazos</h6>
+                                    <p class="card-text small text-muted mb-0">
+                                        Verifique os prazos de suas provas regularmente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="card border-start border-success border-4 h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-check-circle text-success fa-2x"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="card-title">Status</h6>
+                                    <p class="card-text small text-muted mb-0">
+                                        Acompanhe o status de suas provas no dashboard.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="card border-start border-info border-4 h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-envelope text-info fa-2x"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="card-title">Suporte</h6>
+                                    <p class="card-text small text-muted mb-0">
+                                        Entre em contato em caso de dúvidas ou problemas.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-icon {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.border-start {
+    border-left-width: 4px !important;
+}
+
+.btn-lg {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+}
+
+.alert {
+    border-radius: 0.5rem;
+    border: none;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .card-header {
+        padding: 2rem 1rem;
+    }
+    
+    .card-body {
+        padding: 2rem 1rem;
+    }
+    
+    .d-md-flex {
+        flex-direction: column;
+    }
+    
+    .btn-lg {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
