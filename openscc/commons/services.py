@@ -96,7 +96,7 @@ def chamarApiLLM(prompt):
         # Configurar API do Gemini
         client = genai.Client(api_key=settings.GEMINI_API_KEY) # Recomendado: usar settings
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )             
         return response.text                
@@ -196,7 +196,7 @@ def getQuestionsFromSource(file_path,qtPerguntas,infoExtras):
         
         # Gerar conteúdo
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )             
         return response.text
@@ -284,7 +284,7 @@ def fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno):
         
         # Gerar conteúdo
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )             
         return response.text
@@ -365,7 +365,7 @@ def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_perg
         
         # Gerar correção
         response = model.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=conteudos
         ) 
         
