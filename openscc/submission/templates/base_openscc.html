@@ -313,6 +313,12 @@
                         <i class="fas fa-file-alt"></i>
                         Meus Artigos
                       </a>
+                      {% if user.isMembroAutorizado %}
+                        <a class="dropdown-item" href="{% url 'mimir:home' %}">
+                          <i class="fas fa-lock"></i>
+                          Mimir
+                        </a>
+                      {% endif %}
                       <div class="dropdown-divider"></div>
                       <a class="dropdown-item" href="{% url 'submission:logout' %}">
                         <i class="fas fa-sign-out-alt"></i>
