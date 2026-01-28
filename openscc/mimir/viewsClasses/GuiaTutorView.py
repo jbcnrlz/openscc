@@ -10,6 +10,16 @@ from ..models import Problema, GuiaTutor, Parte
 from ..forms import EditarGuiaTutorForm  # Vamos criar este formulário
 from commons.services import chamarApiLLM, extrair_texto_pdf, criarPromptGuiaTutor
 
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.generic import DetailView, View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
+from django.contrib import messages
+import requests
+import json
+from ..models import Problema, GuiaTutor, Parte
+from commons.services import chamarApiLLM, extrair_texto_pdf, criarPromptGuiaTutor
+
 class GerarGuiaTutorView(LoginRequiredMixin, View):
     def post(self, request, problema_id):
         problema = get_object_or_404(Problema, id=problema_id)
@@ -17,10 +27,10 @@ class GerarGuiaTutorView(LoginRequiredMixin, View):
         try:
             # Verificar se já existe um guia
             guia, created = GuiaTutor.objects.get_or_create(problema=problema)
-            
+            print(problema)
             # Gerar conteúdo do guia
             conteudo_guia = self.gerar_guia_tutor(problema)
-            
+            print(conteudo_guia)
             if conteudo_guia:
                 guia.conteudo = conteudo_guia
                 guia.save()
@@ -35,7 +45,7 @@ class GerarGuiaTutorView(LoginRequiredMixin, View):
         except Exception as e:
             messages.error(request, f'Erro ao gerar guia: {str(e)}')
         
-        return redirect('mimir:visualizarGuiaTutor', pk=problema_id)
+        return redirect('mimir:problemaDetail', pk=problema_id)
     
     def gerar_guia_tutor(self, problema):
         # Obter todas as partes do problema
@@ -45,7 +55,7 @@ class GerarGuiaTutorView(LoginRequiredMixin, View):
         # Obter informações das fontes
         fontes_info = ""
         for fp in problema.fontes.all():
-            conteudo_extraido = extrair_texto_pdf([fp.fonte.path, fp.nome])
+            conteudo_extraido = extrair_texto_pdf([fp.fonte.path,fp.nome])
             texto_completo = "\n".join(conteudo_extraido)
             fontes_info += f"FONTE - {fp.nome}\n" + texto_completo + "\n\n"
         
@@ -58,8 +68,8 @@ class GerarGuiaTutorView(LoginRequiredMixin, View):
             fontes_info,
             problema.assunto.layoutGuiaTutor or ""
         )
-        
-        return chamarApiLLM(prompt)
+        print(prompt)
+        return chamarApiLLM(prompt)    
 
 class VisualizarGuiaTutorView(LoginRequiredMixin, DetailView):
     model = Problema
@@ -71,32 +81,8 @@ class VisualizarGuiaTutorView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        problema = self.object
-        guia_tutor = getattr(problema, 'guia_tutor', None)
-        context['guia_tutor'] = guia_tutor
-        context['form'] = EditarGuiaTutorForm(instance=guia_tutor) if guia_tutor else None
+        context['guia_tutor'] = getattr(self.object, 'guia_tutor', None)
         return context
-
-class EditarGuiaTutorView(LoginRequiredMixin, UpdateView):
-    model = GuiaTutor
-    form_class = EditarGuiaTutorForm
-    template_name = 'mimir/editarGuiaTutor.html'
-    context_object_name = 'guia_tutor'
-    
-    def get_object(self, queryset=None):
-        problema_id = self.kwargs.get('problema_id')
-        problema = get_object_or_404(Problema, id=problema_id, assunto__user=self.request.user)
-        guia_tutor = get_object_or_404(GuiaTutor, problema=problema)
-        return guia_tutor
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['problema'] = self.object.problema
-        return context
-    
-    def get_success_url(self):
-        messages.success(self.request, 'Guia do Tutor editado com sucesso!')
-        return reverse_lazy('mimir:visualizarGuiaTutor', kwargs={'pk': self.object.problema.id})
 
 class AtualizarGuiaTutorView(LoginRequiredMixin, View):
     def post(self, request, problema_id):
@@ -128,7 +114,7 @@ class AtualizarGuiaTutorView(LoginRequiredMixin, View):
         # Obter informações das fontes
         fontes_info = ""
         for fp in problema.fontes.all():
-            conteudo_extraido = extrair_texto_pdf([fp.fonte.path, fp.nome])
+            conteudo_extraido = extrair_texto_pdf([fp.fonte.path,fp.nome])
             texto_completo = "\n".join(conteudo_extraido)
             fontes_info += f"FONTE - {fp.nome}\n" + texto_completo + "\n\n"
         
@@ -142,4 +128,25 @@ class AtualizarGuiaTutorView(LoginRequiredMixin, View):
             problema.assunto.layoutGuiaTutor or ""
         )
         
-        return chamarApiLLM(prompt)
+        return chamarApiLLM(prompt)    
+    
+class EditarGuiaTutorView(LoginRequiredMixin, UpdateView):
+    model = GuiaTutor
+    form_class = EditarGuiaTutorForm
+    template_name = 'mimir/editarGuiaTutor.html'
+    context_object_name = 'guia_tutor'
+    
+    def get_object(self, queryset=None):
+        problema_id = self.kwargs.get('problema_id')
+        problema = get_object_or_404(Problema, id=problema_id, assunto__user=self.request.user)
+        guia_tutor = get_object_or_404(GuiaTutor, problema=problema)
+        return guia_tutor
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['problema'] = self.object.problema
+        return context
+    
+    def get_success_url(self):
+        messages.success(self.request, 'Guia do Tutor editado com sucesso!')
+        return reverse_lazy('mimir:visualizarGuiaTutor', kwargs={'pk': self.object.problema.id})
