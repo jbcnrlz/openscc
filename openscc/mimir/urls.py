@@ -5,7 +5,7 @@ from . import views
 from .viewsClasses.PerguntasTemplate import PerguntasView
 from .viewsClasses.TemaListView import TemaListView
 from .viewsClasses.ProblemasView import ProblemaListView, ProblemaDetailView, GerarProblemaView, ProblemaCreateView, RegerarParteView, ProblemaDeleteView, ProblemaDeleteAjaxView
-from .viewsClasses.GuiaTutorView import GerarGuiaTutorView, VisualizarGuiaTutorView, AtualizarGuiaTutorView
+from .viewsClasses.GuiaTutorView import GerarGuiaTutorView, VisualizarGuiaTutorView, AtualizarGuiaTutorView, EditarGuiaTutorView
 from .viewsClasses.ExportarPDFView import ExportarProblemaPDFView, ExportarGuiaTutorPDFView, ExportarCompletoPDFView
 app_name = 'mimir'
 
@@ -92,4 +92,7 @@ urlpatterns = [
      path('assunto/<int:assunto_id>/vinculos/', views.gerenciarVinculosAssunto, name='gerenciarVinculosAssunto'),
      path('vinculo/<int:vinculo_id>/remover/', views.removerVinculo, name='removerVinculo'),
      path('assuntos/vinculos/', views.listarAssuntosVinculos, name='listarAssuntosVinculos'),
+     path('problema/<int:problema_id>/guia-tutor/editar/', 
+         EditarGuiaTutorView.as_view(), 
+         name='editarGuiaTutor')
 ]
