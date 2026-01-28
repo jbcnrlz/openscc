@@ -1,8 +1,23 @@
-from .models import Fontes, Assunto, TiposDePergunta, Pergunta, Prova, Tema, Problema, ObjetivosAprendizagem, FeedbackEspecialista, AplicacaoProva, VinculoAlunoAssunto
+from .models import *
 from django import forms
 from django.core.validators import FileExtensionValidator
 from django.contrib.auth.models import User
 import datetime
+
+class EditarGuiaTutorForm(forms.ModelForm):
+    class Meta:
+        model = GuiaTutor
+        fields = ['conteudo']
+        widgets = {
+            'conteudo': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 25,
+                'style': 'font-family: monospace;'
+            }),
+        }
+        labels = {
+            'conteudo': 'Conteúdo do Guia'
+        }
 class TemaForm(forms.ModelForm):
     class Meta:
         model = Tema

@@ -24,11 +24,17 @@
                 </button>
             </form>
             {% endif %}
+            {% if guia_tutor %}
+                <a href="{% url 'mimir:editarGuiaTutor' problema.pk %}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-edit"></i> Editar Guia
+                </a>
+            {% endif %}
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-4">
+            
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="card-title mb-0">

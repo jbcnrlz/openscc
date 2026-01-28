@@ -1,0 +1,119 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-edit"></i>
+            Editar Guia do Tutor
+        </h1>
+        <div>
+            <a href="{% url 'mimir:visualizarGuiaTutor' problema.pk %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                        Editando Guia do Tutor - {{ problema.titulo }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.conteudo.id_for_label }}" class="form-label">
+                                <strong>Conteúdo do Guia:</strong>
+                            </label>
+                            {{ form.conteudo }}
+                            {% if form.conteudo.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.conteudo.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Você pode editar livremente o conteúdo do guia. Use formatação Markdown para melhor apresentação.
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> Salvar Alterações
+                                </button>
+                                <a href="{% url 'mimir:visualizarGuiaTutor' problema.pk %}" class="btn btn-outline-secondary ms-2">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                            <div>
+                                <a href="{% url 'mimir:atualizarGuiaTutor' problema.pk %}" class="btn btn-outline-warning me-2">
+                                    <i class="fas fa-sync-alt"></i> Regenerar com IA
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Dicas de formatação:</strong>
+                            </small>
+                            <ul class="small text-muted mb-0">
+                                <li>Use # para títulos (## para subtítulos)</li>
+                                <li>Use **texto** para negrito</li>
+                                <li>Use *texto* para itálico</li>
+                                <li>Use - ou * para listas</li>
+                                <li>Use > para citações</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <small class="text-muted">
+                                Última atualização: {{ guia_tutor.atualizado_em|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.CodeMirror {
+    height: 500px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.guia-preview {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    height: 500px;
+    overflow-y: auto;
+}
+
+.guia-preview h1,
+.guia-preview h2,
+.guia-preview h3 {
+    color: #2c3e50;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.guia-preview strong {
+    color: #2980b9;
+}
+</style>
+{% endblock %}
