@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import ValidationError
 import datetime
 from django.utils import timezone
+from django.core.validators import FileExtensionValidator
 # Create your models here.
 
 def isProfessor(self):
@@ -63,6 +64,15 @@ class Assunto(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     nome = models.CharField(max_length=200, blank=False, null=False)
     layoutGuiaTutor = models.TextField(blank=True, null=True)
+    # Substituindo layoutProblema (TextField) por um campo de arquivo
+    layoutProblema = models.FileField(
+        upload_to='layouts_problema/',
+        blank=True,
+        null=True,
+        verbose_name='Layout do Problema (arquivo)',
+        help_text='Arquivo contendo o template (ex.: .txt, .md) com placeholders {{...}} para os dados do problema.',
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])]
+    )
 
     def __str__(self):
         return self.nome
@@ -680,3 +690,33 @@ class VinculoAlunoAssunto(models.Model):
     def periodo(self):
         """Property para obter o período formatado"""
         return f"{self.ano}/{self.semestre}º"
+    
+class LLMLog(models.Model):
+    """
+    Registra todas as chamadas aos modelos de linguagem.
+    """
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='llm_logs'
+    )
+    prompt = models.TextField()
+    response = models.TextField(blank=True, null=True)
+    model_used = models.CharField(max_length=100, blank=True, null=True)
+    tokens_input = models.IntegerField(null=True, blank=True)
+    tokens_output = models.IntegerField(null=True, blank=True)
+    duration_ms = models.IntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='success')  # success, error
+    error_message = models.TextField(blank=True, null=True)
+    endpoint = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Log de LLM'
+        verbose_name_plural = 'Logs de LLM'
+
+    def __str__(self):
+        return f"{self.created_at} - {self.model_used} - {self.status}"
