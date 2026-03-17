@@ -1,0 +1,79 @@
+{% extends 'base_openscc.html' %}
+
+{% block mainContent %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card {% if valido %}border-success{% else %}border-danger{% endif %}">
+                <div class="card-header {% if valido %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+                    <h3 class="mb-0">
+                        <i class="fas fa-certificate"></i> 
+                        Validação de Certificado
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {% if valido %}
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">
+                            <i class="fas fa-check-circle"></i> Certificado Válido!
+                        </h4>
+                        <p>Este certificado foi emitido pelo sistema oficial e está válido.</p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle"></i> Certificado Inválido!
+                        </h4>
+                        <p>Este certificado não pode ser validado pelo sistema.</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="certificado-info mt-4">
+                        <h5>Informações do Certificado</h5>
+                        <table class="table table-bordered">
+                            <tr>
+                                <th width="30%">Participante:</th>
+                                <td>{{ certificado.participante.get_full_name|default:certificado.participante.username }}</td>
+                            </tr>
+                            <tr>
+                                <th>Atividade:</th>
+                                <td>{{ certificado.atividade.nome }}</td>
+                            </tr>
+                            <tr>
+                                <th>Conferência:</th>
+                                <td>{{ certificado.atividade.conferencia.nome }} ({{ certificado.atividade.conferencia.sigla }})</td>
+                            </tr>
+                            <tr>
+                                <th>Data da Atividade:</th>
+                                <td>{{ certificado.data_atividade|date:"d/m/Y" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Carga Horária:</th>
+                                <td>{{ certificado.carga_horaria }} horas</td>
+                            </tr>
+                            <tr>
+                                <th>Tipo:</th>
+                                <td>{{ certificado.get_tipo_display }}</td>
+                            </tr>
+                            <tr>
+                                <th>Data de Emissão:</th>
+                                <td>{{ certificado.data_emissao|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Código de Validação:</th>
+                                <td><code>{{ certificado.codigo_validacao }}</code></td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{% url 'submission:home' %}" class="btn btn-primary">
+                            <i class="fas fa-home"></i> Voltar para o Início
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

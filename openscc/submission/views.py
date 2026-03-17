@@ -1,3 +1,6 @@
+import uuid
+from django.template.loader import render_to_string
+from weasyprint import HTML
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import logout
 from django.contrib.admin.views.decorators import staff_member_required
@@ -11,13 +14,14 @@ from django.contrib import messages
 from django.db import transaction
 # Create your views here.
 
-from .forms import UserForm, ArtigoForm
+from .forms import *
 from .models import *
-
-import qrcode
+from django.http import HttpResponse
+import qrcode, io
+import base64
 from io import BytesIO
-
 import datetime as dt
+from django.db.models import Sum, Q
 
 #def login(request):
 #    if request.method == 'POST':
@@ -32,18 +36,74 @@ import datetime as dt
 def contabilizarPresenca(request, atvId, partId):
     atv = Atividade.objects.get(pk=atvId)
     dataConf = datetime.datetime.fromtimestamp(atv.data.timestamp())
+    
     if dataConf > datetime.datetime.now():
         messages.error(request, 'A atividade ainda não ocorreu. Presença não pode ser contabilizada.')
     else:
-        patv = ParticipanteAtividade.objects.get(atividade__id=atvId, user__id=partId)        
         try:
-            patv.presenca = True
-            patv.data_registro = datetime.datetime.now()
-            patv.save()
-            messages.success(request, 'Presença contabilizada com sucesso!')
-        except:            
-            messages.error(request, 'Erro ao contabilizar presença. Tente novamente.')
+            with transaction.atomic():
+                # Atualizar presença
+                patv = ParticipanteAtividade.objects.get(atividade__id=atvId, user__id=partId)        
+                patv.presenca = True
+                patv.data_registro = datetime.datetime.now()
+                patv.save()
+                
+                # GERAR CERTIFICADO AUTOMATICAMENTE (apenas para participação)
+                try:
+                    gerarCertificadoAutomatico(atv, patv.user, request)
+                    messages.success(request, 'Presença contabilizada e certificado gerado com sucesso!')
+                except Exception as e:
+                    messages.warning(request, f'Presença contabilizada, mas houve um erro ao gerar o certificado: {str(e)}')
+                    
+        except Exception as e:            
+            messages.error(request, f'Erro ao contabilizar presença: {str(e)}')
+    
     return render(request, 'submissao/contabilizarPresenca.html')
+
+def gerarCertificadoAutomatico(atividade, usuario, request):
+    """Gera certificado de participação automaticamente"""
+    from django.utils import timezone
+    import uuid
+    
+    # Verificar se já existe certificado para esta atividade e usuário
+    certificado_existente = Certificado.objects.filter(
+        atividade=atividade,
+        participante=usuario,
+        tipo_certificado='participacao'
+    ).exists()
+    
+    if certificado_existente:
+        return None
+    
+    # Buscar layout padrão da conferência
+    layout_padrao = LayoutCertificado.objects.filter(
+        conferencia=atividade.conferencia,
+        padrao=True,
+        ativo=True
+    ).first()
+    
+    # Se não houver layout padrão, pega o primeiro ativo
+    if not layout_padrao:
+        layout_padrao = LayoutCertificado.objects.filter(
+            conferencia=atividade.conferencia,
+            ativo=True
+        ).first()
+    
+    # Criar certificado
+    certificado = Certificado(
+        participante=usuario,
+        atividade=atividade,
+        layout=layout_padrao,
+        tipo_certificado='participacao',
+        data_atividade=atividade.data.date(),
+        carga_horaria=layout_padrao.carga_horaria_padrao if layout_padrao else 2.00,
+        emitido=True,
+        publicado=True,
+    )
+    
+    certificado.save()
+    
+    return certificado
 
 def generateQRCode(request, atvId, partId):
     atv = Atividade.objects.get(pk=atvId)
@@ -551,3 +611,311 @@ def submissionStatus(request, slug):
     }
     
     return render(request, 'submissao/submissionStatus.html', context)
+
+@login_required
+def meusCertificados(request):
+    # Obter todos os certificados do usuário atual
+    certificados = Certificado.objects.filter(
+        participante=request.user,
+        emitido=True
+    ).select_related(
+        'participante', 
+        'atividade', 
+        'layout',
+        'atividade__conferencia',
+        'atividade__tipo'
+    ).order_by('-data_emissao')
+    
+    # Aplicar filtros
+    conferencia_id = request.GET.get('conferencia')
+    tipo_certificado = request.GET.get('tipo')
+    ano = request.GET.get('ano')
+    
+    if conferencia_id:
+        certificados = certificados.filter(
+            Q(atividade__conferencia_id=conferencia_id) | 
+            Q(layout__conferencia_id=conferencia_id)
+        )
+    
+    if tipo_certificado:
+        certificados = certificados.filter(tipo_certificado=tipo_certificado)
+    
+    if ano:
+        certificados = certificados.filter(data_atividade__year=ano)
+    
+    # Agrupar certificados por conferência e calcular totais
+    certificados_por_conferencia = {}
+    certificados_sem_conferencia = []
+    totais_por_conferencia = {}  # Para armazenar totais por conferência
+    
+    for certificado in certificados:
+        # Tentar obter a conferência através da atividade
+        if certificado.atividade and certificado.atividade.conferencia:
+            conferencia = certificado.atividade.conferencia
+        # Tentar obter a conferência através do layout
+        elif certificado.layout and certificado.layout.conferencia:
+            conferencia = certificado.layout.conferencia
+        else:
+            certificados_sem_conferencia.append(certificado)
+            continue
+            
+        if conferencia.id not in certificados_por_conferencia:
+            certificados_por_conferencia[conferencia.id] = {
+                'conferencia': conferencia,
+                'certificados': [],
+                'total_horas': Decimal('0.00')
+            }
+        
+        certificados_por_conferencia[conferencia.id]['certificados'].append(certificado)
+        certificados_por_conferencia[conferencia.id]['total_horas'] += certificado.carga_horaria
+    
+    # Calcular estatísticas
+    total_certificados = certificados.count()
+    total_carga_horaria = certificados.aggregate(
+        total=Sum('carga_horaria')
+    )['total'] or Decimal('0.00')
+    
+    # Adicionar carga horária dos certificados sem conferência
+    for cert in certificados_sem_conferencia:
+        total_carga_horaria += cert.carga_horaria
+    
+    # Obter anos disponíveis para filtro
+    anos_disponiveis = sorted(set(
+        cert.data_atividade.year for cert in certificados
+    ), reverse=True)
+    
+    # Obter todas as conferências disponíveis
+    conf_ids = set()
+    for cert in certificados:
+        if cert.atividade and cert.atividade.conferencia:
+            conf_ids.add(cert.atividade.conferencia.id)
+        elif cert.layout and cert.layout.conferencia:
+            conf_ids.add(cert.layout.conferencia.id)
+    
+    todas_conferencias = Conferencia.objects.filter(id__in=conf_ids)
+    
+    context = {
+        'certificados_por_conferencia': certificados_por_conferencia.values(),
+        'certificados_sem_conferencia': certificados_sem_conferencia,
+        'total_certificados': total_certificados,
+        'total_carga_horaria': total_carga_horaria,
+        'conferencias_count': len(certificados_por_conferencia),
+        'todas_conferencias': todas_conferencias,
+        'tipos_certificados': Certificado.TIPO_CHOICES,
+        'anos_disponiveis': anos_disponiveis,
+    }
+    return render(request, 'submissao/meusCertificados.html', context)
+
+@login_required
+def visualizarCertificado(request, codigo_validacao):
+    certificado = get_object_or_404(Certificado, codigo_validacao=codigo_validacao)
+    
+    # Verificar permissões
+    if not (request.user == certificado.participante or request.user.is_staff):
+        return render(request, 'erro_acesso.html', {
+            'mensagem': 'Você não tem permissão para visualizar este certificado.'
+        })
+    
+    # Obter dados do certificado
+    try:
+        logos = certificado.get_todos_logos()
+    except AttributeError:
+        logos = []
+    
+    try:
+        texto_certificado = certificado.get_texto_certificado()
+    except AttributeError:
+        texto_certificado = ""
+    
+    try:
+        texto_rodape = certificado.get_rodape_certificado()
+    except AttributeError:
+        texto_rodape = ""
+    
+    try:
+        assinaturas = certificado.get_assinaturas()
+    except AttributeError:
+        assinaturas = []
+    
+    try:
+        logo_evento = certificado.get_logo_evento()
+    except AttributeError:
+        logo_evento = None
+    
+    # Gerar QR Code
+    qr_code_data = None
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        
+        # Usar código de validação
+        qr_data = str(certificado.codigo_validacao)
+        
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Converter para base64
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        qr_code_data = base64.b64encode(buffered.getvalue()).decode()
+    except Exception as e:
+        print(f"Erro ao gerar QR Code: {e}")
+        qr_code_data = None
+    
+    context = {
+        'certificado': certificado,
+        'texto_certificado': texto_certificado,
+        'texto_rodape': texto_rodape,
+        'assinaturas': assinaturas,
+        'logos': logos,
+        'logo_evento': logo_evento,
+        'qr_code': qr_code_data,
+        # Adicionando métodos específicos
+        'data_extenso': certificado.get_data_extenso(datetime.datetime.now()),
+        'cidade_evento': certificado.get_cidade_evento(),
+    }
+    
+    return render(request, 'submissao/visualizarCertificado.html', context)
+
+def validarCertificado(request, codigo_validacao):
+    """Página pública para validação de certificado"""
+    certificado = get_object_or_404(
+        Certificado.objects.select_related(
+            'atividade',
+            'atividade__conferencia',
+            'participante'
+        ),
+        codigo_validacao=codigo_validacao
+    )
+    
+    # Obter informações de validação
+    assinaturas = certificado.get_assinaturas_ordenadas()
+    logos = certificado.get_logos_ordenados()
+    
+    context = {
+        'certificado': certificado,
+        'valido': certificado.emitido and certificado.publicado,
+        'assinaturas': assinaturas,
+        'logos': logos,
+        'atividade_tipo': certificado.atividade.tipo if certificado.atividade else None,
+    }
+    
+    return render(request, 'submissao/validarCertificado.html', context)
+
+@staff_member_required
+def relatorioCertificados(request, conferencia_slug=None):
+    """Relatório de certificados emitidos"""
+    certificados = Certificado.objects.all().select_related(
+        'participante', 'atividade', 'atividade__conferencia', 'tipo_atividade'
+    ).prefetch_related('assinaturas', 'logos').order_by('-data_emissao')
+    
+    if conferencia_slug:
+        certificados = certificados.filter(atividade__conferencia__slug=conferencia_slug)
+    
+    # Agrupar por tipo de atividade
+    por_tipo_atividade = {}
+    for cert in certificados:
+        tipo_nome = cert.tipo_atividade.nome if cert.tipo_atividade else "Sem tipo"
+        if tipo_nome not in por_tipo_atividade:
+            por_tipo_atividade[tipo_nome] = []
+        por_tipo_atividade[tipo_nome].append(cert)
+    
+    # Estatísticas
+    total = certificados.count()
+    hoje = timezone.now().date()
+    emitidos_hoje = certificados.filter(data_emissao__date=hoje).count()
+    total_impressoes = sum(cert.impressoes for cert in certificados)
+    
+    context = {
+        'certificados': certificados,
+        'por_tipo_atividade': por_tipo_atividade,
+        'estatisticas': {
+            'total': total,
+            'emitidos_hoje': emitidos_hoje,
+            'total_impressoes': total_impressoes,
+        },
+        'conferencia_slug': conferencia_slug,
+    }
+    
+    return render(request, 'submissao/relatorioCertificados.html', context)
+
+@staff_member_required
+def gerenciarLayoutsCertificado(request, conferencia_id):
+    """Gerencia layouts de certificado para uma conferência"""
+    conferencia = get_object_or_404(Conferencia, id=conferencia_id)
+    layouts = LayoutCertificado.objects.filter(conferencia=conferencia)
+    
+    if request.method == 'POST':
+        if 'criar_layout' in request.POST:
+            layout = LayoutCertificado.objects.create(
+                nome=request.POST.get('nome'),
+                conferencia=conferencia,
+                cor_fundo=request.POST.get('cor_fundo', '#FFFFFF'),
+                cor_texto_titulo=request.POST.get('cor_texto_titulo', '#000000'),
+                texto_cabecalho=request.POST.get('texto_cabecalho', 'Certificamos que')
+            )
+            messages.success(request, 'Layout criado com sucesso!')
+            return redirect('submission:editarLayoutCertificado', layout_id=layout.id)
+    
+    context = {
+        'conferencia': conferencia,
+        'layouts': layouts,
+    }
+    
+    return render(request, 'submissao/gerenciarLayouts.html', context)
+
+def gerarPdfCertificado(request, codigo):
+    """Gera PDF do certificado"""
+    certificado = get_object_or_404(Certificado, codigo_validacao=codigo)
+    
+    # Verificar permissões
+    if not (request.user == certificado.participante or request.user.is_staff):
+        return HttpResponse("Não autorizado", status=403)
+    
+    # Renderizar template HTML
+    html_string = render_to_string('certificado_pdf.html', {
+        'certificado': certificado,
+        'request': request,
+    })
+    
+    # Criar PDF
+    html = HTML(string=html_string, base_url=request.build_absolute_uri())
+    pdf_file = html.write_pdf()
+    
+    # Registrar impressão
+    certificado.registrar_impressao()
+    
+    # Retornar PDF
+    response = HttpResponse(pdf_file, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="certificado_{certificado.codigo_validacao}.pdf"'
+    return response
+
+def validarCertificado(request, codigo_validacao):
+    """View para validação pública de certificados"""
+    try:
+        certificado = get_object_or_404(
+            Certificado, 
+            codigo_validacao=codigo_validacao,
+            publicado=True  # Apenas certificados públicos
+        )
+        
+        context = {
+            'certificado': certificado,
+            'valido': True,
+            'mensagem': 'Certificado válido!',
+        }
+        
+    except Exception as e:
+        context = {
+            'certificado': None,
+            'valido': False,
+            'mensagem': f'Certificado não encontrado ou inválido. Erro: {str(e)}',
+            'codigo': codigo_validacao,
+        }
+    
+    return render(request, 'submissao/validarCertificado.html', context)
