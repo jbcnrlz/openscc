@@ -86,7 +86,16 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 fontes_selecionadas = form.cleaned_data['fontes']
                 num_partes = form.cleaned_data['num_partes']
                 contexto_inicial = form.cleaned_data['contexto_inicial']
-                
+                layout_instrucoes = ""
+                if assunto.layoutProblema:
+                    try:
+                        # Usa o mesmo padrão de extração das fontes
+                        linhas_layout = extrair_texto_pdf([assunto.layoutProblema.path, assunto.layoutProblema.name])
+                        layout_instrucoes = "\n".join(linhas_layout)
+                    except Exception as e:
+                        print(f"Erro ao extrair layout do assunto: {e}")
+                        layout_instrucoes = ""
+            
                 # Criar problema base
                 problema = Problema.objects.create(
                     titulo=f"Problema em {tema.nome} - {assunto.nome}",
@@ -110,7 +119,9 @@ class GerarProblemaView(LoginRequiredMixin, View):
                     [obj.descricao for obj in objetivos],
                     num_partes, 
                     contexto_inicial,
-                    completoTudo
+                    completoTudo,
+                    layout_instrucoes,
+                    user=request.user 
                 )
                 
                 # Salvar partes no banco
@@ -130,13 +141,12 @@ class GerarProblemaView(LoginRequiredMixin, View):
         
         return render(request, self.template_name, {'form': form})
     
-    def gerar_partes_sequenciais(self, tema, assunto, objetivos, num_partes, contexto_inicial,conteudo_fontes):
+    def gerar_partes_sequenciais(self, tema, assunto, objetivos, num_partes, contexto_inicial,conteudo_fontes,layout_instrucoes="",user=None):
         partes = []
         contexto_accumulado = contexto_inicial
         
         for parte_num in range(1, num_partes + 1):
-            prompt = criarPromptParaParte(tema, assunto, objetivos, parte_num, num_partes, contexto_accumulado,conteudo_fontes)
-            resposta = chamarApiLLM(prompt)
+            resposta = criarPromptParaParte(tema, assunto, objetivos, parte_num, num_partes, contexto_accumulado,conteudo_fontes,layout_instrucoes,user=user)
             if resposta:
                 partes.append(resposta)
                 contexto_accumulado += f"\n\nParte {parte_num}: {resposta}"
@@ -184,6 +194,15 @@ class RegerarParteView(LoginRequiredMixin, View):
     def post(self, request, problema_id,parte_ordem=None):
         problema = get_object_or_404(Problema, id=problema_id)        
         
+        # Extrair texto do layout do assunto
+        layout_instrucoes = ""
+        if problema.assunto.layoutProblema:
+            try:
+                linhas_layout = extrair_texto_pdf([problema.assunto.layoutProblema.path, problema.assunto.layoutProblema.name])
+                layout_instrucoes = "\n".join(linhas_layout)
+            except Exception as e:
+                print(f"Erro ao extrair layout do assunto: {e}")
+                layout_instrucoes = ""
         # Se parte_ordem não veio na URL, pega do formulário
         parte_ordem = request.POST.get('parte_ordem')
 
@@ -215,7 +234,7 @@ class RegerarParteView(LoginRequiredMixin, View):
                     completoTudo += f"FONTE - {fp.nome}\n" + texto_completo + "\n\n"
                 
                 # Gerar nova parte
-                prompt = regerarParte(
+                nova_parte = regerarParte(
                     problema.tema.nome, 
                     problema.assunto.nome,
                     [obj.descricao for obj in problema.objetivos.all()],
@@ -223,9 +242,11 @@ class RegerarParteView(LoginRequiredMixin, View):
                     contexto_anterior,
                     completoTudo,
                     instrucoes,
-                    parte.enunciado
+                    parte.enunciado,
+                    layout_instrucoes,
+                    user=request.user 
                 )
-                nova_parte = chamarApiLLM(prompt)
+                #nova_parte = chamarApiLLM(prompt)
                 
                 if nova_parte:
                     # Atualizar a parte existente
