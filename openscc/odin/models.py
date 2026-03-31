@@ -1,6 +1,9 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.contrib.auth.models import User
+from mimir.models import isProfessor
+
+User.add_to_class('isProfessor', isProfessor)
 
 class FormativeAxis(models.Model):
     """Cadastro global de Eixos Formativos com seleção de cor"""
