@@ -1,0 +1,44 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Eixos Tecnológicos - Odin{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h4 class="mb-0 text-secondary"><i class="bi bi-diagram-3 me-2"></i>Eixos Tecnológicos</h4>
+        <a href="{% url 'axis_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Novo Eixo
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4" style="width: 30%;">Nome do Eixo</th>
+                        <th>Descrição</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for axis in axes %}
+                    <tr>
+                        <td class="ps-4 fw-semibold text-primary">{{ axis.name }}</td>
+                        <td class="text-muted small">{{ axis.description|default:"Nenhuma descrição informada." }}</td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-outline-secondary" disabled title="Editar em breve"><i class="bi bi-pencil"></i></button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">
+                            Nenhum Eixo Tecnológico cadastrado. Clique em "Novo Eixo" para começar.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

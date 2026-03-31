@@ -1,0 +1,69 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Novo Curso - Odin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0">
+                    <i class="bi bi-journal-plus me-2"></i>
+                    {% if form.instance.pk %}
+                        Editar Curso: {{ form.instance.name }}
+                    {% else %}
+                        Cadastrar Novo Curso
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body bg-white p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary">Nome do Curso</label>
+                            {{ form.name }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Eixo Tecnológico</label>
+                            {{ form.reference_axis }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Modalidade</label>
+                            {{ form.modality }}
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-secondary border-bottom pb-2">Integralização e Vagas</h6>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Prazo Mín. (Semestres)</label>
+                            {{ form.min_semesters }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Prazo Máx. (Semestres)</label>
+                            {{ form.max_semesters }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Vagas Totais</label>
+                            {{ form.total_vacancies }}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'course_list' %}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-circle me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i> Salvar Curso
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

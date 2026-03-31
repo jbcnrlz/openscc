@@ -1,0 +1,54 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Cursos Cadastrados - Odin{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h4 class="mb-0 text-secondary"><i class="bi bi-mortarboard me-2"></i>Cursos Cadastrados</h4>
+        <a href="{% url 'course_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Novo Curso
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Nome do Curso</th>
+                        <th>Eixo Tecnológico</th>
+                        <th>Modalidade</th>
+                        <th class="text-center">Duração (Semestres)</th>
+                        <th class="text-center">Vagas</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                    <tr>
+                        <td class="ps-4 fw-semibold text-primary">{{ course.name }}</td>
+                        <td><span class="badge bg-secondary">{{ course.reference_axis }}</span></td>
+                        <td>{{ course.modality }}</td>
+                        <td class="text-center text-muted">
+                            {{ course.min_semesters }} a {{ course.max_semesters }}
+                        </td>
+                        <td class="text-center">{{ course.total_vacancies }}</td>
+                        <td class="text-end pe-4">
+                            <a href="{% url 'course_update' course.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            Nenhum curso cadastrado ainda. Clique em "Novo Curso" para começar.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

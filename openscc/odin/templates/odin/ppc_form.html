@@ -1,0 +1,62 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Novo Projeto Pedagógico - Odin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-plus me-2"></i>Iniciar Novo Projeto Pedagógico</h5>
+            </div>
+            <div class="card-body bg-white p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Curso Vinculado</label>
+                            {{ form.course }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary">Versão (Ex: 2026/1)</label>
+                            {{ form.version_semester }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary">Tipo de Atualização</label>
+                            {{ form.update_type }}
+                        </div>
+                        
+                        <div class="col-12 mt-4">
+                            <label class="form-label fw-bold text-secondary">Ato Legal (Portaria/Decreto)</label>
+                            {{ form.legal_act }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary">Justificativa</label>
+                            {{ form.justification }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Objetivo Geral</label>
+                            {{ form.general_objective }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Perfil do Egresso</label>
+                            {{ form.graduate_profile }}
+                        </div>
+                        <div class="col-12 mt-3">
+                            <div class="form-check form-switch">
+                                {{ form.is_active }}
+                                <label class="form-check-label fw-bold">Marcar como PPC Vigente (Ativo)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="my-4">
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'ppc_list' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-success">Salvar e Ir para a Grade</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
