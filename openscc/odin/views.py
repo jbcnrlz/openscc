@@ -2,7 +2,6 @@ from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView, ListView, CreateView, DetailView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-
 from .models import *
 from .forms import *
 
@@ -12,8 +11,8 @@ class ProfessorRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     login_url = '/admin/login/'
     
     def test_func(self):
-        # Regra de acesso: precisa ser staff ou superusuário
-        return self.request.user.is_staff or self.request.user.is_superuser
+        # Regra de acesso: precisa ser professor para acessar as views de ODIN. O método isProfessor() é adicionado dinamicamente ao User via monkey patching no models.py
+        return self.request.user.isProfessor()
 
 # --- 1. Dashboard ---
 class DashboardView(ProfessorRequiredMixin, TemplateView):
@@ -95,7 +94,8 @@ class PPCListView(ProfessorRequiredMixin, ListView):
     context_object_name = 'ppcs'
 
     def get_queryset(self):
-        return PPCProposal.objects.filter(course__professor=self.request.user).order_by('-created_at')
+        # Agora retorna TODOS os PPCs do sistema, não apenas os do utilizador logado
+        return PPCProposal.objects.all().order_by('-created_at')
 
 class PPCCreateView(ProfessorRequiredMixin, CreateView):
     model = PPCProposal
@@ -108,22 +108,18 @@ class PPCCreateView(ProfessorRequiredMixin, CreateView):
         return kwargs
 
 class PPCDetailView(ProfessorRequiredMixin, DetailView):
-    """Painel principal que agrupa as disciplinas na Grade Curricular"""
     model = PPCProposal
     template_name = 'odin/ppc_detail.html'
     context_object_name = 'ppc'
 
     def get_queryset(self):
-        # Impede que um professor veja a grade do PPC de outro professor
-        return PPCProposal.objects.filter(course__professor=self.request.user)
+        # Permite que qualquer professor acesse os detalhes de qualquer PPC
+        return PPCProposal.objects.all()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Pega as disciplinas atreladas a este PPC ordenadas pelo semestre
         matrix_items = self.object.matrix_items.select_related('discipline').order_by('semester', 'discipline__name')
-        
-        # Agrupa os itens por semestre
         semesters = {}
         for item in matrix_items:
             if item.semester not in semesters:
@@ -132,8 +128,15 @@ class PPCDetailView(ProfessorRequiredMixin, DetailView):
             
         context['semesters'] = semesters
         
-        # Envia o formulário com o usuário logado para carregar o combo de disciplinas
-        context['matrix_form'] = CurriculumMatrixForm()
+        # --- LÓGICA DE PERMISSÃO ---
+        # Verifica se o utilizador logado é o professor dono do curso
+        is_owner = self.object.course.professor == self.request.user
+        context['is_owner'] = is_owner
+        
+        # Só injeta o formulário de montagem se for o dono
+        if is_owner:
+            context['matrix_form'] = CurriculumMatrixForm()
+            
         return context
 
 # --- 5. Adição de Disciplinas na Grade ---
