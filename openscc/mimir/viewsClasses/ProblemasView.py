@@ -89,8 +89,8 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 layout_instrucoes = ""
                 if assunto.layoutProblema:
                     try:
-                        # Usa o mesmo padrão de extração das fontes
-                        linhas_layout = extrair_texto_pdf([assunto.layoutProblema.path, assunto.layoutProblema.name])
+                        # CORREÇÃO: passe apenas o caminho do arquivo
+                        linhas_layout = extrair_texto_pdf(assunto.layoutProblema.path)
                         layout_instrucoes = "\n".join(linhas_layout)
                     except Exception as e:
                         print(f"Erro ao extrair layout do assunto: {e}")
@@ -108,7 +108,8 @@ class GerarProblemaView(LoginRequiredMixin, View):
 
                 completoTudo = ""
                 for fp in fontes_selecionadas:
-                    conteudo_extraido = extrair_texto_pdf([fp.fonte.path,fp.nome])
+                    # CORREÇÃO: passe apenas o caminho do arquivo
+                    conteudo_extraido = extrair_texto_pdf(fp.fonte.path)
                     texto_completo = "\n".join(conteudo_extraido)
                     completoTudo += f"FONTE - {fp.nome}\n" + texto_completo + "\n\n"
                     
@@ -139,7 +140,7 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 messages.error(request, f'Erro ao gerar problema: {str(e)}')
                 return render(request, self.template_name, {'form': form})
         
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form})    
     
     def gerar_partes_sequenciais(self, tema, assunto, objetivos, num_partes, contexto_inicial,conteudo_fontes,layout_instrucoes="",user=None):
         partes = []

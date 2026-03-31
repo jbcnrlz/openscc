@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Artigo
+from .models import *
 from django.core.exceptions import ValidationError
 
 class ArtigoForm(forms.ModelForm):

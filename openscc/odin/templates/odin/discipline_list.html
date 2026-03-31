@@ -1,0 +1,60 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Catálogo de Disciplinas - Odin{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h4 class="mb-0 text-secondary"><i class="bi bi-book me-2"></i>Catálogo de Disciplinas</h4>
+        <a href="{% url 'discipline_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Nova Disciplina
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Sigla</th>
+                        <th>Nome da Disciplina</th>
+                        <th>Cursos Vinculados</th>
+                        <th>Carga Horária (S/L/O)</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for discipline in disciplines %}
+                    <tr>
+                        <td class="ps-4"><span class="badge bg-secondary">{{ discipline.code }}</span></td>
+                        <td class="fw-semibold">{{ discipline.name }}</td>
+                        <td>
+                            {% for course in discipline.courses.all %}
+                                <span class="badge border border-primary text-primary">{{ course.name }}</span>
+                            {% empty %}
+                                <span class="text-muted small">Nenhum curso</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ discipline.theory_classes }}h / {{ discipline.lab_classes }}h / {{ discipline.online_classes }}h
+                            </small>
+                        </td>
+                        <td class="text-end pe-4">
+                            <a href="{% url 'discipline_update' discipline.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            Nenhuma disciplina cadastrada ainda. Comece adicionando uma nova!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

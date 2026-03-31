@@ -1,0 +1,56 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Projetos Pedagógicos - Odin{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h4 class="mb-0 text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Projetos Pedagógicos (Grades)</h4>
+        <a href="{% url 'ppc_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Criar Novo PPC
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Curso</th>
+                        <th>Versão / Semestre</th>
+                        <th>Tipo</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ppc in ppcs %}
+                    <tr>
+                        <td class="ps-4 fw-semibold text-primary">{{ ppc.course.name }}</td>
+                        <td>{{ ppc.version_semester }}</td>
+                        <td>{{ ppc.update_type }}</td>
+                        <td>
+                            {% if ppc.is_active %}
+                                <span class="badge bg-success">Vigente</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Em Elaboração</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <a href="{% url 'ppc_detail' ppc.pk %}" class="btn btn-sm btn-success" title="Montar Grade">
+                                <i class="bi bi-grid-3x3-gap"></i> Montar Grade
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            Nenhum PPC criado. Você precisa criar um PPC para começar a montar a grade de um curso.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

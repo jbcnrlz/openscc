@@ -1,0 +1,48 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Eixos Formativos - Odin{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h4 class="mb-0 text-secondary"><i class="bi bi-palette me-2"></i>Eixos Formativos</h4>
+        <a href="{% url 'formative_axis_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Novo Eixo Formativo
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4" style="width: 10%;">Cor</th>
+                        <th>Nome do Eixo Formativo</th>
+                        <th>Código Hex</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for axis in axes %}
+                    <tr>
+                        <td class="ps-4">
+                            <div style="width: 25px; height: 25px; border-radius: 50%; background-color: {{ axis.color }}; border: 1px solid #ccc;" title="{{ axis.color }}"></div>
+                        </td>
+                        <td class="fw-semibold text-dark">{{ axis.name }}</td>
+                        <td class="text-muted small"><code>{{ axis.color }}</code></td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-outline-secondary" disabled title="Editar em breve"><i class="bi bi-pencil"></i></button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">
+                            Nenhum Eixo Formativo cadastrado. Clique em "Novo Eixo Formativo" para definir suas cores.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -215,6 +215,7 @@ def generateQuestions(request):
                 fontes.append(fonte)
             
             # Gera as perguntas usando o serviço
+            print(qtd_perguntas)
             perguntas = getQuestionsFromSource(fontes, qtd_perguntas, contExtra)
             
             if not perguntas:
@@ -381,7 +382,7 @@ def gerarPerguntas(request):
             for tipo in tipos:
                 quantidade = int(request.POST[f'tipo_{tipo.id}'])
                 if quantidade and quantidade > 0:
-                    quantidades[str(tipo.id)] = quantidade
+                    quantidades[tipo.descricao] = quantidade
                     contExtra += f'- {quantidade} QUESTÕES DO TIPO {tipo.descricao}\n'
                     if tipo.textoParaLLM is not None:
                         contExtra += tipo.textoParaLLM + '\n'
@@ -393,7 +394,7 @@ def gerarPerguntas(request):
             if not fontes_selecionadas:
                 messages.error(request, 'Selecione pelo menos uma fonte.')
                 return render(request, 'mimir/gerarPerguntas.html', {'form': form})
-            
+            print(f"Quantidades: {quantidades}")
             iaResposta = processarRespostaIA(getQuestionsFromSource(fontesPaths, quantidades, contExtra))
             context = {
                 'perguntas': iaResposta['perguntas'] if 'perguntas' in iaResposta else [],

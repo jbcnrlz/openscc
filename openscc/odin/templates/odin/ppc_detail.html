@@ -1,0 +1,102 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Montar Matriz - {{ ppc.course.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="text-secondary mb-0"><i class="bi bi-grid-3x3-gap me-2"></i>Matriz Curricular</h3>
+        <p class="text-muted lead mb-0">{{ ppc.course.name }} - Versão {{ ppc.version_semester }}</p>
+    </div>
+    <a href="{% url 'ppc_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar aos PPCs</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        {% for semester_num, items in semesters.items %}
+        <div class="card shadow-sm border-0 mb-4 border-start border-primary border-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary fw-bold">{{ semester_num }}º Semestre</h5>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for item in items %}
+                
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3" style="border-left: 5px solid {{ item.discipline.formative_axis.color }};">
+                    <div>
+                        <span class="badge" style="background-color: {{ item.discipline.formative_axis.color }}; color: #ffffff;" title="{{ item.discipline.formative_axis.name }}">
+                            {{ item.discipline.code }}
+                        </span>
+                        
+                        <span class="fw-semibold text-dark ms-2">{{ item.discipline.name }}</span>
+                        
+                        {% if item.is_elective %}
+                            <span class="badge bg-warning text-dark ms-2"><i class="bi bi-star-fill"></i> Opcional</span>
+                        {% endif %}
+                        
+                        <div class="text-muted small mt-1">
+                            <i class="bi bi-journal-text me-1"></i> {{ item.discipline.total_classes }} aulas | 
+                            <i class="bi bi-person-video3 ms-2 me-1"></i> Oferta: {{ item.get_offering_display }} |
+                            
+                            <i class="bi bi-diagram-3 ms-2 me-1"></i> {{ item.discipline.formative_axis.name }}
+                        </div>
+                    </div>
+                    
+                    <form action="{% url 'matrix_item_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Tem a certeza de que deseja remover esta disciplina deste semestre?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover do Semestre">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% empty %}
+        <div class="alert alert-info border-0 shadow-sm">
+            <i class="bi bi-info-circle-fill me-2"></i> Nenhuma disciplina alocada ainda. Utilize o painel ao lado para começar a montar a grelha curricular!
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 bg-white sticky-top" style="top: 20px;">
+            <div class="card-header bg-success text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-node-plus me-2"></i>Alocar Disciplina</h5>
+            </div>
+            <div class="card-body">
+                <form action="{% url 'matrix_item_create' ppc.id %}" method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary small">Disciplina do Catálogo</label>
+                        {{ matrix_form.discipline }}
+                        <div class="form-text small">Apenas as disciplinas vinculadas a este curso aparecem aqui.</div>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary small">Semestre Alvo</label>
+                            {{ matrix_form.semester }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary small">Oferta</label>
+                            {{ matrix_form.offering }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-check mb-4 bg-light p-2 rounded border">
+                        <div class="ms-3 pt-1">
+                            {{ matrix_form.is_elective }}
+                            <label class="form-check-label small fw-bold text-dark">Marcar como Opcional (*)</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                        <i class="bi bi-plus-circle me-1"></i> Inserir no Semestre
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
