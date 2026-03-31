@@ -1,6 +1,6 @@
 {% extends 'odin/base.html' %}
 
-{% block title %}Montar Matriz - {{ ppc.course.name }}{% endblock %}
+{% block title %}Matriz Curricular - {{ ppc.course.name }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -30,35 +30,38 @@
                         <span class="fw-semibold text-dark ms-2">{{ item.discipline.name }}</span>
                         
                         {% if item.is_elective %}
-                            <span class="badge bg-warning text-dark ms-2"><i class="bi bi-star-fill"></i> Opcional</span>
+                            <span class="badge bg-warning text-dark ms-2"><i class="bi bi-star-fill"></i> Optativa</span>
                         {% endif %}
                         
                         <div class="text-muted small mt-1">
                             <i class="bi bi-journal-text me-1"></i> {{ item.discipline.total_classes }} aulas | 
                             <i class="bi bi-person-video3 ms-2 me-1"></i> Oferta: {{ item.get_offering_display }} |
-                            
                             <i class="bi bi-diagram-3 ms-2 me-1"></i> {{ item.discipline.formative_axis.name }}
                         </div>
                     </div>
                     
-                    <form action="{% url 'matrix_item_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Tem a certeza de que deseja remover esta disciplina deste semestre?');">
+                    {% if is_owner %}
+                    <form action="{% url 'matrix_item_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza de que deseja remover esta disciplina deste semestre?');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover do Semestre">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>
         </div>
         {% empty %}
         <div class="alert alert-info border-0 shadow-sm">
-            <i class="bi bi-info-circle-fill me-2"></i> Nenhuma disciplina alocada ainda. Utilize o painel ao lado para começar a montar a grelha curricular!
+            <i class="bi bi-info-circle-fill me-2"></i> Nenhuma disciplina alocada ainda na matriz deste curso.
         </div>
         {% endfor %}
     </div>
 
     <div class="col-lg-4">
+        
+        {% if is_owner %}
         <div class="card shadow-sm border-0 bg-white sticky-top" style="top: 20px;">
             <div class="card-header bg-success text-white py-3">
                 <h5 class="mb-0"><i class="bi bi-node-plus me-2"></i>Alocar Disciplina</h5>
@@ -68,9 +71,8 @@
                     {% csrf_token %}
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary small">Disciplina do Catálogo</label>
+                        <label class="form-label fw-bold text-secondary small">Disciplina do Catálogo Global</label>
                         {{ matrix_form.discipline }}
-                        <div class="form-text small">Apenas as disciplinas vinculadas a este curso aparecem aqui.</div>
                     </div>
                     
                     <div class="row g-2 mb-3">
@@ -87,7 +89,7 @@
                     <div class="form-check mb-4 bg-light p-2 rounded border">
                         <div class="ms-3 pt-1">
                             {{ matrix_form.is_elective }}
-                            <label class="form-check-label small fw-bold text-dark">Marcar como Opcional (*)</label>
+                            <label class="form-check-label small fw-bold text-dark">Marcar como Optativa (*)</label>
                         </div>
                     </div>
 
@@ -97,6 +99,23 @@
                 </form>
             </div>
         </div>
+        
+        {% else %}
+        <div class="card shadow-sm border-0 bg-light sticky-top border-top border-primary border-4" style="top: 20px;">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-eye text-primary mb-3" style="font-size: 3rem;"></i>
+                <h5 class="text-secondary fw-bold">Modo de Visualização</h5>
+                <hr class="w-50 mx-auto">
+                <p class="text-muted mt-3">
+                    Você está visualizando a matriz curricular do curso de <strong>{{ ppc.course.name }}</strong>.
+                </p>
+                <div class="alert alert-warning small text-start mt-4 mb-0">
+                    <i class="bi bi-shield-lock-fill me-1"></i> Apenas o(a) coordenador(a) <strong>Prof. {{ ppc.course.professor.username|title }}</strong> possui permissão para adicionar ou remover disciplinas desta matriz.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}
