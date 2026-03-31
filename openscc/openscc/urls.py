@@ -29,5 +29,6 @@ urlpatterns = [
     path('login', RedirectView.as_view(url='login/', permanent=True)),
     path("accounts/", include("django.contrib.auth.urls")),
     path("mimir/", include("mimir.urls")),
+    path('odin/', include('odin.urls')),
     path("", include("submission.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

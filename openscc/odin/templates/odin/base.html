@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Odin - Gestão Acadêmica{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        /* Ajuste fino para a altura do menu lateral ocupar toda a tela */
+        .sidebar {
+            min-height: 100vh;
+        }
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            transition: 0.2s;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .submenu-link {
+            font-size: 0.9em;
+            padding-left: 2.5rem !important;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container-fluid">
+        <div class="row flex-nowrap">
+            
+            <div class="col-auto col-md-3 col-xl-2 px-sm-2 px-0 bg-dark sidebar shadow">
+                <div class="d-flex flex-column align-items-center align-items-sm-start px-3 pt-4 text-white">
+                    
+                    <a href="{% url 'dashboard' %}" class="d-flex align-items-center pb-3 mb-md-0 me-md-auto text-white text-decoration-none border-bottom border-secondary w-100">
+                        <i class="bi bi-shield-shaded fs-3 me-2 text-primary"></i>
+                        <span class="fs-4 d-none d-sm-inline fw-bold">Odin</span>
+                    </a>
+                    
+                    <ul class="nav flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start w-100 mt-3" id="menu">
+                        
+                        <li class="nav-item w-100 mb-1">
+                            <a href="{% url 'dashboard' %}" class="nav-link px-3 align-middle">
+                                <i class="fs-5 bi bi-speedometer2 me-2"></i> <span class="d-none d-sm-inline">Painel Geral</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item w-100 mb-1">
+                            <a href="#submenuAcademico" data-bs-toggle="collapse" class="nav-link px-3 align-middle">
+                                <i class="fs-5 bi bi-mortarboard me-2"></i> 
+                                <span class="d-none d-sm-inline">Acadêmico</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.8em; float: right; margin-top: 5px;"></i>
+                            </a>
+                            <ul class="collapse show nav flex-column ms-1 w-100" id="submenuAcademico" data-bs-parent="#menu">
+                                <li class="w-100">
+                                    <a href="{% url 'course_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Meus Cursos</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'discipline_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Catálogo de Disciplinas</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'ppc_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Projetos Pedagógicos</span></a>
+                                </li>
+                            </ul>
+                        </li>
+
+<li class="nav-item w-100 mb-1">
+                            <a href="#submenuConfig" data-bs-toggle="collapse" class="nav-link px-3 align-middle">
+                                <i class="fs-5 bi bi-gear me-2"></i> 
+                                <span class="d-none d-sm-inline">Configurações</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.8em; float: right; margin-top: 5px;"></i>
+                            </a>
+                            <ul class="collapse nav flex-column ms-1 w-100" id="submenuConfig" data-bs-parent="#menu">
+                                <li class="w-100">
+                                    <a href="{% url 'axis_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Eixos Tecnológicos</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'modality_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Modalidades</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'formative_axis_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Eixos Formativos</span></a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <hr class="border-secondary w-100">
+                    
+                    <div class="dropdown pb-4 w-100 text-center text-sm-start">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle px-2" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle fs-4 text-secondary me-2"></i>
+                            <span class="d-none d-sm-inline small">
+                                Prof. {{ user.username|title }}
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser">
+                            <li><a class="dropdown-item" href="#">Meu Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#">Sair do Sistema</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col py-4 px-4 h-100" style="overflow-y: auto;">
+                {% block content %}
+                {% endblock %}
+            </div>
+            
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+{% extends 'base_openscc.html' %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-certificate"></i> 
+                Certificado de {{ certificado.get_tipo_certificado_display }}
+            </h4>
+        </div>
+        <div class="card-body text-center">
+            <!-- Certificado Design -->
+            {% with bg_color=certificado.layout.cor_fundo|default:'#f8f9fa' text_color=certificado.layout.cor_texto_corpo|default:'#333333' %}
+            <div class="certificado-container border p-5 mb-4" style="background-color: {{ bg_color }}; min-height: 600px;">
+                
+                <!-- Logos do Layout -->
+                {% if logos %}
+                <div class="logos-section mb-4">
+                    <div class="row justify-content-between align-items-center">
+                        {% for logo in logos %}
+                        <div class="col-auto">
+                            <div class="logo-instituicao mb-2">
+                                {% if logo.url %}
+                                <img src="{{ logo.url }}" 
+                                     alt="{{ logo.nome|default:'Logo' }}"
+                                     style="max-height: 60px; max-width: 150px;"
+                                     class="img-fluid">
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Logo do Evento -->
+                {% if logo_evento %}
+                <div class="logo-evento mb-4">
+                    <img src="{{ logo_evento }}" 
+                         alt="Logo do Evento"
+                         style="max-height: 80px;">
+                </div>
+                {% endif %}
+                
+                <!-- Se não houver logos específicos, mostrar logo da conferência -->
+                {% if not logos and not logo_evento and certificado.atividade.conferencia.logo %}
+                <div class="logo-conferencia mb-4">
+                    <img src="{{ certificado.atividade.conferencia.logo.url }}" 
+                         alt="{{ certificado.atividade.conferencia.nome }}"
+                         style="max-height: 80px;">
+                </div>
+                {% endif %}
+                
+                <div class="certificado-header mb-4">
+                    <h1 class="text-primary" 
+                        style="font-family: {{ certificado.layout.fonte_titulo|default:"'Times New Roman', serif" }};">
+                        CERTIFICADO
+                    </h1>
+                </div>
+                
+                <div class="certificado-body mb-4" 
+                     style="font-family: {{ certificado.layout.fonte_corpo|default:"'Arial', sans-serif" }}; 
+                            color: {{ text_color }};">
+                    
+                    <!-- Texto do Certificado -->
+
+                    
+                    <!-- Texto do layout se existir -->
+                    {% if texto_certificado %}
+                        <div class="mt-4">
+                            {{ texto_certificado|linebreaks }}
+                        </div>
+                    {% else %}
+                        <div class="mb-4">
+                            <p class="lead">
+                                Certificamos que <strong>{{ certificado.participante.get_full_name|default:certificado.participante.username }}</strong>
+                            </p>
+                            <p>                        
+                                {% if certificado.atividade %}
+                                    participou da atividade <strong>"{{ certificado.atividade.nome }}"</strong> 
+                                    realizada em <strong>{{ certificado.get_data_extenso }}</strong> 
+                                    na cidade de <strong>{{ certificado.get_cidade_evento }}</strong> 
+                                    como parte da <strong>{{ certificado.atividade.conferencia.nome }}</strong> 
+                                    no papel de <strong>{{ certificado.get_tipo_certificado_display }}</strong>
+                                    com carga horária de <strong>{{ certificado.carga_horaria }} horas</strong>.
+                                {% else %}
+                                    participou das atividades da <strong>{{ certificado.layout.conferencia.nome }}</strong>
+                                    realizada em <strong>{{ certificado.get_data_extenso }}</strong>
+                                    na cidade de <strong>{{ certificado.get_cidade_evento }}</strong>
+                                    no papel de <strong>{{ certificado.get_tipo_certificado_display }}</strong>
+                                    com carga horária total de <strong>{{ certificado.carga_horaria }} horas</strong>.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}                    
+                    
+                </div>
+                
+                <!-- Linha de local e data -->
+                <div class="local-data-section mt-4 mb-4">
+                    <div class="row justify-content-center">
+                        <div class="local-data-section mt-4 mb-4">
+                            <div class="row justify-content-end"> <div class="col-md-6 text-end"> <p><strong>{{ certificado.get_cidade_evento }}</strong>, 
+                                    <strong>{{ data_extenso }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Assinaturas -->
+                {% if assinaturas %}
+                <div class="certificado-footer mt-5">
+                    <div class="row justify-content-center">
+                        {% for assinatura in assinaturas %}
+                        <div class="col-md-3">
+                            <div class="assinatura mb-3">
+                                {% if assinatura.imagem %}
+                                <img src="{{ assinatura.imagem }}" 
+                                     alt="Assinatura {{ assinatura.nome }}"
+                                     style="max-height: 60px;">
+                                {% else %}
+                                <hr style="width: 80%; margin: 0 auto; border-top: 2px solid #000;">
+                                {% endif %}
+                                <p class="mt-2 mb-1"><strong>{{ assinatura.nome }}</strong></p>
+                                <small>{{ assinatura.cargo }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <!-- Assinaturas padrão -->
+                <div class="certificado-footer mt-5">
+                    <div class="row justify-content-center">
+                        <div class="col-md-4">
+                            <div class="assinatura mb-3">
+                                <hr style="width: 80%; margin: 0 auto; border-top: 2px solid #000;">
+                                <p class="mt-2 mb-1"><strong>Coordenação</strong></p>
+                                <small>{{ certificado.layout.conferencia.nome }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- QR Code e Informações -->
+                <div class="row mt-5">
+                    <div class="col-md-8 offset-md-2">
+                        <div class="qr-code-section p-3 border rounded">
+                            <div class="row align-items-center">
+                                <div class="col-md-4 text-center">
+                                    {% if qr_code %}
+                                    <img src="data:image/png;base64,{{ qr_code }}" 
+                                         alt="QR Code de Validação" 
+                                         class="img-fluid" 
+                                         style="max-width: 120px;">
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-8">
+                                    <p class="mb-1"><strong>Código de Validação:</strong></p>
+                                    <code class="small">{{ certificado.codigo_validacao }}</code>
+                                    <p class="mt-2 mb-0 small text-muted">
+                                        <i class="fas fa-info-circle"></i>
+                                        Certificado emitido em {{ certificado.data_emissao|date:"d/m/Y" }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Texto do Rodapé -->
+                {% if texto_rodape %}
+                <div class="rodape-certificado mt-4 pt-3 border-top">
+                    <p class="small">{{ texto_rodape }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endwith %}
+            
+            <!-- Botões de Ação -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-3">
+                <a href="{% url 'submission:meusCertificados' %}" class="btn btn-outline-primary btn-lg me-2">
+                    <i class="fas fa-list"></i> Meus Certificados
+                </a>
+                
+                <button class="btn btn-outline-info btn-lg me-2" 
+                        onclick="navigator.clipboard.writeText('{{ certificado.codigo_validacao }}'); 
+                                this.innerHTML = '<i class=\'fas fa-check\'></i> Código Copiado!';
+                                setTimeout(() => {this.innerHTML = '<i class=\'fas fa-copy\'></i> Copiar Código';}, 2000);">
+                    <i class="fas fa-copy"></i> Copiar Código
+                </button>
+                
+                <button class="btn btn-outline-success btn-lg" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir
+                </button>
+            </div>
+            
+            <!-- Informações Técnicas -->
+            <div class="alert alert-light mt-4 border">
+                <h5><i class="fas fa-info-circle"></i> Informações do Certificado</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <p class="mb-1"><strong>Cidade do Evento:</strong></p>
+                        <p>{{ certificado.get_cidade_evento }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-1"><strong>Data por Extenso:</strong></p>
+                        <p>{{ certificado.get_data_extenso }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-1"><strong>Ano:</strong></p>
+                        <p>{{ certificado.data_atividade.year }}</p>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Código de Validação:</strong></p>
+                        <code>{{ certificado.codigo_validacao }}</code>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Data de Emissão:</strong></p>
+                        <p>{{ certificado.data_emissao|date:"d/m/Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.certificado-container {
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    position: relative;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+}
+
+.certificado-header h1 {
+    font-size: 2.5rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+}
+
+.certificado-body {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin: 20px 0;
+}
+
+.certificado-body .lead {
+    font-size: 1.3rem;
+    margin-bottom: 30px;
+}
+
+.assinatura {
+    min-height: 120px;
+    padding: 10px;
+}
+
+.qr-code-section {
+    background-color: rgba(255,255,255,0.8);
+}
+
+.local-data-section hr {
+    border-top: 1px solid #ddd;
+    width: 80%;
+    margin: 0 auto 15px auto;
+}
+
+.local-data-section p {
+    margin-bottom: 0.2rem;
+}
+
+/* Estilos para impressão */
+@media print {
+    .card-header, .alert, .btn-group, .btn {
+        display: none !important;
+    }
+    
+    .certificado-container {
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        min-height: auto !important;
+        page-break-inside: avoid;
+    }
+    
+    body {
+        background-color: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .certificado-body .lead {
+        font-size: 1.2rem !important;
+    }
+    
+    .qr-code-section {
+        border: 1px solid #ccc !important;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar se há cidade definida
+    const cidadeElement = document.querySelector('.local-data-section .col-md-6:first-child strong');
+    if (cidadeElement && cidadeElement.textContent === 'Local do Evento') {
+        cidadeElement.style.color = '#dc3545';
+    }
+    
+    // Feedback visual para botões
+    const copyButtons = document.querySelectorAll('[onclick*="clipboard"]');
+    copyButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            this.classList.add('btn-success');
+            this.classList.remove('btn-outline-info');
+            
+            setTimeout(() => {
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-info');
+            }, 2000);
+        });
+    });
+});
+</script>
+{% endblock %}

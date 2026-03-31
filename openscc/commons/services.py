@@ -17,7 +17,7 @@ def get_llm():
         print("Usando modelo Ollama Gemma 3 localmente")
         return ChatOllama(
             model="gemma3:12b",
-            temperature=0.1
+            temperature=0.7
             #base_url="http://192.168.86.20:11434",
         )
     return ChatGoogleGenerativeAI(
@@ -191,14 +191,9 @@ IMPORTANTE, SIGA ESSAS INSTRUÇÕES SEM FALHA - Esta parte deve:
 - Integre as fontes de referência quando relevante
 - Mantenha o mesmo nível de detalhe e complexidade
 - Siga as instruções de layout fornecidas na estruturação do caso
-- Identificação e Queixa: Dados sociodemográficos e motivo da consulta.
-- Relato Espontâneo: Citações diretas da paciente expressando sentimentos, dúvidas e ansiedades (essencial para a dimensão biopsicossocial).
-- Anamnese e Exame Físico: Descrição técnica detalhada, incluindo sinais vitais e dados antropométricos.
-- Exames Complementares: Resultados com Valores de Referência (VR).
-- Evolução: Progressão no tempo (ex: retorno semanas depois) e desfecho (ex: descrição da placenta e parto).
 
 OBSERVAÇÕES FINAIS:
-- O problema deve ter um título relevante (por exemplo: Naila vai ter um bebê) e isso deve aparecer na parte 1, mas não precisa ser repetido nas partes seguintes.
+- O problema deve ter um título relevante e isso deve aparecer na parte 1, mas não precisa ser repetido nas partes seguintes.
 - Mantenha o fluxo narrativo natural, como se fosse uma história real.
 - Não adicione * ou qualquer outro tipo de caracter de marcação.
 - Sempre que forem os personagens da história falando, coloque o conteúdo entre aspas
@@ -223,7 +218,7 @@ GERE {total_perguntas} QUESTÕES DE PROVA SOBRE O ASSUNTO:
 
 # INSTRUÇÕES DE FORMATO:
 - GERE O GABARITO DE TODAS
-- PARA AS DISCURSIVAS, GERE O PADRÃO DE RESPOSTA ESPERADO        
+- PARA AS DISSERTATIVAS, GERE O PADRÃO DE RESPOSTA ESPERADO        
 - FORMATE TODA A SAÍDA EM JSON COM A CHAVE "perguntas" E O VALOR SENDO UM ARRAY DE OBJETOS COM "tipo", "enunciado", "alternativa" E "resposta"
 - NÃO UTILIZE NENHUMA TAG HTML
 - AO GERAR AS ALTERNATIVAS, UTILIZE LETRAS PARA IDENTIFICAR CADA ALTERNATIVA
@@ -232,10 +227,13 @@ GERE {total_perguntas} QUESTÕES DE PROVA SOBRE O ASSUNTO:
 - A CHAVE "alternativas", EM CASO DE QUESTÃO QUE AS TENHAM, NO JSON SEMPRE DEVE SER UM ARRAY E NUNCA UM OBJETO
 - O PADRÃO DE RESPOSTA E O GABARITO DE ALTERNATIVAS DEVEM FICAR NA CHAVE "resposta"
 - CONTEMPLE TODOS OS MATERIAIS PARA A GERAÇÃO DAS QUESTÕES, OU SEJA, PELO MENOS UMA QUESTÃO DE CADA TEMA SOLICITADO
+- VOCÊ DEVE GERAR EXATAMENTE O NÚMERO DE QUESTÕES SOLICITADO PARA CADA TIPO, NEM MAIS, NEM MENOS
+- NO CAMPO TIPO DO JSON COLOQUE O TIPO DE QUESTÃO SOLICITADO CONFORME ENVIADO PELO PROMPT
+- O TIPO DEVE SER IGUAL AO TIPO SOLICITADO
 {format_instructions}
 
 REGRAS:
-Para questões discursivas: use "alternativas": null
+Para questões dissertativas: use "alternativas": null
 Para múltipla escolha: "alternativas" deve ter 5 itens no formato "A) texto"
 Use apenas aspas duplas
 Não adicione texto fora do JSON
@@ -368,7 +366,7 @@ def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
 def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
     """Gera questões a partir do conteúdo do PDF usando LangChain com JSON parsing"""
     totalPerguntas = sum(qtPerguntas.values())
-    textoPerguntas = "\n".join([f"- {qtPerguntas[k]} de {k}" for k in qtPerguntas])
+    textoPerguntas = "\n".join([f"{k};" for k in qtPerguntas])
     
     try:
         # Extrair texto do PDF
@@ -381,9 +379,10 @@ def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
         # Limitar tamanho para evitar timeout
         conteudo_limitado = completoTudo
         
-        # Criar chain com parser JSON
+        # Criar chain com parser JSON        
         prompt_template, parser = criar_template_questoes()
-        
+        print(prompt_template)
+
         chain = prompt_template | get_llm() | parser
         
         # Invocar chain
@@ -394,7 +393,7 @@ def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
             "info_extras": infoExtras,
             "format_instructions": parser.get_format_instructions()
         }
-
+        print(inputs)
         response = invoke_chain(chain, inputs, endpoint='getQuestionsFromSource', 
                                 user=user)
         

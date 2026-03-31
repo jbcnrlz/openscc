@@ -1,0 +1,82 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Dashboard - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-secondary"><i class="bi bi-speedometer2 me-2"></i>Visão Geral</h2>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted fw-bold text-uppercase mb-1">Cursos Cadastrados</h6>
+                        <h3 class="mb-0 text-dark">{{ total_courses }}</h3>
+                    </div>
+                    <div class="text-primary opacity-50">
+                        <i class="bi bi-mortarboard fs-1"></i>
+                    </div>
+                </div>
+                <a href="{% url 'course_list' %}" class="text-decoration-none mt-3 d-block text-primary small fw-bold">
+                    Gerenciar Cursos <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted fw-bold text-uppercase mb-1">Catálogo de Disciplinas</h6>
+                        <h3 class="mb-0 text-dark">{{ total_disciplines }}</h3>
+                    </div>
+                    <div class="text-success opacity-50">
+                        <i class="bi bi-journals fs-1"></i>
+                    </div>
+                </div>
+                <a href="{% url 'discipline_list' %}" class="text-decoration-none mt-3 d-block text-success small fw-bold">
+                    Gerenciar Disciplinas <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted fw-bold text-uppercase mb-1">PPCs Vigentes</h6>
+                        <h3 class="mb-0 text-dark">{{ active_ppcs }}</h3>
+                    </div>
+                    <div class="text-warning opacity-50">
+                        <i class="bi bi-file-earmark-text fs-1"></i>
+                    </div>
+                </div>
+                <a href="#" class="text-decoration-none mt-3 d-block text-warning small fw-bold">
+                    Gerenciar Projetos Pedagógicos <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4 class="text-secondary mb-3">Acesso Rápido</h4>
+<div class="row g-3">
+    <div class="col-md-3">
+        <a href="{% url 'course_create' %}" class="btn btn-outline-primary w-100 text-start py-3">
+            <i class="bi bi-plus-circle me-2"></i> Novo Curso
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{% url 'discipline_create' %}" class="btn btn-outline-success w-100 text-start py-3">
+            <i class="bi bi-plus-circle me-2"></i> Nova Disciplina
+        </a>
+    </div>
+</div>
+{% endblock %}

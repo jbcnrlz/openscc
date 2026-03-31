@@ -1,0 +1,138 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}
+    {% if form.instance.pk %}Editar Disciplina{% else %}Nova Disciplina{% endif %} - Odin
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0">
+                    <i class="bi bi-journal-plus me-2"></i>
+                    {% if form.instance.pk %}
+                        Editar Disciplina: {{ form.instance.code }}
+                    {% else %}
+                        Cadastrar Nova Disciplina
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body bg-white p-4">
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger shadow-sm mb-4 border-start border-danger border-4">
+                        <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção:</strong> 
+                        Não foi possível guardar a disciplina. Verifica os erros abaixo:
+                        <ul class="mb-0 mt-2 text-danger small">
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary">Sigla</label>
+                            {{ form.code }}
+                            {% if form.code.errors %}<div class="text-danger small mt-1">{{ form.code.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold text-secondary">Nome da Disciplina</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Eixo Formativo</label>
+                            {{ form.formative_axis }}
+                            {% if form.formative_axis.errors %}<div class="text-danger small mt-1">{{ form.formative_axis.errors.0 }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-6 mt-4">
+                            <div class="p-3 bg-light border rounded h-100 {% if form.courses.errors %}border-danger{% endif %}">
+                                <label class="form-label fw-bold text-primary mb-1">Cursos Vinculados *</label>
+                                <p class="text-muted small mb-2">Pressiona <code>Ctrl</code> para selecionar múltiplos.</p>
+                                {{ form.courses }}
+                                {% if form.courses.errors %}<div class="text-danger small mt-2 fw-bold">{{ form.courses.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mt-4">
+                            <div class="p-3 bg-light border rounded h-100 {% if form.prerequisites.errors %}border-danger{% else %}border-warning{% endif %}">
+                                <label class="form-label fw-bold text-warning mb-1">Pré-requisitos (Opcional)</label>
+                                <p class="text-muted small mb-2">Disciplinas exigidas antes desta.</p>
+                                {{ form.prerequisites }}
+                                {% if form.prerequisites.errors %}<div class="text-danger small mt-2 fw-bold">{{ form.prerequisites.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-secondary border-bottom pb-2">Distribuição de Carga Horária (Aulas)</h6>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Teóricas (Sala)</label>
+                            {{ form.theory_classes }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Práticas (Laboratório)</label>
+                            {{ form.lab_classes }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">On-line (Síncronas)</label>
+                            {{ form.online_classes }}
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-secondary border-bottom pb-2">Detalhes Pedagógicos</h6>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary">Objetivos de Aprendizagem</label>
+                            {{ form.learning_objectives }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary">Ementa</label>
+                            {{ form.syllabus }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Metodologias Propostas</label>
+                            {{ form.methodology }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Instrumentos de Avaliação</label>
+                            {{ form.assessment_criteria }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Bibliografia Básica</label>
+                            {{ form.basic_bibliography }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">Bibliografia Complementar</label>
+                            {{ form.complementary_bibliography }}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'discipline_list' %}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-circle me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i> Guardar Disciplina
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
