@@ -94,5 +94,6 @@ urlpatterns = [
      path('assuntos/vinculos/', views.listarAssuntosVinculos, name='listarAssuntosVinculos'),
      path('problema/<int:problema_id>/guia-tutor/editar/', 
          EditarGuiaTutorView.as_view(), 
-         name='editarGuiaTutor')
+         name='editarGuiaTutor'),
+     path('perguntas/criar/', views.criarPergunta, name='criarPergunta'),
 ]
