@@ -273,12 +273,83 @@
     </div>
 </div>
 
+<!-- Modal de Alerta de Foco (Anti-Cola) -->
+<div class="modal fade" id="alertaFocoModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Atenção: Saída de Tela Detectada</h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-desktop fa-3x text-danger mb-3"></i>
+                <p class="fs-5">Detectamos que você saiu da aba ou janela da prova.</p>
+                <div class="alert alert-warning mt-3">
+                    <strong>Avisos: <span id="contador-avisos" class="fs-4">0</span> de 3</strong>
+                </div>
+                <p class="text-muted small mb-0">Por regras de segurança, se você sair da tela da prova 3 vezes, sua avaliação será <strong>finalizada automaticamente</strong>.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">Entendi, retornarei à prova</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ===== DECLARAÇÃO DE VARIÁVEIS GLOBAIS =====
 let respostasSalvas = new Set();
 let tempoRestante = {{ aplicacao.tempo_limite.total_seconds|default:7200|stringformat:"d" }};
 
-// ===== DECLARAÇÃO DE TODAS AS FUNÇÕES PRIMEIRO =====
+// Variáveis para o Tab Focus (Anti-cola)
+let avisosSaida = 0;
+const MAX_AVISOS = 3;
+let provaFinalizadaPorInfracao = false; 
+
+// ===== DECLARAÇÃO DE TODAS AS FUNÇÕES =====
+
+// Funções de Monitoramento (Anti-Cola)
+function configurarMonitoramentoTab() {
+    // 1. Detecta quando o aluno troca de aba ou minimiza o navegador
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && !provaFinalizadaPorInfracao) {
+            registrarInfracao();
+        }
+    });
+
+    // 2. Detecta quando a janela perde o foco
+    window.addEventListener('blur', function() {
+        setTimeout(() => {
+            if (!document.hasFocus() && !document.hidden && !provaFinalizadaPorInfracao) {
+                registrarInfracao();
+            }
+        }, 200);
+    });
+}
+
+function registrarInfracao() {
+    // Se algum modal já estiver aberto (como o de finalização), ignoramos
+    if (document.body.classList.contains('modal-open') && !document.getElementById('alertaFocoModal').classList.contains('show')) {
+        return;
+    }
+
+    avisosSaida++;
+    
+    if (avisosSaida >= MAX_AVISOS) {
+        provaFinalizadaPorInfracao = true;
+        alert('LIMITE EXCEDIDO: Você saiu da tela da prova muitas vezes. A avaliação será finalizada agora.');
+        finalizarProvaAutomaticamente();
+    } else {
+        // Atualiza o contador e exibe o modal
+        const contadorElement = document.getElementById('contador-avisos');
+        if (contadorElement) {
+            contadorElement.textContent = avisosSaida;
+        }
+        
+        const modalElement = document.getElementById('alertaFocoModal');
+        const alertaModal = new bootstrap.Modal(modalElement);
+        alertaModal.show();
+    }
+}
 
 // Timer
 function iniciarTimer() {
@@ -324,32 +395,30 @@ function mostrarAlertaTempo(tempo) {
 function finalizarProvaAutomaticamente() {
     // Salvar todas as respostas antes de finalizar
     salvarTodasRespostas().then(() => {
-        alert('Tempo esgotado! A prova será finalizada automaticamente.');
+        if (!provaFinalizadaPorInfracao) {
+            alert('Tempo esgotado! A prova será finalizada automaticamente.');
+        }
         window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
     });
 }
 
 // ===== FUNÇÕES PARA UPLOAD DE ARQUIVO =====
 
-// Alternar entre upload e texto
 function toggleRespostaTexto(perguntaId) {
     const uploadContainer = document.getElementById(`upload-container-${perguntaId}`);
     const textareaContainer = document.getElementById(`textarea-container-${perguntaId}`);
     
     if (textareaContainer.style.display === 'none') {
-        // Mostrar textarea, ocultar upload
         textareaContainer.style.display = 'block';
         uploadContainer.querySelector('.border').style.display = 'none';
         uploadContainer.querySelector('.mt-3 button').style.display = 'none';
     } else {
-        // Mostrar upload, ocultar textarea
         textareaContainer.style.display = 'none';
         uploadContainer.querySelector('.border').style.display = 'block';
         uploadContainer.querySelector('.mt-3 button').style.display = 'block';
     }
 }
 
-// Remover arquivo de resposta
 function removerArquivoResposta(perguntaId) {
     if (confirm('Tem certeza que deseja remover este arquivo?')) {
         const statusElement = document.getElementById(`status-${perguntaId}`);
@@ -364,13 +433,12 @@ function removerArquivoResposta(perguntaId) {
             },
             body: JSON.stringify({
                 pergunta_id: perguntaId,
-                resposta_texto: '' // Resposta vazia remove o arquivo
+                resposta_texto: '' 
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                // Recarregar a página para atualizar a interface
                 location.reload();
             } else {
                 throw new Error(data.message || 'Erro ao remover arquivo');
@@ -383,7 +451,6 @@ function removerArquivoResposta(perguntaId) {
     }
 }
 
-// Upload de arquivo
 function uploadArquivoResposta(perguntaId, arquivo) {
     const statusElement = document.getElementById(`status-${perguntaId}`);
     const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
@@ -416,7 +483,6 @@ function uploadArquivoResposta(perguntaId, arquivo) {
             
             atualizarContadores();
             
-            // Recarregar após um tempo para mostrar o arquivo
             setTimeout(() => {
                 location.reload();
             }, 1500);
@@ -428,7 +494,6 @@ function uploadArquivoResposta(perguntaId, arquivo) {
         console.error('Erro ao enviar arquivo:', error);
         statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao enviar';
         
-        // Tentar novamente após 5 segundos
         setTimeout(() => {
             const inputArquivo = document.getElementById(`arquivo-${perguntaId}`);
             if (inputArquivo.files.length > 0) {
@@ -438,7 +503,6 @@ function uploadArquivoResposta(perguntaId, arquivo) {
     });
 }
 
-// Preview do arquivo selecionado
 function configurarPreviewArquivo(perguntaId) {
     const inputArquivo = document.getElementById(`arquivo-${perguntaId}`);
     const previewContainer = document.getElementById(`preview-arquivo-${perguntaId}`);
@@ -449,7 +513,6 @@ function configurarPreviewArquivo(perguntaId) {
             const file = this.files[0];
             const fileSize = (file.size / (1024 * 1024)).toFixed(2);
             
-            // Validar tamanho
             if (file.size > 10 * 1024 * 1024) {
                 alert('Arquivo muito grande. Tamanho máximo: 10MB');
                 this.value = '';
@@ -457,7 +520,6 @@ function configurarPreviewArquivo(perguntaId) {
                 return;
             }
             
-            // Validar tipo
             const tiposPermitidos = [
                 'application/pdf',
                 'application/msword',
@@ -483,7 +545,6 @@ function configurarPreviewArquivo(perguntaId) {
             `;
             previewContainer.style.display = 'block';
             
-            // Upload automático após seleção
             uploadArquivoResposta(perguntaId, file);
         } else {
             previewContainer.style.display = 'none';
@@ -491,18 +552,14 @@ function configurarPreviewArquivo(perguntaId) {
     });
 }
 
-// Salvar resposta via AJAX (texto)
 function salvarResposta(perguntaId, respostaTexto = null) {
-    // Se não foi passada a resposta, buscar do elemento apropriado
     if (respostaTexto === null) {
         const textarea = document.getElementById(`resposta-${perguntaId}`);
         const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
         
         if (radioSelecionado) {
-            // É uma pergunta de múltipla escolha
             respostaTexto = radioSelecionado.value;
         } else if (textarea) {
-            // É uma pergunta de resposta aberta
             respostaTexto = textarea.value;
         } else {
             respostaTexto = '';
@@ -512,9 +569,7 @@ function salvarResposta(perguntaId, respostaTexto = null) {
     const statusElement = document.getElementById(`status-${perguntaId}`);
     const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
     
-    // Se estiver vazio, não salva imediatamente (aguarda auto-save)
     if (!respostaTexto.trim()) {
-        // Remove do conjunto de respostas salvas se estiver vazio
         if (respostasSalvas.has(perguntaId)) {
             respostasSalvas.delete(perguntaId);
             badgeElement.innerHTML = '<i class="fas fa-clock text-warning"></i> Pendente';
@@ -525,7 +580,6 @@ function salvarResposta(perguntaId, respostaTexto = null) {
         return;
     }
     
-    // Atualizar visualmente imediatamente
     statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Salvando...';
     
     fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
@@ -567,7 +621,6 @@ function salvarResposta(perguntaId, respostaTexto = null) {
         console.error('Erro ao salvar resposta:', error);
         statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao salvar';
         
-        // Tentar novamente após 5 segundos se ainda houver resposta
         const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
         const textarea = document.getElementById(`resposta-${perguntaId}`);
         if ((radioSelecionado && radioSelecionado.value.trim()) || (textarea && textarea.value.trim())) {
@@ -576,11 +629,9 @@ function salvarResposta(perguntaId, respostaTexto = null) {
     });
 }
 
-// Função auxiliar para salvar resposta individual (usada no salvamento em lote)
 function salvarRespostaIndividual(perguntaId) {
     let respostaTexto = '';
     
-    // Verificar se é múltipla escolha ou resposta aberta
     const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
     const textarea = document.getElementById(`resposta-${perguntaId}`);
     
@@ -622,23 +673,19 @@ function salvarRespostaIndividual(perguntaId) {
     });
 }
 
-// Salvar todas as respostas antes de finalizar
 function salvarTodasRespostas() {
     const promises = [];
     const perguntaIds = new Set();
     
-    // Coletar todas as perguntas
     {% for pergunta in perguntas %}
         perguntaIds.add({{ pergunta.id }});
     {% endfor %}
     
-    // Para cada pergunta, tentar salvar
     perguntaIds.forEach(perguntaId => {
         promises.push(
             salvarRespostaIndividual(perguntaId)
                 .catch(error => {
                     console.error(`Erro ao salvar questão ${perguntaId}:`, error);
-                    // Continua mesmo com erro, mas marca como não salvo
                     return {status: 'error', perguntaId: perguntaId};
                 })
         );
@@ -652,7 +699,6 @@ function atualizarContadores() {
     const respondidas = respostasSalvas.size;
     const pendentes = total - respondidas;
     
-    // Atualizar todos os contadores
     const contadorRespostasHeader = document.getElementById('contador-respostas-header');
     const contadorPendentesHeader = document.getElementById('contador-pendentes-header');
     const contadorRespostasFinal = document.getElementById('contador-respostas-final');
@@ -665,7 +711,6 @@ function atualizarContadores() {
     if (contadorRespostasModal) contadorRespostasModal.textContent = respondidas;
     if (contadorPendentesModal) contadorPendentesModal.textContent = pendentes;
     
-    // Atualizar cores dos contadores
     if (contadorPendentesHeader) {
         contadorPendentesHeader.className = pendentes > 0 ? 'text-warning' : 'text-success';
     }
@@ -677,7 +722,6 @@ function atualizarContadores() {
 // ===== INICIALIZAÇÃO E EVENT LISTENERS =====
 
 function inicializarProva() {
-    // Inicializar contador de respostas salvas
     {% for pergunta in perguntas %}
         {% with resposta_existente=respostas_existentes|get_item:pergunta.id %}
         {% if resposta_existente and resposta_existente.resposta_texto.strip %}
@@ -689,13 +733,11 @@ function inicializarProva() {
         {% endwith %}
     {% endfor %}
 
-    // Se a prova já foi iniciada, calcular tempo restante baseado no início
     {% if prova_aluno.data_inicio %}
         const tempoDecorrido = Math.floor((new Date().getTime() - new Date('{{ prova_aluno.data_inicio|date:"c" }}').getTime()) / 1000);
         tempoRestante = Math.max(0, {{ aplicacao.tempo_limite.total_seconds|default:7200|stringformat:"d" }} - tempoDecorrido);
     {% endif %}
 
-    // Configurar upload de arquivo para perguntas que aceitam
     {% for pergunta in perguntas %}
         {% if pergunta.aceita_upload_resposta %}
         configurarPreviewArquivo({{ pergunta.id }});
@@ -704,15 +746,16 @@ function inicializarProva() {
 
     atualizarContadores();
     iniciarTimer();
+    
+    // Iniciar o monitoramento de foco (Anti-cola)
+    configurarMonitoramentoTab(); 
 
-    // Configurar modal de finalização
     const finalizarModal = document.getElementById('finalizarModal');
     
     if (finalizarModal) {
         finalizarModal.addEventListener('show.bs.modal', function() {
             atualizarContadores();
             
-            // Listar questões pendentes
             const listaPendentes = document.getElementById('lista-pendentes');
             const alertPendentes = document.getElementById('alert-pendentes');
             const total = {{ perguntas|length }};
@@ -720,7 +763,6 @@ function inicializarProva() {
             
             if (pendentes > 0 && listaPendentes && alertPendentes) {
                 let listaHTML = '';
-                // Percorre todas as perguntas para encontrar as pendentes
                 {% for pergunta in perguntas %}
                     if (!respostasSalvas.has({{ pergunta.id }})) {
                         listaHTML += `<span class="badge bg-warning me-1 mb-1">Questão {{ forloop.counter }}</span>`;
@@ -733,11 +775,9 @@ function inicializarProva() {
             }
         });
         
-        // Botão de finalização confirmado
         const btnFinalizar = document.getElementById('btn-finalizar-confirmado');
         if (btnFinalizar) {
             btnFinalizar.addEventListener('click', function() {
-                // Desabilitar botão para evitar múltiplos cliques
                 this.disabled = true;
                 this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Finalizando...';
                 
@@ -748,7 +788,6 @@ function inicializarProva() {
         }
     }
     
-    // Adicionar rolagem suave para as questões
     document.querySelectorAll('.questao-item .card-header').forEach(header => {
         header.style.cursor = 'pointer';
         header.addEventListener('click', function() {
@@ -756,42 +795,35 @@ function inicializarProva() {
         });
     });
 
-    // Adicionar event listeners para os textareas
     document.querySelectorAll('.resposta-texto').forEach(textarea => {
         textarea.addEventListener('keyup', function() {
             const perguntaId = this.dataset.perguntaId;
-            // Debounce para evitar muitas requisições
             clearTimeout(this._timeout);
             this._timeout = setTimeout(() => {
                 salvarResposta(perguntaId);
-            }, 1000); // Espera 1 segundo após a última tecla
+            }, 1000); 
         });
     });
 
-    // Adicionar event listeners para os radio buttons
     document.querySelectorAll('.alternativa-radio').forEach(radio => {
         radio.addEventListener('change', function() {
             const perguntaId = this.dataset.perguntaId;
-            // Salvar imediatamente quando selecionar uma alternativa
             salvarResposta(perguntaId);
         });
     });
 
-    // Auto-save periódico
     setInterval(() => {
-        // Para questões de múltipla escolha, não precisa salvar periodicamente pois já salvam automaticamente
-        // Apenas para questões de resposta aberta
         document.querySelectorAll('.resposta-texto').forEach(textarea => {
             if (textarea.value.trim()) {
                 const perguntaId = textarea.dataset.perguntaId;
                 salvarResposta(perguntaId);
             }
         });
-    }, 30000); // Salva a cada 30 segundos
+    }, 30000); 
 
-    // Prevenir saída acidental da página
     window.addEventListener('beforeunload', function(e) {
-        if (respostasSalvas.size > 0) {
+        // Ignora o aviso se a prova está sendo finalizada por infração
+        if (respostasSalvas.size > 0 && !provaFinalizadaPorInfracao) {
             e.preventDefault();
             e.returnValue = 'Você tem respostas não salvas. Tem certeza que deseja sair?';
             return e.returnValue;
@@ -833,7 +865,6 @@ document.addEventListener('DOMContentLoaded', function() {
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
-/* Estilo para o preview de arquivo */
 .preview-arquivo {
     transition: all 0.3s ease;
 }
