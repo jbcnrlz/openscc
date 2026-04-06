@@ -2484,3 +2484,53 @@ def parse_gemini_response(resultado):
         return nota, feedback
     except Exception as e:
         return 0, "Erro crítico no processamento da resposta."
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def criarPergunta(request):
+    if request.method == 'POST':
+        # Instancia o form vazio com os dados do POST (supondo que o PerguntaForm exija request.user)
+        form = PerguntaForm(request.user, request.POST, request.FILES)
+        
+        if form.is_valid():
+            try:
+                pergunta = form.save()
+                
+                # Processar upload de imagens
+                novas_imagens = request.FILES.getlist('imagens')
+                for imagem in novas_imagens:
+                    if imagem.content_type not in ['image/jpeg', 'image/png', 'image/gif']:
+                        messages.error(request, f'Arquivo {imagem.name} não é uma imagem válida.')
+                        continue
+                    
+                    if imagem.size > 5 * 1024 * 1024:  # 5MB
+                        messages.error(request, f'Imagem {imagem.name} é muito grande (máximo 5MB).')
+                        continue
+                    
+                    ImagemPergunta.objects.create(pergunta=pergunta, imagem=imagem)
+                
+                messages.success(request, 'Pergunta criada com sucesso!')
+                
+                # Redirecionamento conforme o botão clicado
+                if 'salvar_e_ver' in request.POST:
+                    return redirect('mimir:visualizarPergunta', pergunta.id)
+                elif 'salvar_e_adicionar_outra' in request.POST:
+                    return redirect('mimir:criarPergunta')
+                else:
+                    return redirect('mimir:visualizarPerguntas')
+                    
+            except Exception as e:
+                messages.error(request, f'Erro ao criar pergunta: {str(e)}')
+                print(f"Erro detalhado: {e}")
+        else:
+            messages.error(request, 'Por favor, corrija os erros no formulário.')
+            print(f"Erros do formulário: {form.errors}")
+    else:
+        # Requer instanciar o form apenas com o user
+        form = PerguntaForm(request.user)
+
+    return render(request, 'mimir/criarPergunta.html', {
+        'form': form,
+        'titulo': 'Criar Nova Pergunta'
+    })
