@@ -21,7 +21,7 @@ def get_llm():
             #base_url="http://192.168.86.20:11434",
         )
     return ChatGoogleGenerativeAI(
-        model="gemini-3-flash",  # ou "gemini-1.5-flash"
+        model="gemini-3.1-flash-lite",  # ou "gemini-1.5-flash"
         google_api_key=settings.GEMINI_API_KEY,
         temperature=0.7,
         max_tokens=None,
