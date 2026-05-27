@@ -29,6 +29,27 @@ def get_llm():
         max_retries=2,
     )
 
+def extrair_texto_puro(content):
+    """
+    Extrai o texto puro da resposta do LangChain, lidando com casos onde 
+    o conteúdo é retornado como uma lista de blocos (comportamento comum do Gemini).
+    """
+    if isinstance(content, str):
+        return content.strip()
+    
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            # Se for um dicionário, pega a chave 'text'
+            if isinstance(block, dict) and 'text' in block:
+                text_parts.append(block['text'])
+            # Se for string perdida na lista
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return "\n".join(text_parts).strip()
+        
+    return str(content).strip()
+
 def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
     """
     Executa uma chain do LangChain e registra o log.
@@ -309,7 +330,7 @@ def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fonte
 
     response = invoke_chain(chain, inputs, endpoint='regerarParte',user=user)
     
-    return response.content if hasattr(response, 'content') else str(response)
+    return extrair_texto_puro(response.content) if hasattr(response, 'content') else str(response)
 
 def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, contexto_anterior, fontes, instrucoes_layout="", user=None):
     """Cria parte do problema usando LangChain"""
@@ -328,7 +349,7 @@ def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, co
 
     response = invoke_chain(chain, inputs, endpoint='criarPromptParaParte', user=user)
     
-    return response.content if hasattr(response, 'content') else str(response)
+    return extrair_texto_puro(response.content) if hasattr(response, 'content') else str(response)
 
 def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
     llm = get_llm()
@@ -341,9 +362,10 @@ def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
     try:
         response = llm.invoke(prompt)
         if hasattr(response, 'content'):
-            response_content = response.content
+            # Usando a nova função aqui
+            response_content = extrair_texto_puro(response.content)
         else:
-            response_content = str(response)
+            response_content = extrair_texto_puro(response)
     except Exception as e:
         status = 'error'
         error = str(e)
