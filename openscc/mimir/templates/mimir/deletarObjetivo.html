@@ -1,0 +1,28 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> Remover Objetivo</h5>
+                </div>
+                <div class="card-body p-4 text-center">
+                    <p>Tem certeza que deseja remover permanentemente este objetivo do ecossistema pedagógico?</p>
+                    <div class="p-3 bg-light rounded text-dark border mb-4">
+                        <em>"{{ objective.descricao }}"</em>
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="{% url 'mimir:listarObjetivos' %}" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-danger px-4">Confirmar Exclusão</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -161,50 +161,62 @@ class GerarProblemaForm(forms.Form):
     tema = forms.ModelChoiceField(
         queryset=Tema.objects.none(),
         label="Tema",
-        required=True
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     assunto = forms.ModelChoiceField(
-        queryset=Assunto.objects.all(),
+        queryset=Assunto.objects.none(), # Alterado para none() na declaração
         label="Assunto",
-        required=True
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     fontes = forms.ModelMultipleChoiceField(
         queryset=Fontes.objects.none(),
         label="Fontes de Referência",
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         help_text="Selecione as fontes que serão usadas como base para gerar o problema"
     )
     objetivos = forms.ModelMultipleChoiceField(
-        queryset=ObjetivosAprendizagem.objects.all(),
+        queryset=ObjetivosAprendizagem.objects.none(), # Alterado para none() preventivamente
         label="Objetivos de Aprendizagem",
         required=True,
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'})
     )
     num_partes = forms.IntegerField(
         label="Número de Partes",
         min_value=1,
         max_value=10,
         initial=3,
-        required=True
+        required=True,
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
     )
     contexto_inicial = forms.CharField(
         label="Contexto Inicial",
-        widget=forms.Textarea(attrs={'rows': 4}),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Ex: Um paciente de 45 anos chega à UBS com queixa de...'}),
         required=True,
         help_text="Descreva o cenário inicial do problema"
     )
     data_aplicacao = forms.DateTimeField(
         label="Data de Aplicação",
         required=True,
-        widget=forms.DateTimeInput(attrs={'type': 'datetime-local'})
+        widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'})
     )
     
     def __init__(self, user, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Filtra os Temas do usuário logado (o model usa 'usuario')
         self.fields['tema'].queryset = Tema.objects.filter(usuario=user)
+        
+        # Filtra as Fontes do usuário logado
         self.fields['fontes'].queryset = Fontes.objects.filter(user=user)
-
+        
+        # Filtra os Assuntos do usuário logado
+        self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
+        
+        self.fields['objetivos'].queryset = ObjetivosAprendizagem.objects.all()
+    
 class RegerarParteForm(forms.Form):
     parte_ordem = forms.IntegerField(
         label="Número da Parte para Regerar",
@@ -358,3 +370,23 @@ class VincularMultiplosAlunosForm(forms.Form):
         super().__init__(*args, **kwargs)
         if user:
             self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
+
+class TemplateContextoForm(forms.ModelForm):
+    class Meta:
+        model = TemplateContexto
+        fields = ['titulo', 'texto']
+        widgets = {
+            'titulo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Caso Clínico - UBS Padrão'}),
+            'texto': forms.Textarea(attrs={'class': 'form-control', 'rows': 8, 'placeholder': 'Digite aqui o esqueleto básico do contexto inicial...'}),
+        }
+
+class ObjetivosAprendizagemForm(forms.ModelForm):
+    class Meta:
+        model = ObjetivosAprendizagem
+        fields = ['descricao']
+        widgets = {
+            'descricao': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Ex: Identificar os principais fatores de risco para a hipertensão arterial sistêmica.'
+            }),
+        }

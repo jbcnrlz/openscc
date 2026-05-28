@@ -2,7 +2,7 @@ import os, json, re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from .models import *
-from .forms import FontesForm, GeracaoPerguntasForm, PerguntaForm, ProvaForm, TemaForm, SolicitarFeedbackForm, ResponderFeedbackForm, AplicacaoProvaForm, VincularMultiplosAlunosForm
+from .forms import *
 from django.contrib import messages
 from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo, corrigirRespostaMultimodal
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
@@ -2534,3 +2534,99 @@ def criarPergunta(request):
         'form': form,
         'titulo': 'Criar Nova Pergunta'
     })
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def listarTemplatesContexto(request):
+    templates = TemplateContexto.objects.filter(usuario=request.user)
+    return render(request, 'mimir/listarTemplatesContexto.html', {'templates': templates})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def criarTemplateContexto(request):
+    if request.method == 'POST':
+        form = TemplateContextoForm(request.POST)
+        if form.is_valid():
+            template = form.save(commit=False)
+            template.usuario = request.user
+            template.save()
+            messages.success(request, 'Template cadastrado com sucesso!')
+            return redirect('mimir:listarTemplatesContexto')
+    else:
+        form = TemplateContextoForm()
+    return render(request, 'mimir/templateContextoForm.html', {'form': form, 'titulo': 'Cadastrar Template'})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def atualizarTemplateContexto(request, pk):
+    template = get_object_or_404(TemplateContexto, pk=pk, usuario=request.user)
+    if request.method == 'POST':
+        form = TemplateContextoForm(request.POST, instance=template)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Template atualizado com sucesso!')
+            return redirect('mimir:listarTemplatesContexto')
+    else:
+        form = TemplateContextoForm(instance=template)
+    return render(request, 'mimir/templateContextoForm.html', {'form': form, 'titulo': 'Editar Template', 'template': template})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def deletarTemplateContexto(request, pk):
+    template = get_object_or_404(TemplateContexto, pk=pk, usuario=request.user)
+    if request.method == 'POST':
+        template.delete()
+        messages.success(request, 'Template excluído com sucesso!')
+        return redirect('mimir:listarTemplatesContexto')
+    return render(request, 'mimir/deletarTemplateContexto.html', {'template': template})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def listarObjetivos(request):
+    objetivos = ObjetivosAprendizagem.objects.all().order_by('descricao')
+    return render(request, 'mimir/listarObjetivos.html', {'objetivos': objetivos})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def criarObjetivo(request):
+    if request.method == 'POST':
+        form = ObjetivosAprendizagemForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Objetivo de aprendizagem cadastrado com sucesso!')
+            return redirect('mimir:listarObjetivos')
+    else:
+        form = ObjetivosAprendizagemForm()
+    return render(request, 'mimir/objetivoForm.html', {'form': form, 'titulo': 'Cadastrar Objetivo de Aprendizagem'})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def atualizarObjetivo(request, pk):
+    objetivo = get_object_or_404(ObjetivosAprendizagem, pk=pk)
+    if request.method == 'POST':
+        form = ObjetivosAprendizagemForm(request.POST, instance=objetivo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Objetivo de aprendizagem atualizado com sucesso!')
+            return redirect('mimir:listarObjetivos')
+    else:
+        form = ObjetivosAprendizagemForm(instance=objetivo)
+    return render(request, 'mimir/objetivoForm.html', {'form': form, 'titulo': 'Editar Objetivo de Aprendizagem', 'objetivo': objetivo})
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def deletarObjetivo(request, pk):
+    objetivo = get_object_or_404(ObjetivosAprendizagem, pk=pk)
+    if request.method == 'POST':
+        objetivo.delete()
+        messages.success(request, 'Objetivo de aprendizagem excluído com sucesso!')
+        return redirect('mimir:listarObjetivos')
+    return render(request, 'mimir/deletarObjetivo.html', {'objective': objetivo})

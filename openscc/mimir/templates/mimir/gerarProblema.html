@@ -3,160 +3,209 @@
 {% block mainContent %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title mb-0">Gerar Problema com IA</h4>
+        <div class="col-md-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between py-3">
+                    <h4 class="card-title mb-0 fs-5">
+                        <i class="fas fa-brain me-2"></i> Gerar Problema com IA (PBL)
+                    </h4>
+                    <span class="badge bg-light text-primary fw-bold px-3 py-2">Mimir RAG Engine</span>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <form method="post" id="gerarProblemaForm">
                         {% csrf_token %}
                         
                         {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger shadow-sm">
                             {% for error in form.non_field_errors %}
-                            {{ error }}
+                            <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
                             {% endfor %}
                         </div>
                         {% endif %}
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.tema.label_tag }}
-                                    {{ form.tema }}
-                                    {% if form.tema.errors %}
-                                    <div class="text-danger">
-                                        {% for error in form.tema.errors %}
-                                        <small>{{ error }}</small>
-                                        {% endfor %}
+                        <!-- Abas de Organização do Formulário -->
+                        <ul class="nav nav-pills nav-justified mb-4 border-bottom pb-2" id="formTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active fw-bold py-2" id="config-tab" data-bs-toggle="tab" data-bs-target="#tab-config" type="button" role="tab">
+                                    <i class="fas fa-sliders-h me-2"></i>1. Configurações Iniciais
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-bold py-2" id="objetivos-tab" data-bs-toggle="tab" data-bs-target="#tab-objetivos" type="button" role="tab">
+                                    <i class="fas fa-bullseye me-2"></i>2. Objetivos 
+                                    <span class="badge bg-secondary ms-1" id="count-objetivos">0</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-bold py-2" id="fontes-tab" data-bs-toggle="tab" data-bs-target="#tab-fontes" type="button" role="tab">
+                                    <i class="fas fa-book me-2"></i>3. Fontes de Referência
+                                    <span class="badge bg-secondary ms-1" id="count-fontes">0</span>
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Conteúdo das Abas -->
+                        <div class="tab-content min-vh-50" id="formTabsContent">
+                            
+                            <!-- ABA 1: CONFIGURAÇÕES INICIAIS -->
+                            <div class="tab-pane fade show active" id="tab-config" role="tabpanel">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-secondary">{{ form.tema.label }}</label>
+                                            {{ form.tema }}
+                                            {% if form.tema.errors %}<div class="text-danger small mt-1">{% for error in form.tema.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                        </div>
                                     </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-secondary">{{ form.assunto.label }}</label>
+                                            {{ form.assunto }}
+                                            {% if form.assunto.errors %}<div class="text-danger small mt-1">{% for error in form.assunto.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-secondary">{{ form.num_partes.label }}</label>
+                                            {{ form.num_partes }}
+                                            {% if form.num_partes.errors %}<div class="text-danger small mt-1">{% for error in form.num_partes.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-secondary">{{ form.data_aplicacao.label }}</label>
+                                            {{ form.data_aplicacao }}
+                                            {% if form.data_aplicacao.errors %}<div class="text-danger small mt-1">{% for error in form.data_aplicacao.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- TEXTAREA CONTEXTO E SELECT DE TEMPLATES -->
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label fw-bold text-secondary mb-0">{{ form.contexto_inicial.label }}</label>
+                                        
+                                        <!-- Dropdown de Seleção de Templates Cadastrados -->
+                                        {% if templates_contexto %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <small class="text-muted small"><i class="fas fa-magic text-primary"></i> Injetar Template:</small>
+                                            <select id="selectTemplateContexto" class="form-select form-select-sm border-primary text-primary fw-bold" style="width: auto; max-width: 280px;">
+                                                <option value="">-- Selecione para preencher --</option>
+                                                {% for t in templates_contexto %}
+                                                    <option value="{{ t.texto }}">{{ t.titulo }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        {% else %}
+                                        <small class="text-muted">
+                                            <a href="{% url 'mimir:criarTemplateContexto' %}" target="_blank" class="text-decoration-none">
+                                                <i class="fas fa-plus"></i> Criar Template Rápido
+                                            </a>
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {{ form.contexto_inicial }}
+                                    
+                                    {% if form.contexto_inicial.help_text %}
+                                        <div class="form-text text-muted"><i class="fas fa-info-circle me-1"></i> {{ form.contexto_inicial.help_text }}</div>
                                     {% endif %}
+                                    {% if form.contexto_inicial.errors %}<div class="text-danger small mt-1">{% for error in form.contexto_inicial.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                </div>
+                                
+                                <div class="text-end mt-4">
+                                    <button type="button" class="btn btn-primary px-4" onclick="switchTab('objetivos-tab')">
+                                        Avançar para Objetivos <i class="fas fa-arrow-right ms-2"></i>
+                                    </button>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.assunto.label_tag }}
-                                    {{ form.assunto }}
-                                    {% if form.assunto.errors %}
-                                    <div class="text-danger">
-                                        {% for error in form.assunto.errors %}
-                                        <small>{{ error }}</small>
-                                        {% endfor %}
+
+                            <!-- ABA 2: OBJETIVOS DE APRENDIZAGEM -->
+                            <div class="tab-pane fade" id="tab-objetivos" role="tabpanel">
+                                <div class="card border mb-3">
+                                    <div class="card-header bg-light py-2">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                                <i class="fas fa-search"></i>
+                                            </span>
+                                            <input type="text" id="searchObjetivos" class="form-control border-start-0" placeholder="Filtrar objetivos por palavra-chave...">
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" id="clearObjetivos">Limpar</button>
+                                        </div>
                                     </div>
-                                    {% endif %}
+                                    <div class="card-body p-0 list-container" id="containerObjetivos">
+                                        <div class="p-3 grid-checkboxes">
+                                            {{ form.objetivos }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if form.objetivos.errors %}<div class="text-danger small mb-3">{% for error in form.objetivos.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                
+                                <div class="d-flex justify-content-between mt-4">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="switchTab('config-tab')">
+                                        <i class="fas fa-arrow-left me-2"></i> Voltar
+                                    </button>
+                                    <button type="button" class="btn btn-primary px-4" onclick="switchTab('fontes-tab')">
+                                        Avançar para Fontes <i class="fas fa-arrow-right ms-2"></i>
+                                    </button>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="mb-3">
-                            {{ form.objetivos.label_tag }}
-                            <div class="border p-3 rounded">
-                                {{ form.objetivos }}
-                            </div>
-                            {% if form.objetivos.errors %}
-                            <div class="text-danger">
-                                {% for error in form.objetivos.errors %}
-                                <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="mb-3">
-                            {{ form.fontes.label_tag }}
-                            <div class="border p-3 rounded">
-                                {% if form.fontes.field.queryset.exists %}
-                                    {{ form.fontes }}
-                                {% else %}
-                                    <div class="alert alert-info">
-                                        Nenhuma fonte cadastrada. 
-                                        <a href="{% url 'mimir:addFontes' %}" class="alert-link">
-                                            Cadastrar nova fonte
-                                        </a>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            {% if form.fontes.help_text %}
-                            <div class="form-text">{{ form.fontes.help_text }}</div>
-                            {% endif %}
-                            {% if form.fontes.errors %}
-                            <div class="text-danger">
-                                {% for error in form.fontes.errors %}
-                                <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.num_partes.label_tag }}
-                                    {{ form.num_partes }}
-                                    {% if form.num_partes.errors %}
-                                    <div class="text-danger">
-                                        {% for error in form.num_partes.errors %}
-                                        <small>{{ error }}</small>
-                                        {% endfor %}
-                                    </div>
+                            <!-- ABA 3: FONTES DE REFERÊNCIA -->
+                            <div class="tab-pane fade" id="tab-fontes" role="tabpanel">
+                                <div class="card border mb-3">
+                                    {% if form.fontes.field.queryset.exists %}
+                                        <div class="card-header bg-light py-2">
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-white border-end-0 text-muted">
+                                                    <i class="fas fa-search"></i>
+                                                </span>
+                                                <input type="text" id="searchFontes" class="form-control border-start-0" placeholder="Filtrar fontes pelo nome ou descrição...">
+                                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFontes">Limpar</button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-0 list-container" id="containerFontes">
+                                            <div class="p-3 grid-checkboxes">
+                                                {{ form.fontes }}
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <div class="card-body text-center py-5">
+                                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                                            <h5>Nenhuma fonte cadastrada por você</h5>
+                                            <p class="text-muted small">Adicione arquivos PDFs para embasar a geração do Mimir RAG.</p>
+                                            <a href="{% url 'mimir:addFonte' %}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-plus me-1"></i> Cadastrar Nova Fonte
+                                            </a>
+                                        </div>
                                     {% endif %}
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.data_aplicacao.label_tag }}
-                                    {{ form.data_aplicacao }}
-                                    {% if form.data_aplicacao.errors %}
-                                    <div class="text-danger">
-                                        {% for error in form.data_aplicacao.errors %}
-                                        <small>{{ error }}</small>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
+                                {% if form.fontes.help_text %}<div class="form-text mb-2 text-muted"><i class="fas fa-info-circle me-1"></i> {{ form.fontes.help_text }}</div>{% endif %}
+                                {% if form.fontes.errors %}<div class="text-danger small mb-3">{% for error in form.fontes.errors %}{{ error }}{% endfor %}</div>{% endif %}
+                                
+                                <div class="d-flex justify-content-between mt-4">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="switchTab('objetivos-tab')">
+                                        <i class="fas fa-arrow-left me-2"></i> Voltar
+                                    </button>
+                                    <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm" id="submitButton">
+                                        <i class="fas fa-magic me-2"></i> Gerar Estrutura do Caso
+                                    </button>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="mb-3">
-                            {{ form.contexto_inicial.label_tag }}
-                            {{ form.contexto_inicial }}
-                            {% if form.contexto_inicial.help_text %}
-                            <div class="form-text">{{ form.contexto_inicial.help_text }}</div>
-                            {% endif %}
-                            {% if form.contexto_inicial.errors %}
-                            <div class="text-danger">
-                                {% for error in form.contexto_inicial.errors %}
-                                <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'mimir:problemaList' %}" class="btn btn-secondary me-md-2">Cancelar</a>
-                            <button type="submit" class="btn btn-primary btn-lg" id="submitButton">
-                                <i class="bi bi-magic"></i> Gerar Problema
-                            </button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Como funciona</h5>
-                </div>
-                <div class="card-body">
-                    <p>O problema será gerado em partes sequenciais:</p>
-                    <ol>
-                        <li><strong>Parte 1:</strong> Baseada no contexto inicial e fontes selecionadas</li>
-                        <li><strong>Partes seguintes:</strong> Desenvolvem a partir das partes anteriores</li>
-                        <li><strong>Última parte:</strong> Inclui o desfecho ou conclusão</li>
-                    </ol>
-                    <p class="text-muted mb-0">
-                        Cada parte pode ser regerada individualmente posteriormente.
-                    </p>
+            <div class="card mt-4 border-0 bg-light text-secondary">
+                <div class="card-body py-3 d-flex align-items-center">
+                    <i class="fas fa-info-circle fa-lg text-primary me-3"></i>
+                    <small class="mb-0">
+                        O motor do <strong>Mimir</strong> processará as fontes anexadas em fatias através de RAG para gerar dados estruturados (Queixas, Sinais Vitais, Exames e Evolução clínica) de acordo com o número de partes escolhido.
+                    </small>
                 </div>
             </div>
         </div>
@@ -166,22 +215,15 @@
 <!-- Modal de Carregamento -->
 <div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0">
-                <h5 class="modal-title">Processando...</h5>
-            </div>
-            <div class="modal-body text-center">
-                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary my-3" style="width: 3.5rem; height: 3.5rem; border-width: 0.35em;" role="status">
                     <span class="visually-hidden">Processando...</span>
                 </div>
-                <div class="mt-3">
-                    <h6>Gerando problema com IA</h6>
-                    <p class="text-muted">Isso pode levar alguns instantes. Por favor, aguarde.</p>
-                </div>
-                <div class="progress mt-3">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                         role="progressbar" 
-                         style="width: 100%"></div>
+                <h5 class="mt-2 fw-bold text-dark">Alinhando Embeddings com LLM</h5>
+                <p class="text-muted small px-3">Isso pode levar até um minuto devido à análise semântica dos documentos e estruturação sequencial do problema PBL. Não recarregue a página.</p>
+                <div class="progress mx-4 mt-3" style="height: 6px; border-radius: 3px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 100%"></div>
                 </div>
             </div>
         </div>
@@ -189,87 +231,241 @@
 </div>
 
 <script>
+// Troca de Abas Manual via Botão
+function switchTab(tabId) {
+    const triggerEl = document.querySelector(`#${tabId}`);
+    if (triggerEl) {
+        bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Interceptar o envio do formulário
+    
+    // --- LÓGICA DE INJEÇÃO DO TEMPLATE DO CONTEXTO ---
+    const selectTemplate = document.getElementById('selectTemplateContexto');
+    const textareaContexto = document.getElementById('{{ form.contexto_inicial.id_for_label }}');
+
+    if (selectTemplate && textareaContexto) {
+        selectTemplate.addEventListener('change', function() {
+            const textoTemplate = this.value;
+            
+            if (textoTemplate) {
+                // Se o usuário já tiver digitado algo, pede confirmação para não apagar por acidente
+                if (textareaContexto.value.trim() !== "") {
+                    const confirmar = confirm("Atenção: A seleção deste template irá substituir o texto que você já digitou. Deseja continuar?");
+                    if (!confirmar) {
+                        this.value = ""; // Reseta o select
+                        return;
+                    }
+                }
+                // Injeta o conteúdo estruturado no textarea
+                textareaContexto.value = textoTemplate;
+            }
+        });
+    }
+
+    // --- LÓGICA DE FILTRO DOS OBJETIVOS DE APRENDIZAGEM ---
+    const searchObjetivos = document.getElementById('searchObjetivos');
+    const containerObjetivos = document.getElementById('containerObjetivos');
+    
+    if (searchObjetivos && containerObjetivos) {
+        const labelsObjetivos = containerObjetivos.querySelectorAll('label');
+        
+        searchObjetivos.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase().trim();
+            labelsObjetivos.forEach(label => {
+                const text = label.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    label.style.setProperty('display', 'flex', 'important');
+                } else {
+                    label.style.setProperty('display', 'none', 'important');
+                }
+            });
+        });
+        
+        document.getElementById('clearObjetivos').addEventListener('click', function() {
+            searchObjetivos.value = '';
+            labelsObjetivos.forEach(label => label.style.setProperty('display', 'flex', 'important'));
+            updateCounters();
+        });
+    }
+
+    // --- LÓGICA DE FILTRO DAS FONTES DE REFERÊNCIA ---
+    const searchFontes = document.getElementById('searchFontes');
+    const containerFontes = document.getElementById('containerFontes');
+    
+    if (searchFontes && containerFontes) {
+        const labelsFontes = containerFontes.querySelectorAll('label');
+        
+        searchFontes.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase().trim();
+            labelsFontes.forEach(label => {
+                const text = label.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    label.style.setProperty('display', 'flex', 'important');
+                } else {
+                    label.style.setProperty('display', 'none', 'important');
+                }
+            });
+        });
+        
+        document.getElementById('clearFontes').addEventListener('click', function() {
+            searchFontes.value = '';
+            labelsFontes.forEach(label => label.style.setProperty('display', 'flex', 'important'));
+            updateCounters();
+        });
+    }
+
+    // --- ENGENHARIA DOS CONTADORES (BADGES DE SELEÇÃO) ---
+    function updateCounters() {
+        const numObjetivos = document.querySelectorAll('input[name="objetivos"]:checked').length;
+        const numFontes = document.querySelectorAll('input[name="fontes"]:checked').length;
+        
+        const badgeObj = document.getElementById('count-objetivos');
+        const badgeFontes = document.getElementById('count-fontes');
+        
+        if (badgeObj) {
+            badgeObj.textContent = numObjetivos;
+            badgeObj.className = numObjetivos > 0 ? "badge bg-success ms-1" : "badge bg-secondary ms-1";
+        }
+        if (badgeFontes) {
+            badgeFontes.textContent = numFontes;
+            badgeFontes.className = numFontes > 0 ? "badge bg-success ms-1" : "badge bg-secondary ms-1";
+        }
+    }
+
+    document.getElementById('gerarProblemaForm').addEventListener('change', updateCounters);
+    updateCounters(); // Executa carga inicial
+
+    // --- VALIDAÇÃO E ENVIO DO FORMULÁRIO ---
     document.getElementById('gerarProblemaForm').addEventListener('submit', function(e) {
-        e.preventDefault(); // Impedir envio imediato
+        e.preventDefault();
         
         const tema = document.getElementById('{{ form.tema.id_for_label }}');
         const assunto = document.getElementById('{{ form.assunto.id_for_label }}');
-        const fontesSelecionadas = document.querySelectorAll('input[name="fontes"]:checked');
-        const numPartes = document.getElementById('{{ form.num_partes.id_for_label }}');
+        const objetivosSelecionados = document.querySelectorAll('input[name="objetivos"]:checked');
+        const contexto = document.getElementById('{{ form.contexto_inicial.id_for_label }}');
         
-        // Validações básicas
-        if (!tema.value) {
-            alert('Selecione um tema.');
+        if (!tema.value || !assunto.value) {
+            switchTab('config-tab');
+            alert('Atenção: Escolha o Tema e o Assunto do problema.');
+            return false;
+        }
+
+        if (!contexto.value.trim()) {
+            switchTab('config-tab');
+            contexto.focus();
+            alert('Atenção: O Contexto Inicial do cenário é obrigatório.');
             return false;
         }
         
-        if (!assunto.value) {
-            alert('Selecione um assunto.');
+        if (objetivosSelecionados.length === 0) {
+            switchTab('objetivos-tab');
+            alert('Por favor, selecione ao menos um Objetivo de Aprendizagem.');
             return false;
         }
         
-        if (fontesSelecionadas.length === 0) {
-            alert('Selecione pelo menos uma fonte.');
-            return false;
-        }
-        
-        if (!numPartes.value || parseInt(numPartes.value) <= 0) {
-            alert('Defina um número válido de partes.');
-            return false;
-        }
-        
-        // Mostrar modal de carregamento
+        // Ativação do Modal de processamento
         const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
         loadingModal.show();
         
-        // Desabilitar botão de submit
-        document.getElementById('submitButton').disabled = true;
-        document.getElementById('submitButton').innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
+        const submitBtn = document.getElementById('submitButton');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processando Tokens...';
         
-        // Enviar formulário após um pequeno delay para o modal aparecer
         setTimeout(() => {
-            // Reativar o formulário e enviar
             this.submit();
-        }, 1000);
+        }, 600);
     });
 });
 </script>
 
 <style>
-/* Estilos para o modal de carregamento */
-#loadingModal .modal-content {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+/* Container principal com rolagem vertical livre */
+.list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: #f8f9fc;
+    border-radius: 8px;
+    padding: 12px;
 }
 
-#loadingModal .spinner-border {
-    border-width: 0.3em;
+/* Remove margens e marcas de listas caso o Django use a estrutura ul/li */
+.grid-checkboxes ul, 
+.grid-checkboxes li {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
 }
 
-#loadingModal .progress {
-    height: 6px;
-    border-radius: 3px;
+/* Força os containers internos do Django a ocuparem a largura total */
+.grid-checkboxes > div,
+.grid-checkboxes > div > div {
+    width: 100% !important;
 }
 
-/* Desabilitar interação com o conteúdo de fundo */
+/* Estiliza o <label> de cada opção como o card de largura total e altura dinâmica */
+.grid-checkboxes label {
+    display: flex !important;
+    align-items: flex-start !important; 
+    width: 100% !important;
+    height: auto !important; 
+    background: #ffffff;
+    padding: 14px 16px !important;
+    margin-bottom: 8px !important; 
+    border: 1px solid #e3e6f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    
+    white-space: normal !important;
+    word-break: break-word !important;
+    font-weight: normal !important;
+    font-size: 0.95rem;
+    color: #4e5166;
+}
+
+/* Ajusta a caixa de seleção de forma limpa */
+.grid-checkboxes input[type="checkbox"] {
+    flex-shrink: 0; 
+    width: 1.2em !important;
+    height: 1.2em !important;
+    margin-top: 3px !important;
+    margin-right: 12px !important; 
+    margin-left: 0 !important;     
+    cursor: pointer;
+}
+
+.grid-checkboxes label:hover {
+    border-color: #bac8f3 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 3px 8px rgba(78, 115, 223, 0.06) !important;
+}
+
+.grid-checkboxes label:has(input:checked) {
+    border-color: #4e73df !important;
+    background-color: #f4f7fe !important;
+    color: #2e59d9 !important;
+    font-weight: 500 !important;
+}
+
+.nav-pills .nav-link {
+    color: #6e707e;
+    background-color: #f8f9fc;
+    border: 1px solid #e3e6f0;
+    margin: 0 4px;
+}
+
+.nav-pills .nav-link.active {
+    background-color: #4e73df;
+    color: #fff;
+    border-color: #4e73df;
+}
+
 .modal-backdrop {
-    opacity: 0.8 !important;
-}
-
-/* Estilo para botão desabilitado */
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.form-check-label {
-    font-weight: normal;
-}
-.form-check {
-    margin-bottom: 0.5rem;
+    opacity: 0.7 !important;
 }
 </style>
 {% endblock %}
