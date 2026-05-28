@@ -96,4 +96,12 @@ urlpatterns = [
          EditarGuiaTutorView.as_view(), 
          name='editarGuiaTutor'),
      path('perguntas/criar/', views.criarPergunta, name='criarPergunta'),
+     path('templates-contexto/', views.listarTemplatesContexto, name='listarTemplatesContexto'),
+     path('templates-contexto/criar/', views.criarTemplateContexto, name='criarTemplateContexto'),
+     path('templates-contexto/<int:pk>/editar/', views.atualizarTemplateContexto, name='atualizarTemplateContexto'),
+     path('templates-contexto/<int:pk>/deletar/', views.deletarTemplateContexto, name='deletarTemplateContexto'),
+     path('objetivos/', views.listarObjetivos, name='listarObjetivos'),
+     path('objetivos/criar/', views.criarObjetivo, name='criarObjetivo'),
+     path('objetivos/<int:pk>/editar/', views.atualizarObjetivo, name='atualizarObjetivo'),
+     path('objetivos/<int:pk>/deletar/', views.deletarObjetivo, name='deletarObjetivo'),
 ]

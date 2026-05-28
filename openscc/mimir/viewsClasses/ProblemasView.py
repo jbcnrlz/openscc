@@ -4,9 +4,9 @@ from django.views.generic import ListView, DetailView, CreateView, View, DeleteV
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from ..models import Problema, Parte, Assunto
+from ..models import *
 from ..forms import ProblemaForm, GerarProblemaForm, RegerarParteForm
-from commons.services import criarPromptParaParte, chamarApiLLM, extrair_texto_pdf, regerarParte
+from commons.services import criarPromptParaParte, extrair_texto_pdf, regerarParte
 from django.contrib.auth.models import User
 from django.http import Http404
 class ProblemaListView(LoginRequiredMixin, ListView):
@@ -72,7 +72,13 @@ class GerarProblemaView(LoginRequiredMixin, View):
     
     def get(self, request):
         form = GerarProblemaForm(user=request.user)
-        return render(request, self.template_name, {'form': form})
+        # Busca os templates do professor logado para alimentar o dropdown
+        templates = TemplateContexto.objects.filter(usuario=request.user)
+        
+        return render(request, self.template_name, {
+            'form': form,
+            'templates_contexto': templates
+        })
     
     def post(self, request):
         form = GerarProblemaForm(request.user, request.POST)
@@ -87,6 +93,7 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 num_partes = form.cleaned_data['num_partes']
                 contexto_inicial = form.cleaned_data['contexto_inicial']
                 layout_instrucoes = ""
+                
                 if assunto.layoutProblema:
                     try:
                         # CORREÇÃO: passe apenas o caminho do arquivo
@@ -138,16 +145,26 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 
             except Exception as e:
                 messages.error(request, f'Erro ao gerar problema: {str(e)}')
-                return render(request, self.template_name, {'form': form})
+                # Recarrega os templates caso ocorra uma exceção no bloco try
+                templates = TemplateContexto.objects.filter(usuario=request.user)
+                return render(request, self.template_name, {
+                    'form': form, 
+                    'templates_contexto': templates
+                })
         
-        return render(request, self.template_name, {'form': form})    
+        # Recarrega os templates caso o formulário falhe na validação
+        templates = TemplateContexto.objects.filter(usuario=request.user)
+        return render(request, self.template_name, {
+            'form': form, 
+            'templates_contexto': templates
+        })    
     
-    def gerar_partes_sequenciais(self, tema, assunto, objetivos, num_partes, contexto_inicial,conteudo_fontes,layout_instrucoes="",user=None):
+    def gerar_partes_sequenciais(self, tema, assunto, objetivos, num_partes, contexto_inicial, conteudo_fontes, layout_instrucoes="", user=None):
         partes = []
         contexto_accumulado = contexto_inicial
         
         for parte_num in range(1, num_partes + 1):
-            resposta = criarPromptParaParte(tema, assunto, objetivos, parte_num, num_partes, contexto_accumulado,conteudo_fontes,layout_instrucoes,user=user)
+            resposta = criarPromptParaParte(tema, assunto, objetivos, parte_num, num_partes, contexto_accumulado, conteudo_fontes, layout_instrucoes, user=user)
             if resposta:
                 partes.append(resposta)
                 contexto_accumulado += f"\n\nParte {parte_num}: {resposta}"

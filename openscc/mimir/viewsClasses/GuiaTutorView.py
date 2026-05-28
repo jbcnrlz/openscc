@@ -69,7 +69,7 @@ class GerarGuiaTutorView(LoginRequiredMixin, View):
             problema.assunto.layoutGuiaTutor or ""
         )
         print(prompt)
-        return chamarApiLLM(prompt)    
+        return prompt.content if hasattr(prompt, 'content') else str(prompt)   
 
 class VisualizarGuiaTutorView(LoginRequiredMixin, DetailView):
     model = Problema

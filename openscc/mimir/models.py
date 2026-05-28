@@ -720,3 +720,17 @@ class LLMLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at} - {self.model_used} - {self.status}"
+    
+class TemplateContexto(models.Model):
+    titulo = models.CharField(max_length=200, verbose_name="Título do Template")
+    texto = models.TextField(verbose_name="Texto do Contexto Inicial")
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='templates_contexto')
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Template de Contexto'
+        verbose_name_plural = 'Templates de Contexto'
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return self.titulo
