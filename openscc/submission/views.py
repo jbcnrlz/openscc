@@ -919,3 +919,40 @@ def validarCertificado(request, codigo_validacao):
         }
     
     return render(request, 'submissao/validarCertificado.html', context)
+
+@login_required
+def emitirCertificadoAtividade(request, idAtv):
+    """
+    Garante a emissão e redireciona para a visualização do certificado 
+    de uma atividade específica para o usuário logado.
+    """
+    atv = get_object_or_404(Atividade, pk=idAtv)
+    
+    participacao = ParticipanteAtividade.objects.filter(
+        atividade=atv, 
+        user=request.user, 
+        presenca=True
+    ).first()
+    
+    if not participacao:
+        messages.error(request, "Você precisa ter a presença confirmada para emitir este certificado.")
+        return redirect('submission:profile')
+
+    certificado = Certificado.objects.filter(
+        atividade=atv, 
+        participante=request.user, 
+        tipo_certificado='participacao'
+    ).first()
+    
+    if not certificado:
+        try:
+            certificado = gerarCertificadoAutomatico(atv, request.user, request)
+        except Exception as e:
+            messages.error(request, f"Erro ao gerar certificado: {str(e)}")
+            return redirect('submission:profile')
+            
+    if certificado:
+        return redirect('submission:visualizarCertificado', codigo_validacao=certificado.codigo_validacao)
+    else:
+        messages.error(request, "Não foi possível emitir o certificado. Verifique com a organização se o layout do evento já foi configurado.")
+        return redirect('submission:profile')

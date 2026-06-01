@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "mimir"
+    "mimir",
+    "odin"
 ]
 
 MIDDLEWARE = [
@@ -131,5 +132,6 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MEDIA_ROOT = os.path.join(str(Path(__file__).resolve().parent.parent.parent),"media")
-GEMINI_API_KEY = "AIzaSyCvdi0DtMEURKemFS4KABYybX0L57btUo4"
+#GEMINI_API_KEY = "AIzaSyDu4m-qvEJGxRlNNF1Q2TTJ62k4IsNzrGc"
+GEMINI_API_KEY = None
 APPEND_SLASH = True
