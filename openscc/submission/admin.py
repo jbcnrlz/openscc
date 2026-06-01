@@ -1,4 +1,4 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse # <-- 1. Adicionado HttpResponse
 from django.contrib import admin, messages
 from .models import *
 from django.utils.html import format_html
@@ -10,14 +10,128 @@ def visualizeSubscription(modeladmin,request,queryset):
     selected = queryset.values_list("pk",flat=True)
     return HttpResponseRedirect("/inscritos/?ids=%s" % (",".join(str(pk) for pk in selected)))
 
+# --- NOVA AÇÃO ATUALIZADA ---
+@admin.action(description='Gerar Relatório de Presenças Confirmadas')
+def relatorio_presencas_confirmadas(modeladmin, request, queryset):
+    """
+    Gera um HTML com a lista de participantes que já tiveram 
+    sua presença confirmada (presenca=True) via QR Code ou manualmente.
+    """
+    html = """
+    <!DOCTYPE html>
+    <html lang="pt-br">
+    <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Presenças</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+            .container { padding: 20px; }
+            h2, h3, p { margin: 5px 0; }
+            .info-header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #000; padding: 10px; text-align: left; font-size: 14px; }
+            th { background-color: #f2f2f2; }
+            .page-break { page-break-after: always; }
+            .page-break:last-child { page-break-after: auto; }
+            @media print {
+                .no-print { display: none !important; }
+                @page { margin: 1.5cm; }
+            }
+            .print-btn {
+                background-color: #4CAF50; color: white; border: none;
+                padding: 10px 20px; cursor: pointer; font-size: 16px;
+                margin-bottom: 20px; border-radius: 4px;
+            }
+            .status-badge {
+                background-color: #d4edda; color: #155724;
+                padding: 3px 8px; border-radius: 12px; font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir Relatório</button>
+    """
+    
+    for atividade in queryset:
+        # Filtra APENAS quem tem presenca=True
+        participacoes = ParticipanteAtividade.objects.filter(
+            atividade=atividade,
+            presenca=True
+        ).select_related('user')
+        
+        # Ordena alfabeticamente pelo nome do usuário
+        participacoes = sorted(participacoes, key=lambda p: (p.user.first_name or p.user.username).lower())
+
+        html += f"""
+        <div class="page-break">
+            <div class="info-header">
+                <h2>Relatório de Presenças Confirmadas</h2>
+                <h3>{atividade.nome}</h3>
+                <p><strong>Data/Hora:</strong> {atividade.data.strftime('%d/%m/%Y às %H:%M')}</p>
+                <p><strong>Local:</strong> {atividade.local}</p>
+                <p><strong>Total de Presentes:</strong> {len(participacoes)}</p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%; text-align: center;">#</th>
+                        <th style="width: 50%;">Nome do Participante</th>
+                        <th style="width: 20%;">Usuário</th>
+                        <th style="width: 25%; text-align: center;">Horário do Registro</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        if not participacoes:
+            html += """
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 20px;">
+                        Nenhuma presença confirmada para esta atividade até o momento.
+                    </td>
+                </tr>
+            """
+        else:
+            for i, p in enumerate(participacoes, 1):
+                nome_completo = p.user.get_full_name() or "Sem nome cadastrado"
+                # Formata a data de registro, caso exista
+                data_reg = p.data_registro.strftime('%d/%m/%Y %H:%M:%S') if p.data_registro else "N/A"
+                
+                html += f"""
+                    <tr>
+                        <td style="text-align: center;">{i}</td>
+                        <td>{nome_completo}</td>
+                        <td>{p.user.username}</td>
+                        <td style="text-align: center;">
+                            <span class="status-badge">{data_reg}</span>
+                        </td>
+                    </tr>
+                """
+            
+        html += """
+                </tbody>
+            </table>
+        </div>
+        """
+        
+    html += """
+        </div>
+    </body>
+    </html>
+    """
+    
+    return HttpResponse(html)
+# -------------------------------------
+
+
 class ConferenciaAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug" : ["nome"]}
 
 class AtividadeAdmin(admin.ModelAdmin):
     exclude = ["participantes"]
-    actions = [visualizeSubscription]
-
-
+    actions = [visualizeSubscription, relatorio_presencas_confirmadas] # <-- 3. Ação inserida na lista
 
 admin.site.register(Autores)
 admin.site.register(Artigo)
