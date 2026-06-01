@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "mimir"
+    "mimir",
+    "odin"
 ]
 
 MIDDLEWARE = [
@@ -76,17 +77,6 @@ WSGI_APPLICATION = "openscc.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-
-DATABASES = {
-    "default":{
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'openscc',
-        'USER': 'jbcnrlz',
-        'PASSWORD': 'a12b25c54',
-        'HOST': 'localhost',
-        'PORT': '3306'
-    }
-}
 
 
 # Password validation
@@ -131,5 +121,5 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MEDIA_ROOT = os.path.join(str(Path(__file__).resolve().parent.parent.parent),"media")
-GEMINI_API_KEY = "AIzaSyCvdi0DtMEURKemFS4KABYybX0L57btUo4"
+GEMINI_API_KEY = None
 APPEND_SLASH = True

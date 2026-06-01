@@ -434,7 +434,6 @@
     </div>
 
     <div class="content-container">
-        <!-- Cards de Estatísticas -->
         <div class="stats-container">
             <div class="stat-card">
                 <div class="stat-icon" style="color: var(--primary-color);">
@@ -466,7 +465,6 @@
             </div>
         </div>
 
-        <!-- Filtros -->
         <div class="filter-container">
             <h3 class="filter-title">
                 <i class="fas fa-filter"></i>
@@ -480,7 +478,6 @@
             </div>
         </div>
 
-        <!-- Lista de Conferências e Atividades -->
         {% if conferencias %}
             {% for conferencia_nome, atividades in conferencias.items %}
                 <div class="conference-section" data-conference="{{ conferencia_nome }}">
@@ -520,7 +517,6 @@
                                     </div>
                                     {% endif %}
                                     
-                                    <!-- Informações de Presença -->
                                     {% if atividade.ja_presente %}
                                     <div class="detail-item" style="color: var(--success-color);">
                                         <i class="fas fa-check-circle"></i>
@@ -541,6 +537,10 @@
                                             <i class="fas fa-check-circle"></i>
                                             Presença Confirmada
                                         </span>
+                                        <a href="{% url 'submission:emitirCertificadoAtividade' atividade.id %}" class="btn-success" target="_blank">
+                                            <i class="fas fa-award"></i>
+                                            Emitir Certificado
+                                        </a>
                                     {% else %}
                                         {% if atividade.status == "completed" %}
                                             <span class="btn-disabled">
@@ -587,13 +587,9 @@
         const activityCards = document.querySelectorAll('.activity-card');
         const conferenceSections = document.querySelectorAll('.conference-section');
         
-        // Filtro de atividades por status
         filterButtons.forEach(button => {
             button.addEventListener('click', function() {
-                // Remove a classe active de todos os botões
                 filterButtons.forEach(btn => btn.classList.remove('active'));
-                
-                // Adiciona a classe active ao botão clicado
                 this.classList.add('active');
                 
                 const filterValue = this.getAttribute('data-filter');
@@ -613,13 +609,11 @@
                         }
                     });
                     
-                    // Mostra/oculta a seção da conferência baseado nas atividades visíveis
                     section.style.display = hasVisibleActivities ? 'block' : 'none';
                 });
             });
         });
 
-        // Adicionar animações de entrada
         activityCards.forEach((card, index) => {
             card.style.opacity = '0';
             card.style.transform = 'translateY(20px)';
