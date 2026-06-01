@@ -78,17 +78,6 @@ WSGI_APPLICATION = "openscc.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 
-DATABASES = {
-    "default":{
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'openscc',
-        'USER': 'jbcnrlz',
-        'PASSWORD': 'a12b25c54',
-        'HOST': 'localhost',
-        'PORT': '3306'
-    }
-}
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -132,6 +121,5 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MEDIA_ROOT = os.path.join(str(Path(__file__).resolve().parent.parent.parent),"media")
-#GEMINI_API_KEY = "AIzaSyDu4m-qvEJGxRlNNF1Q2TTJ62k4IsNzrGc"
 GEMINI_API_KEY = None
 APPEND_SLASH = True
