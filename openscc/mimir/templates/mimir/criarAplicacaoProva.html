@@ -1,184 +1,180 @@
-<!-- templates/mimir/criar_aplicacao_prova.html -->
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container py-4">
+<div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="card-title mb-0">
-                        <i class="fas fa-plus-circle me-2"></i>Criar Nova Aplicação de Prova
+            <div class="card shadow-sm border-0">
+                
+                <!-- Cabeçalho -->
+                <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between py-3">
+                    <h4 class="card-title mb-0 fs-5">
+                        <i class="fas fa-calendar-check me-2"></i> Criar Aplicação de Prova
                     </h4>
+                    <span class="badge bg-light text-primary fw-bold px-3 py-2">Mimir Avaliações</span>
                 </div>
-                <div class="card-body">
-                    <div class="mb-4">
-                        <h5>Prova: {{ prova.titulo }}</h5>
-                        <p class="text-muted mb-0">{{ prova.descricao }}</p>
-                        <small class="text-muted">Assunto: {{ prova.assunto.nome }}</small>
+                
+                <div class="card-body p-4">
+                    <!-- Resumo da Prova Selecionada -->
+                    <div class="bg-light p-3 rounded-3 border mb-4 d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-clipboard-list text-primary fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1 fw-bold text-dark">{{ prova.titulo }}</h5>
+                            <p class="text-muted small mb-0">{{ prova.descricao|truncatewords:25 }}</p>
+                            <span class="badge bg-secondary mt-2"><i class="fas fa-book me-1"></i> {{ prova.assunto.nome }}</span>
+                        </div>
                     </div>
 
-                    <form method="post">
+                    <form method="post" id="formAplicacao">
                         {% csrf_token %}
                         
                         {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger shadow-sm">
                             {% for error in form.non_field_errors %}
-                                {{ error }}
+                                <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
                             {% endfor %}
                         </div>
                         {% endif %}
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.data_disponivel.id_for_label }}" class="form-label">
-                                    <i class="fas fa-calendar-plus me-1"></i>Data de Início
-                                </label>
+                        <!-- SEÇÃO 1: PRAZOS E DATAS -->
+                        <h6 class="text-uppercase fw-bold text-secondary mb-3 mt-2"><i class="fas fa-clock me-2"></i>1. Configuração de Prazos</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label for="{{ form.data_disponivel.id_for_label }}" class="form-label fw-bold text-dark">Data de Início</label>
                                 {{ form.data_disponivel }}
-                                {% if form.data_disponivel.errors %}
-                                <div class="text-danger small">
-                                    {% for error in form.data_disponivel.errors %}
-                                        {{ error }}
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
+                                {% if form.data_disponivel.errors %}<div class="text-danger small mt-1">{{ form.data_disponivel.errors }}</div>{% endif %}
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.data_limite.id_for_label }}" class="form-label">
-                                    <i class="fas fa-calendar-times me-1"></i>Data Limite
-                                </label>
+                            <div class="col-md-4">
+                                <label for="{{ form.data_limite.id_for_label }}" class="form-label fw-bold text-dark">Data Limite</label>
                                 {{ form.data_limite }}
-                                {% if form.data_limite.errors %}
-                                <div class="text-danger small">
-                                    {% for error in form.data_limite.errors %}
-                                        {{ error }}
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
+                                {% if form.data_limite.errors %}<div class="text-danger small mt-1">{{ form.data_limite.errors }}</div>{% endif %}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="{{ form.tempo_limite.id_for_label }}" class="form-label fw-bold text-dark">Tempo Limite</label>
+                                {{ form.tempo_limite }}
+                                <div class="form-text small text-muted"><i class="fas fa-info-circle"></i> Formato HH:MM:SS</div>
+                                {% if form.tempo_limite.errors %}<div class="text-danger small mt-1">{{ form.tempo_limite.errors }}</div>{% endif %}
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.tempo_limite.id_for_label }}" class="form-label">
-                                <i class="fas fa-clock me-1"></i>Tempo Limite
-                            </label>
-                            {{ form.tempo_limite }}
-                            <div class="form-text">
-                                Formato: HH:MM:SS (ex: 02:00:00 para 2 horas)
-                            </div>
-                            {% if form.tempo_limite.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.tempo_limite.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
+                        <div class="mb-4 bg-light p-3 border rounded-3">
+                            <div class="form-check form-switch fs-5 d-flex align-items-center">
                                 {{ form.disponivel }}
-                                <label class="form-check-label" for="{{ form.disponivel.id_for_label }}">
-                                    Disponível para os alunos
+                                <label class="form-check-label ms-2 text-dark fw-bold" for="{{ form.disponivel.id_for_label }}">
+                                    Ativar disponibilidade da prova para os alunos imediatamente
                                 </label>
                             </div>
                         </div>
 
-                        <!-- Nova Seção: Seleção de Alunos por Assunto -->
-                        <div class="card mb-4">
-                            <div class="card-header bg-info text-white">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-users me-1"></i>Seleção de Alunos
-                                </h6>
+                        <hr class="my-4 text-muted">
+
+                        <!-- SEÇÃO 2: PÚBLICO ALVO -->
+                        <h6 class="text-uppercase fw-bold text-secondary mb-3"><i class="fas fa-users me-2"></i>2. Público Alvo (Alunos)</h6>
+                        
+                        <!-- Opção A: Por Turma / Assunto -->
+                        <div class="card border-info mb-4 shadow-sm">
+                            <div class="card-header bg-info bg-opacity-10 border-info text-dark fw-bold py-2">
+                                <i class="fas fa-layer-group text-info me-2"></i> Opção A: Aplicação em Lote (Por Assunto)
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="id_assunto" class="form-label fw-bold">
-                                            <i class="fas fa-book me-1"></i>Selecionar por Assunto
-                                        </label>
-                                        <select name="assunto" id="id_assunto" class="form-select">
-                                            <option value="">-- Selecione um assunto --</option>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="id_assunto" class="form-label text-muted fw-bold">Vincular Assunto Base</label>
+                                        <select name="assunto" id="id_assunto" class="form-select form-select-sm">
+                                            <option value="">-- Não aplicar em lote --</option>
                                             {% for item in assuntos_professor %}
-                                            <option value="{{ item.assunto.id }}" 
-                                                    data-alunos-count="{{ item.contagem_alunos }}">
-                                                {{ item.assunto.nome }} ({{ item.contagem_alunos }} alunos)
-                                            </option>
+                                                <option value="{{ item.assunto.id }}" data-alunos-count="{{ item.contagem_alunos }}">
+                                                    {{ item.assunto.nome }} ({{ item.contagem_alunos }} vinculados)
+                                                </option>
                                             {% endfor %}
                                         </select>
-                                        <div class="form-text">
-                                            Selecione um assunto para aplicar a prova a todos os alunos vinculados
-                                        </div>
                                     </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label fw-bold">
-                                            <i class="fas fa-filter me-1"></i>Filtro por Período
-                                        </label>
-                                        <div class="row g-2">
-                                            <div class="col-6">
-                                                <select name="ano" id="id_ano" class="form-select">
-                                                    <option value="">Todos os anos</option>
-                                                    {% for ano_value, ano_label in anos_disponiveis %}
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted fw-bold">Filtrar Turma por Período</label>
+                                        <div class="d-flex gap-2">
+                                            <select name="ano" id="id_ano" class="form-select form-select-sm">
+                                                <option value="">Qualquer ano</option>
+                                                {% for ano_value, ano_label in anos_disponiveis %}
                                                     <option value="{{ ano_value }}">{{ ano_label }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-                                            <div class="col-6">
-                                                <select name="semestre" id="id_semestre" class="form-select">
-                                                    <option value="">Todos os semestres</option>
-                                                    <option value="1">1º Semestre</option>
-                                                    <option value="2">2º Semestre</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="form-text">
-                                            Filtre os alunos por ano e semestre
+                                                {% endfor %}
+                                            </select>
+                                            <select name="semestre" id="id_semestre" class="form-select form-select-sm">
+                                                <option value="">Qualquer semestre</option>
+                                                <option value="1">1º Semestre</option>
+                                                <option value="2">2º Semestre</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Informações do Assunto Selecionado -->
-                                <div id="info-assunto" class="alert alert-info d-none">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong id="assunto-nome"></strong>
-                                            <br>
-                                            <small id="assunto-info"></small>
-                                        </div>
-                                        <div>
-                                            <span class="badge bg-success" id="assunto-alunos-count">0</span>
-                                            <span class="text-muted">aluno(s)</span>
-                                        </div>
+                                <div id="info-assunto" class="alert alert-primary mt-3 mb-0 py-2 d-none d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-check-circle me-2"></i>A prova será distribuída para a turma de <strong id="assunto-nome"></strong>.
                                     </div>
-                                </div>
-
-                                <!-- Seleção Manual de Alunos (como backup) -->
-                                <div class="mt-3">
-                                    <label for="{{ form.alunos.id_for_label }}" class="form-label fw-bold">
-                                        <i class="fas fa-user-check me-1"></i>Seleção Manual de Alunos (Opcional)
-                                    </label>
-                                    {{ form.alunos }}
-                                    {% if form.alunos.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in form.alunos.errors %}
-                                            {{ error }}
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                    <div class="form-text">
-                                        Use esta opção para selecionar alunos individualmente, ou deixe em branco para usar a seleção por assunto.
-                                    </div>
+                                    <span class="badge bg-primary fs-6" id="assunto-alunos-count">0</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-between">
-                            <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>Cancelar
+                        <div class="text-center text-muted mb-4 fw-bold">E / OU</div>
+
+                        <!-- Opção B: Seleção Manual Avançada -->
+                        <div class="card border-secondary mb-4 shadow-sm">
+                            <div class="card-header bg-light border-secondary text-dark fw-bold py-2 d-flex justify-content-between align-items-center">
+                                <div><i class="fas fa-user-plus text-secondary me-2"></i> Opção B: Seleção Manual (Alunos Avulsos)</div>
+                                <span class="badge bg-secondary" id="manual-count">0 selecionados</span>
+                            </div>
+                            
+                            <!-- Esconde o select padrão horroroso do Django -->
+                            <div class="d-none">
+                                {{ form.alunos }}
+                            </div>
+                            
+                            <div class="card-body p-0">
+                                <!-- Barra de Pesquisa de Alunos -->
+                                <div class="p-3 border-bottom bg-white">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted border-end-0"><i class="fas fa-search"></i></span>
+                                        <input type="text" id="searchStudents" class="form-control border-start-0" placeholder="Buscar aluno por nome, e-mail ou identificador...">
+                                        <button class="btn btn-outline-secondary" type="button" id="clearSearch">Limpar</button>
+                                    </div>
+                                </div>
+
+                                <!-- Lista Rica e Rolável de Alunos -->
+                                <div class="list-container bg-light" id="studentsContainer">
+                                    {% for aluno in form.alunos.field.queryset %}
+                                    <label class="student-item d-flex align-items-center p-3 border-bottom bg-white cursor-pointer hover-bg">
+                                        <div class="form-check mb-0 me-3">
+                                            <input class="form-check-input custom-student-cb fs-5" type="checkbox" value="{{ aluno.id }}">
+                                        </div>
+                                        <div class="d-flex flex-column flex-grow-1">
+                                            <span class="fw-bold text-dark mb-1">
+                                                {{ aluno.get_full_name|default:aluno.username }}
+                                            </span>
+                                            <div class="d-flex text-muted small gap-3">
+                                                <span><i class="fas fa-envelope text-secondary me-1"></i> {{ aluno.email|default:"Sem e-mail cadastrado" }}</span>
+                                                <span><i class="fas fa-id-badge text-secondary me-1"></i> {{ aluno.username }}</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                {% if form.alunos.errors %}
+                                    <div class="p-2 text-danger small bg-white">{{ form.alunos.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Botões Finais -->
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-outline-secondary px-4">
+                                <i class="fas fa-arrow-left me-1"></i> Cancelar
                             </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Criar Aplicação
+                            <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm" id="submitButton">
+                                <i class="fas fa-save me-2"></i> Finalizar e Criar Aplicação
                             </button>
                         </div>
                     </form>
@@ -190,88 +186,204 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- LÓGICA DO ASSUNTO/TURMA ---
     const assuntoSelect = document.getElementById('id_assunto');
-    const anoSelect = document.getElementById('id_ano');
-    const semestreSelect = document.getElementById('id_semestre');
     const infoAssunto = document.getElementById('info-assunto');
     const assuntoNome = document.getElementById('assunto-nome');
-    const assuntoInfo = document.getElementById('assunto-info');
     const assuntoAlunosCount = document.getElementById('assunto-alunos-count');
-    const alunosSelect = document.getElementById('{{ form.alunos.id_for_label }}');
+    const anoSelect = document.getElementById('id_ano');
+    const semestreSelect = document.getElementById('id_semestre');
 
-    // Atualizar informações quando o assunto é selecionado
-    assuntoSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        
-        if (this.value) {
+    function updateAssuntoView() {
+        if (assuntoSelect.value) {
+            const selectedOption = assuntoSelect.options[assuntoSelect.selectedIndex];
             assuntoNome.textContent = selectedOption.text.split(' (')[0];
             assuntoAlunosCount.textContent = selectedOption.dataset.alunosCount;
-            assuntoInfo.textContent = 'Assunto selecionado para aplicar a prova a todos os alunos vinculados';
             infoAssunto.classList.remove('d-none');
-            
-            // Limpar seleção manual quando assunto é selecionado
-            for (let i = 0; i < alunosSelect.options.length; i++) {
-                alunosSelect.options[i].selected = false;
-            }
+            infoAssunto.classList.add('d-flex');
         } else {
             infoAssunto.classList.add('d-none');
-        }
-    });
-
-    // Limpar seleção de assunto quando alunos são selecionados manualmente
-    alunosSelect.addEventListener('change', function() {
-        if (this.selectedOptions.length > 0) {
-            assuntoSelect.value = '';
-            infoAssunto.classList.add('d-none');
-        }
-    });
-
-    // Atualizar contagem quando filtros de período mudam
-    function atualizarContagemAssunto() {
-        if (assuntoSelect.value) {
-            // Aqui você poderia fazer uma requisição AJAX para obter a contagem filtrada
-            // Por enquanto, vamos manter a contagem original
-            const selectedOption = assuntoSelect.options[assuntoSelect.selectedIndex];
-            assuntoAlunosCount.textContent = selectedOption.dataset.alunosCount;
-            
-            let filtroInfo = '';
-            if (anoSelect.value) {
-                filtroInfo += ` Ano: ${anoSelect.options[anoSelect.selectedIndex].text}`;
-            }
-            if (semestreSelect.value) {
-                filtroInfo += ` Semestre: ${semestreSelect.options[semestreSelect.selectedIndex].text}`;
-            }
-            
-            if (filtroInfo) {
-                assuntoInfo.textContent = `Assunto selecionado${filtroInfo}`;
-            } else {
-                assuntoInfo.textContent = 'Assunto selecionado para aplicar a prova a todos os alunos vinculados';
-            }
+            infoAssunto.classList.remove('d-flex');
         }
     }
 
-    anoSelect.addEventListener('change', atualizarContagemAssunto);
-    semestreSelect.addEventListener('change', atualizarContagemAssunto);
+    assuntoSelect.addEventListener('change', updateAssuntoView);
+    anoSelect.addEventListener('change', updateAssuntoView);
+    semestreSelect.addEventListener('change', updateAssuntoView);
+
+    // --- LÓGICA DE SELEÇÃO MANUAL (SINCRONIZAÇÃO) ---
+    // O Django renderiza o multiple select com o ID 'id_alunos' (confirme se é este)
+    const hiddenSelect = document.getElementById('{{ form.alunos.id_for_label }}'); 
+    const customCheckboxes = document.querySelectorAll('.custom-student-cb');
+    const manualCountBadge = document.getElementById('manual-count');
+
+    function updateManualCount() {
+        const count = document.querySelectorAll('.custom-student-cb:checked').length;
+        manualCountBadge.textContent = count + ' selecionados';
+        manualCountBadge.className = count > 0 ? 'badge bg-success' : 'badge bg-secondary';
+    }
+
+    // Inicializa as checkboxes com base no select oculto (útil se der erro no form e voltar)
+    if (hiddenSelect) {
+        Array.from(hiddenSelect.options).forEach(opt => {
+            if (opt.selected) {
+                const cb = document.querySelector(`.custom-student-cb[value="${opt.value}"]`);
+                if (cb) cb.checked = true;
+            }
+        });
+    }
+    updateManualCount();
+
+    // Sincroniza a checkbox visual com a option oculta do Django
+    customCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            if (hiddenSelect) {
+                const option = hiddenSelect.querySelector(`option[value="${this.value}"]`);
+                if (option) option.selected = this.checked;
+            }
+            updateManualCount();
+            
+            // Opcional: Se selecionar manualmente, talvez limpar o assunto
+            if (this.checked && assuntoSelect.value) {
+                // assuntoSelect.value = '';
+                // updateAssuntoView();
+            }
+        });
+    });
+
+    // --- LÓGICA DA BARRA DE PESQUISA ---
+    const searchInput = document.getElementById('searchStudents');
+    const studentItems = document.querySelectorAll('.student-item');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase().trim();
+            studentItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    item.style.setProperty('display', 'flex', 'important');
+                } else {
+                    item.style.setProperty('display', 'none', 'important');
+                }
+            });
+        });
+
+        document.getElementById('clearSearch').addEventListener('click', function() {
+            searchInput.value = '';
+            studentItems.forEach(item => item.style.setProperty('display', 'flex', 'important'));
+        });
+    }
+
+    // --- PROTEÇÃO DE SUBMISSÃO ---
+    document.getElementById('formAplicacao').addEventListener('submit', function(e) {
+        const countChecked = document.querySelectorAll('.custom-student-cb:checked').length;
+        
+        // Verifica se selecionou turma OU pelo menos um aluno manualmente
+        if (!assuntoSelect.value && countChecked === 0) {
+            e.preventDefault();
+            alert("Atenção: Selecione um 'Assunto Base' para vincular a turma inteira OU selecione manualmente pelo menos um aluno na Opção B.");
+            return false;
+        }
+
+        const btn = document.getElementById('submitButton');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Salvando...';
+        btn.classList.add('disabled');
+    });
 });
 </script>
 
 <style>
-.form-control:focus, .form-select:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+/* Forçar estilização moderna sobre inputs de data/hora nativos do Django */
+#formAplicacao input[type="datetime-local"],
+#formAplicacao input[type="text"] {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
 }
 
-.form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+#formAplicacao input:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
-.card {
-    border-radius: 0.5rem;
+/* Customização do interruptor do Bootstrap */
+.form-switch .form-check-input {
+    width: 3em;
+    height: 1.5em;
+    cursor: pointer;
 }
 
-.badge {
-    font-size: 0.9rem;
+/* Container de Alunos da Opção B */
+.list-container {
+    max-height: 350px;
+    overflow-y: auto;
 }
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.hover-bg {
+    transition: background-color 0.15s ease-in-out;
+}
+
+.hover-bg:hover {
+    background-color: #f1f3f5 !important;
+}
+
+/* Destaque para aluno selecionado */
+.student-item:has(.custom-student-cb:checked) {
+    background-color: #f4f7fe !important;
+    border-left: 4px solid #0d6efd !important;
+}
+
+.student-item:has(.custom-student-cb:checked) .fw-bold {
+    color: #0d6efd !important;
+}
+
+/* ==========================================================================
+   CORREÇÃO DA BARRA DE PESQUISA (INPUT GROUP FIX)
+   Impede que regras globais quebrem o alinhamento do botão e do ícone
+   ========================================================================== */
+.input-group {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    width: 100%;
+}
+
+.input-group > .input-group-text {
+    display: flex !important;
+    align-items: center !important;
+    width: auto !important;
+    white-space: nowrap;
+}
+
+.input-group > .form-control {
+    position: relative !important;
+    flex: 1 1 auto !important;
+    width: 1% !important; /* O segredo para manter o texto alinhado com o botão */
+    min-width: 0 !important;
+    display: block !important;
+    margin: 0 !important;
+}
+
+.input-group > .btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    position: relative !important;
+    z-index: 2 !important;
+}
+
 </style>
 {% endblock %}
