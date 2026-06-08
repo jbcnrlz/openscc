@@ -1,123 +1,96 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container py-4">
-    <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container mt-4">
+    <!-- Cabeçalho Principal -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <h2 class="h4 mb-0 text-dark fw-bold">
+            <i class="fas fa-palette me-2 text-teal"></i> Banco de Temas
+        </h2>
         <div>
-            <h1 class="h3 mb-2">
-                <i class="fas fa-tags text-primary me-2"></i>Gerenciar Temas
-            </h1>
-            <p class="text-muted">Gerencie os temas disponíveis para problemas PBL</p>
+            <a href="{% url 'mimir:criarTema' %}" class="btn btn-teal text-white btn-sm fw-bold shadow-sm">
+                <i class="fas fa-plus me-1"></i> Novo Tema
+            </a>
         </div>
-        <a href="{% url 'mimir:criarTema' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Novo Tema
-        </a>
     </div>
 
-    <!-- Alertas -->
+    <!-- Mensagens de Feedback -->
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                <i class="fas 
-                    {% if message.tags == 'success' %}fa-check-circle
-                    {% elif message.tags == 'warning' %}fa-exclamation-triangle
-                    {% elif message.tags == 'error' %}fa-times-circle
-                    {% else %}fa-info-circle{% endif %}
-                me-2"></i>
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
                 {{ message }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         {% endfor %}
     {% endif %}
 
-    <!-- Card Principal -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white py-3">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list me-2"></i>Lista de Temas
-                        <span class="badge bg-secondary ms-2">{{ total_temas }}</span>
-                    </h5>
+    <!-- Contêiner Principal da Tabela -->
+    <div class="card shadow-sm border-0">
+        
+        <!-- Barra de Pesquisa e Título -->
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="card-title mb-0 fs-6 fw-bold text-secondary">
+                <i class="fas fa-list me-2"></i> Temas Cadastrados
+                <span class="badge bg-secondary ms-1">{{ total_temas }}</span>
+            </h5>
+            
+            <form method="get" class="d-flex m-0" style="min-width: 280px;">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light text-muted border-end-0"><i class="fas fa-search"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0" placeholder="Buscar temas..." value="{{ search_query }}">
+                    <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+                    {% if search_query %}
+                        <a href="{% url 'mimir:listarTemas' %}" class="btn btn-outline-danger" title="Limpar busca">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    {% endif %}
                 </div>
-                <div class="col-md-6">
-                    <!-- Barra de Pesquisa -->
-                    <form method="get" class="d-flex">
-                        <div class="input-group">
-                            <input type="text" 
-                                   name="search" 
-                                   class="form-control" 
-                                   placeholder="Buscar temas..."
-                                   value="{{ search_query }}"
-                                   aria-label="Buscar temas">
-                            <button class="btn btn-outline-secondary" type="submit">
-                                <i class="fas fa-search"></i>
-                            </button>
-                            {% if search_query %}
-                                <a href="{% url 'mimir:temaList' %}" class="btn btn-outline-danger">
-                                    <i class="fas fa-times"></i>
-                                </a>
-                            {% endif %}
-                        </div>
-                    </form>
-                </div>
-            </div>
+            </form>
         </div>
 
-        <div class="card-body">
+        <div class="card-body p-0">
             {% if temas %}
-                <!-- Tabela de Temas -->
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped">
+                    <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>
+                                <th style="width: 80%;" class="ps-4">
+                                    <!-- Lógica de Ordenação Preservada -->
                                     <a href="?order_by={% if order_by == 'nome' %}-nome{% else %}nome{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                                       class="text-decoration-none text-dark">
+                                       class="text-decoration-none text-secondary d-flex align-items-center">
                                         Nome do Tema
-                                        {% if order_by == 'nome' %}
-                                            <i class="fas fa-sort-up ms-1"></i>
-                                        {% elif order_by == '-nome' %}
-                                            <i class="fas fa-sort-down ms-1"></i>
-                                        {% else %}
-                                            <i class="fas fa-sort ms-1"></i>
-                                        {% endif %}
+                                        <span class="ms-1 text-muted small">
+                                            {% if order_by == 'nome' %}
+                                                <i class="fas fa-sort-up"></i>
+                                            {% elif order_by == '-nome' %}
+                                                <i class="fas fa-sort-down"></i>
+                                            {% else %}
+                                                <i class="fas fa-sort"></i>
+                                            {% endif %}
+                                        </span>
                                     </a>
                                 </th>
-                                <th width="150">Ações</th>
+                                <th style="width: 20%;" class="text-end pe-4">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for tema in temas %}
                             <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
-                                             style="width: 32px; height: 32px;">
-                                            <i class="fas fa-tag text-white" style="font-size: 0.8rem;"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-0">{{ tema.nome }}</h6>
-                                            <small class="text-muted">ID: {{ tema.id }}</small>
-                                        </div>
-                                    </div>
+                                <td class="ps-4">
+                                    <span class="d-block text-dark fw-bold mb-1">
+                                        <i class="fas fa-tag text-teal me-2"></i>{{ tema.nome }}
+                                    </span>
+                                    <small class="text-muted d-block">
+                                        ID de Sistema: #{{ tema.id }}
+                                    </small>
                                 </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{% url 'mimir:editarTema' tema.pk %}" 
-                                           class="btn btn-outline-warning" 
-                                           data-bs-toggle="tooltip" 
-                                           title="Editar tema">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="{% url 'mimir:deletarTema' tema.pk %}" 
-                                           class="btn btn-outline-danger" 
-                                           data-bs-toggle="tooltip" 
-                                           title="Excluir tema">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'mimir:editarTema' tema.pk %}" class="btn btn-outline-secondary btn-sm me-1" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:deletarTema' tema.pk %}" class="btn btn-outline-danger btn-sm" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -125,171 +98,144 @@
                     </table>
                 </div>
 
-                <!-- Paginação -->
+                <!-- Rodapé com Paginação Integrada -->
                 {% if is_paginated %}
-                <nav aria-label="Navegação de páginas">
-                    <ul class="pagination justify-content-center mb-0">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                        {% endif %}
-
-                        {% for num in page_obj.paginator.page_range %}
-                            {% if page_obj.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <div class="card-footer bg-white border-top py-3">
+                    <nav aria-label="Navegação de páginas">
+                        <ul class="pagination pagination-sm justify-content-center mb-2">
+                            {% if page_obj.has_previous %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
-                                        {{ num }}
+                                    <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}" title="Primeira">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
+                                        Anterior
                                     </a>
                                 </li>
                             {% endif %}
-                        {% endfor %}
 
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                    <div class="text-center text-muted mt-2">
-                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-                    </div>
-                </nav>
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}">
+                                        Próxima
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if order_by != 'nome' %}&order_by={{ order_by }}{% endif %}" title="Última">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                        <div class="text-center">
+                            <small class="text-muted" style="font-size: 0.75rem;">
+                                Exibindo página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} (Total de {{ page_obj.paginator.count }} temas)
+                            </small>
+                        </div>
+                    </nav>
+                </div>
                 {% endif %}
 
             {% else %}
-                <!-- Estado vazio -->
-                <div class="text-center py-5">
-                    <div class="mb-4">
-                        <i class="fas fa-tags fa-4x text-muted"></i>
-                    </div>
-                    <h4 class="text-muted mb-3">
+                <!-- Empty State Padronizado -->
+                <div class="text-center py-5 text-secondary">
+                    <i class="fas fa-palette fa-3x mb-3 text-muted opacity-50"></i>
+                    <h5 class="text-dark">{% if search_query %}Nenhum tema encontrado{% else %}Nenhum tema cadastrado{% endif %}</h5>
+                    <p class="small text-muted mb-4">
                         {% if search_query %}
-                            Nenhum tema encontrado
+                            Não foram encontrados temas com a palavra "{{ search_query }}".
                         {% else %}
-                            Nenhum tema cadastrado
-                        {% endif %}
-                    </h4>
-                    <p class="text-muted mb-4">
-                        {% if search_query %}
-                            Não foram encontrados temas para "{{ search_query }}".
-                            <a href="{% url 'mimir:temaList' %}" class="text-decoration-none">Limpar busca</a>
-                        {% else %}
-                            Comece criando o primeiro tema do sistema.
+                            Crie os temas macro para classificar os problemas gerados pela IA.
                         {% endif %}
                     </p>
-                    {% if not search_query %}
-                        <a href="{% url 'mimir:criarTema' %}" class="btn btn-primary">
-                            <i class="fas fa-plus me-2"></i>Criar Primeiro Tema
+                    {% if search_query %}
+                        <a href="{% url 'mimir:listarTemas' %}" class="btn btn-outline-secondary btn-sm">Limpar Busca</a>
+                    {% else %}
+                        <a href="{% url 'mimir:criarTema' %}" class="btn btn-teal text-white btn-sm shadow-sm">
+                            <i class="fas fa-plus me-1"></i> Criar Primeiro Tema
                         </a>
                     {% endif %}
                 </div>
             {% endif %}
         </div>
     </div>
-
-    <!-- Estatísticas Rápidas -->
-    {% if temas %}
-    <div class="row mt-4">
-        <div class="col-md-4">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h4 class="mb-0">{{ total_temas }}</h4>
-                            <span>Total de Temas</span>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-tags fa-2x opacity-50"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h4 class="mb-0">{{ page_obj.paginator.count }}</h4>
-                            <span>Mostrando</span>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-list fa-2x opacity-50"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h4 class="mb-0">{{ page_obj.paginator.num_pages }}</h4>
-                            <span>Páginas</span>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-file-alt fa-2x opacity-50"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-// Inicializar tooltips
-document.addEventListener('DOMContentLoaded', function() {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    });
-});
-</script>
 <style>
-/* static/css/custom.css */
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.075);
+/* Integrando as cores padrão do seu Dashboard (Teal/Verde-Água para Temas) */
+:root {
+    --bs-teal: #20c997;
 }
 
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+.text-teal { 
+    color: var(--bs-teal) !important; 
 }
 
-.card-header {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+.btn-teal { 
+    background-color: var(--bs-teal); 
+    border-color: var(--bs-teal); 
 }
 
-.btn-group-sm > .btn {
-    padding: 0.25rem 0.5rem;
+.btn-teal:hover { 
+    background-color: #1aa179; 
+    border-color: #1aa179; 
+    color: white; 
 }
 
-.badge {
-    font-size: 0.75em;
+/* Ajustes da Paginação */
+.pagination .page-link {
+    color: #4e73df;
+    border-color: #e3e6f0;
+}
+.pagination .page-item.active .page-link {
+    background-color: #4e73df;
+    border-color: #4e73df;
+    color: #fff;
+}
+
+/* Fix para a barra de pesquisa não ficar esmagada */
+.input-group {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    width: 100%;
+}
+.input-group > .input-group-text {
+    display: flex !important;
+    align-items: center !important;
+    width: auto !important;
+    white-space: nowrap;
+}
+.input-group > .form-control {
+    position: relative !important;
+    flex: 1 1 auto !important;
+    width: 1% !important;
+    min-width: 0 !important;
+    display: block !important;
+    margin: 0 !important;
+}
+.input-group > .btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    position: relative !important;
+    z-index: 2 !important;
 }
 </style>
 {% endblock %}
