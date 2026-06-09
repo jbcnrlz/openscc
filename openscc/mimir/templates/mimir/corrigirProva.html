@@ -92,11 +92,11 @@
             </div>
             <div class="row mt-3">
                 <div class="col-12">
-                    <div class="alert alert-info">
+                    <div class="alert alert-info mb-0">
                         <i class="fas fa-robot me-2"></i>
-                        <strong>Correção Automática:</strong> 
+                        <strong>Dica:</strong> 
                         Questões de múltipla escolha são corrigidas automaticamente. 
-                        Use o botão "Corrigir com IA" para questões dissertativas e respostas com imagens.
+                        Use o botão "Corrigir com IA" para avaliar de forma inteligente as respostas textuais ou em imagem.
                     </div>
                 </div>
             </div>
@@ -174,7 +174,7 @@
                                 {{ pergunta.resposta.resposta_texto|linebreaks }}
                             </div>
                         {% else %}
-                            <p class="text-muted fst-italic">Aluno não respondeu esta questão.</p>
+                            <p class="text-muted fst-italic">Aluno não respondeu ou enviou apenas arquivo.</p>
                         {% endif %}
                         
                         <!-- Arquivo anexado pelo aluno -->
@@ -270,6 +270,7 @@
                                 Nota (0-10):
                             </label>
                             <div class="input-group" style="max-width: 200px;">
+                                <!-- IMPORTANTE: O uso de stringformat:'f' garante que o valor use ponto (.) e não quebre o formulário -->
                                 <input type="number" 
                                        class="form-control nota-questao" 
                                        id="nota-{{ pergunta.pergunta.id }}" 
@@ -277,7 +278,7 @@
                                        min="0" 
                                        max="10" 
                                        step="0.1"
-                                       value="{% if pergunta.resposta and pergunta.resposta.nota %}{{ pergunta.resposta.nota }}{% else %}0{% endif %}"
+                                       value="{% if pergunta.resposta and pergunta.resposta.nota is not None %}{{ pergunta.resposta.nota|stringformat:'f' }}{% else %}0{% endif %}"
                                        data-pergunta-id="{{ pergunta.pergunta.id }}"
                                        data-automatica="false">
                                 <button type="button" 
@@ -358,13 +359,13 @@
                     <!-- Status de Correção -->
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted" id="status-salvamento-{{ pergunta.pergunta.id }}">
-                            {% if pergunta.resposta and pergunta.resposta.nota is not None %}
-                            <i class="fas fa-check text-success"></i> Correção salva
+                            {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
+                            <i class="fas fa-robot text-info"></i> Correção automática
                             {% else %}
-                                {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
-                                <i class="fas fa-robot text-info"></i> Correção automática
+                                {% if pergunta.resposta and pergunta.resposta.nota is not None %}
+                                <i class="fas fa-pen text-primary"></i> Nota atribuída
                                 {% else %}
-                                <i class="fas fa-sync text-secondary"></i> Alterações não salvas
+                                <i class="fas fa-sync text-secondary"></i> Aguardando avaliação
                                 {% endif %}
                             {% endif %}
                         </small>
@@ -379,31 +380,24 @@
         {% endfor %}
 
         <!-- Botões de Ação -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
+        <div class="card shadow-sm mb-4 border-primary">
+            <div class="card-body bg-light">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="text-muted" id="resumo-correcao">
-                            <strong id="questoes-corrigidas">0</strong> de {{ perguntas_com_respostas|length }} questões corrigidas
+                        <span class="text-dark" id="resumo-correcao">
+                            <strong id="questoes-corrigidas">0</strong> de {{ perguntas_com_respostas|length }} questões com nota atribuída
                         </span>
                         <br>
                         <small class="text-muted" id="resumo-automatico">
-                            <span id="questoes-automaticas">0</span> correções automáticas
-                        </small>
-                        <br>
-                        <small class="text-muted" id="resumo-arquivos">
-                            <span id="questoes-com-arquivo">0</span> respostas com arquivo
+                            <span id="questoes-automaticas">0</span> correções automáticas (IA/Múltipla Escolha)
                         </small>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-outline-info me-2" id="btn-corrigir-todas-ia">
+                        <button type="button" class="btn btn-outline-info me-2 fw-bold" id="btn-corrigir-todas-ia">
                             <i class="fas fa-robot me-1"></i>Corrigir Todas com IA
                         </button>
-                        <button type="button" class="btn btn-secondary me-2" onclick="salvarRascunho()">
-                            <i class="fas fa-save me-1"></i>Salvar Rascunho
-                        </button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-check-circle me-1"></i>Finalizar Correção
+                        <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm">
+                            <i class="fas fa-check-circle me-1"></i>Salvar e Finalizar Correção
                         </button>
                     </div>
                 </div>
@@ -415,34 +409,32 @@
 <!-- Modal de Confirmação -->
 <div class="modal fade" id="confirmacaoModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title">Finalizar Correção</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">Finalizar Correção</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja finalizar a correção desta prova?</p>
+            <div class="modal-body p-4">
+                <p class="text-dark">Você está prestes a gravar a nota final e disponibilizar o resultado para o aluno.</p>
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Resumo da Correção:</strong>
+                    <strong>Resumo Final:</strong>
                     <div class="mt-2">
                         <div><strong>Questões corrigidas:</strong> <span id="modal-corrigidas">0</span> de {{ perguntas_com_respostas|length }}</div>
-                        <div><strong>Correções automáticas:</strong> <span id="modal-automaticas">0</span></div>
-                        <div><strong>Respostas com arquivo:</strong> <span id="modal-arquivos">0</span></div>
-                        <div><strong>Nota final:</strong> <span id="modal-nota-final">0.0</span></div>
+                        <div><strong>Nota final calculada:</strong> <span id="modal-nota-final" class="badge bg-success fs-6 ms-1">0.0</span></div>
                     </div>
                 </div>
 
                 <div class="alert alert-warning" id="alert-questoes-pendentes" style="display: none;">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Atenção!</strong> Existem questões pendentes de correção manual.
+                    <strong>Atenção!</strong> Existem questões que ainda não receberam nota.
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continuar Corrigindo</button>
-                <button type="button" class="btn btn-success" id="btn-confirmar-correcao">
-                    <i class="fas fa-check-circle me-1"></i>Confirmar Correção
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Revisar Novamente</button>
+                <button type="button" class="btn btn-success px-4" id="btn-confirmar-correcao">
+                    <i class="fas fa-check-circle me-1"></i>Confirmar e Salvar
                 </button>
             </div>
         </div>
@@ -451,13 +443,13 @@
 
 <!-- Modal de Carregamento IA -->
 <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-body text-center py-4">
-                <div class="spinner-border text-primary mb-3" role="status">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-body text-center py-5">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Processando...</span>
                 </div>
-                <h6 class="text-primary" id="loading-title">Corrigindo com IA</h6>
+                <h6 class="text-primary fw-bold" id="loading-title">Corrigindo com IA</h6>
                 <p class="text-muted small mb-0" id="loading-message">Analisando resposta do aluno...</p>
             </div>
         </div>
@@ -475,14 +467,12 @@ let questoesComArquivo = new Set();
 // ===== FUNÇÕES DE CORREÇÃO COM IA =====
 function corrigirComIA(perguntaId) {
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-    
-    // Atualizar mensagem de loading baseada no tipo de resposta
     const tipoRespostaInput = document.getElementById(`tipo-resposta-${perguntaId}`);
     const temArquivo = tipoRespostaInput && tipoRespostaInput.value === 'arquivo';
     
     if (temArquivo) {
         document.getElementById('loading-title').textContent = 'Processando Imagem';
-        document.getElementById('loading-message').textContent = 'Analisando resposta em imagem...';
+        document.getElementById('loading-message').textContent = 'Analisando resposta multimodal...';
     } else {
         document.getElementById('loading-title').textContent = 'Corrigindo com IA';
         document.getElementById('loading-message').textContent = 'Analisando resposta do aluno...';
@@ -490,7 +480,6 @@ function corrigirComIA(perguntaId) {
     
     loadingModal.show();
     
-    // Coletar dados da questão
     const cardIndex = Array.from(document.querySelectorAll('.questao-correcao')).findIndex(card => 
         card.querySelector(`[data-pergunta-id="${perguntaId}"]`)) + 1;
     
@@ -502,7 +491,6 @@ function corrigirComIA(perguntaId) {
     
     if (temArquivo) {
         tipoResposta = 'arquivo';
-        // Para arquivos, enviaremos apenas a referência - o backend irá buscar o arquivo
         respostaAluno = "Resposta em arquivo - processamento multimodal necessário";
     } else {
         respostaAluno = document.querySelector(`#questao-${cardIndex} .resposta-aluno .resposta-texto`).textContent;
@@ -511,7 +499,6 @@ function corrigirComIA(perguntaId) {
         }
     }
     
-    // Fazer requisição para o backend
     fetch("{% url 'mimir:corrigirComIA' %}", {
         method: 'POST',
         headers: {
@@ -528,16 +515,12 @@ function corrigirComIA(perguntaId) {
         })
     })
     .then(response => {
-        if (!response.ok) {
-            throw new Error('Erro na requisição');
-        }
+        if (!response.ok) throw new Error('Erro na requisição');
         return response.json();
     })
     .then(data => {
         loadingModal.hide();
-        
         if (data.success) {
-            // Preencher automaticamente os campos
             const notaInput = document.getElementById(`nota-${perguntaId}`);
             const feedbackInput = document.getElementById(`feedback-${perguntaId}`);
             
@@ -545,20 +528,13 @@ function corrigirComIA(perguntaId) {
                 notaInput.value = data.nota;
                 feedbackInput.value = data.feedback;
                 
-                // Atualizar variáveis globais
                 notasPorQuestao[perguntaId] = parseFloat(data.nota);
-                if (data.nota > 0) {
-                    questoesCorrigidas.add(parseInt(perguntaId));
-                }
+                if (data.nota > 0) questoesCorrigidas.add(parseInt(perguntaId));
                 
                 atualizarStatusQuestao(perguntaId);
                 atualizarResumoCorrecao();
                 
-                // Mostrar mensagem de sucesso
-                let mensagem = 'Correção com IA realizada com sucesso!';
-                if (data.tipo_processamento === 'multimodal') {
-                    mensagem = 'Correção multimodal (imagem) realizada com sucesso!';
-                }
+                let mensagem = data.tipo_processamento === 'multimodal' ? 'Correção de imagem realizada!' : 'Correção com IA concluída!';
                 showToast('success', mensagem);
             }
         } else {
@@ -567,232 +543,155 @@ function corrigirComIA(perguntaId) {
     })
     .catch(error => {
         loadingModal.hide();
-        console.error('Erro:', error);
-        showToast('error', 'Erro ao conectar com o serviço de IA');
+        showToast('error', 'Erro de conexão com a IA');
     });
 }
 
 function corrigirTodasComIA() {
     const questõesDissertativas = Array.from(document.querySelectorAll('.correcao-ia-completa-btn'));
-    
     if (questõesDissertativas.length === 0) {
-        showToast('info', 'Não há questões dissertativas para corrigir');
+        showToast('info', 'Não há questões textuais para corrigir.');
         return;
     }
     
-    // Contar questões com arquivo
-    const questõesComArquivo = questõesDissertativas.filter(btn => {
-        const perguntaId = btn.dataset.perguntaId;
-        const tipoRespostaInput = document.getElementById(`tipo-resposta-${perguntaId}`);
-        return tipoRespostaInput && tipoRespostaInput.value === 'arquivo';
-    }).length;
-    
-    let mensagemConfirmacao = `Deseja corrigir automaticamente ${questõesDissertativas.length} questão(ões) dissertativa(s) com IA?`;
-    if (questõesComArquivo > 0) {
-        mensagemConfirmacao += `\n\n${questõesComArquivo} delas contêm imagens que serão processadas multimodalmente.`;
-    }
-    
-    if (!confirm(mensagemConfirmacao)) {
-        return;
-    }
+    if (!confirm(`Deseja corrigir automaticamente as ${questõesDissertativas.length} questão(ões) dissertativa(s) com IA?`)) return;
     
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
     loadingModal.show();
     
-    // Corrigir cada questão sequencialmente
     let currentIndex = 0;
-    let processadasComSucesso = 0;
     
     function processNext() {
         if (currentIndex >= questõesDissertativas.length) {
             loadingModal.hide();
-            showToast('success', `${processadasComSucesso}/${questõesDissertativas.length} questões corrigidas com IA!`);
+            showToast('success', `Todas as questões foram avaliadas pela IA!`);
             return;
         }
-        
         const btn = questõesDissertativas[currentIndex];
-        const perguntaId = btn.dataset.perguntaId;
+        document.getElementById('loading-title').textContent = `Processando IA (${currentIndex + 1}/${questõesDissertativas.length})`;
+        corrigirComIA(btn.dataset.perguntaId);
         
-        // Atualizar mensagem de progresso
-        document.getElementById('loading-title').textContent = `Processando (${currentIndex + 1}/${questõesDissertativas.length})`;
-        
-        corrigirComIA(perguntaId);
-        
-        // Aguardar um pouco antes da próxima para não sobrecarregar
+        // Timer pra evitar Rate Limit na API Gemini
         setTimeout(() => {
             currentIndex++;
-            processadasComSucesso++;
             processNext();
-        }, 3000);
+        }, 3500);
     }
-    
     processNext();
 }
 
 // ===== FUNÇÕES AUXILIARES =====
 function showToast(type, message) {
-    // Criar toast dinamicamente
     const toastContainer = document.createElement('div');
-    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
     
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0`;
-    toast.setAttribute('role', 'alert');
-    
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">
-                ${message}
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-info-circle';
+    const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
+
+    toastContainer.innerHTML = `
+        <div class="toast align-items-center text-white ${bgClass} border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold">
+                    <i class="fas ${icon} me-2"></i> ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>
     `;
-    
-    toastContainer.appendChild(toast);
     document.body.appendChild(toastContainer);
-    
-    const bsToast = new bootstrap.Toast(toast);
+    const bsToast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
     bsToast.show();
-    
-    // Remover após fechar
-    toast.addEventListener('hidden.bs.toast', () => {
-        toastContainer.remove();
-    });
+    toastContainer.querySelector('.toast').addEventListener('hidden.bs.toast', () => toastContainer.remove());
 }
 
 function ampliarImagem(imgElement) {
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.innerHTML = `
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Visualização Ampliada</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 bg-transparent">
+                <div class="modal-header border-0">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body text-center">
-                    <img src="${imgElement.src}" class="img-fluid" style="max-height: 80vh;">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <div class="modal-body text-center p-0">
+                    <img src="${imgElement.src}" class="img-fluid rounded shadow-lg" style="max-height: 90vh;">
                 </div>
             </div>
         </div>
     `;
-    
     document.body.appendChild(modal);
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
-    
-    modal.addEventListener('hidden.bs.modal', function () {
-        document.body.removeChild(modal);
-    });
+    modal.addEventListener('hidden.bs.modal', () => document.body.removeChild(modal));
 }
 
-// ===== FUNÇÕES DE INICIALIZAÇÃO =====
+// ===== INICIALIZAÇÃO =====
 function inicializarCorrecao() {
-    // Inicializar contadores
     {% for item in perguntas_com_respostas %}
         {% with tipo_pergunta=item.pergunta.tipoDePergunta.descricao|lower %}
         {% if "múltipla escolha" in tipo_pergunta or "multipla escolha" in tipo_pergunta or "multiple choice" in tipo_pergunta %}
-            // Questão de múltipla escolha - correção automática
-            {% if item.correta %}
-            notasPorQuestao[{{ item.pergunta.id }}] = 10;
-            {% else %}
-            notasPorQuestao[{{ item.pergunta.id }}] = 0;
-            {% endif %}
+            notasPorQuestao[{{ item.pergunta.id }}] = {% if item.correta %}10{% else %}0{% endif %};
             pesosPorQuestao[{{ item.pergunta.id }}] = 1;
             questoesCorrigidas.add({{ item.pergunta.id }});
             questoesAutomaticas.add({{ item.pergunta.id }});
         {% else %}
-            // Questão manual
+            // IMPORTANTE: parseFloat garante que convertemos o valor corretamente e não quebre a sintaxe do JS
+            notasPorQuestao[{{ item.pergunta.id }}] = parseFloat("{% if item.resposta and item.resposta.nota is not None %}{{ item.resposta.nota|stringformat:'f' }}{% else %}0{% endif %}") || 0;
+            pesosPorQuestao[{{ item.pergunta.id }}] = parseInt("{% if item.resposta and item.resposta.peso %}{{ item.resposta.peso }}{% else %}1{% endif %}") || 1;
             {% if item.resposta and item.resposta.nota is not None %}
             questoesCorrigidas.add({{ item.pergunta.id }});
-            notasPorQuestao[{{ item.pergunta.id }}] = {% if item.resposta.nota %}{{ item.resposta.nota }}{% else %}0{% endif %};
-            {% else %}
-            notasPorQuestao[{{ item.pergunta.id }}] = 0;
             {% endif %}
-            pesosPorQuestao[{{ item.pergunta.id }}] = {% if item.resposta and item.resposta.peso %}{{ item.resposta.peso }}{% else %}1{% endif %};
         {% endif %}
         
-        // Verificar se tem arquivo
         {% if item.resposta and item.resposta.arquivo_resposta %}
-        questoesComArquivo.add({{ item.pergunta.id }});
+            questoesComArquivo.add({{ item.pergunta.id }});
         {% endif %}
         {% endwith %}
     {% endfor %}
 
     atualizarResumoCorrecao();
 
-    // Event listeners para botões de correção com IA
-    document.querySelectorAll('.correcao-ia-completa-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const perguntaId = this.dataset.perguntaId;
-            corrigirComIA(perguntaId);
-        });
+    // Listeners IA
+    document.querySelectorAll('.correcao-ia-completa-btn, .correcao-ia-btn').forEach(btn => {
+        btn.addEventListener('click', function() { corrigirComIA(this.dataset.perguntaId); });
     });
-
-    // Event listeners para botões pequenos de IA
-    document.querySelectorAll('.correcao-ia-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const perguntaId = this.dataset.perguntaId;
-            corrigirComIA(perguntaId);
-        });
-    });
-
-    // Event listener para botão "Corrigir Todas com IA"
     document.getElementById('btn-corrigir-todas-ia').addEventListener('click', corrigirTodasComIA);
 
-    // Event listeners para questões manuais
+    // Listeners de Input Manual
     document.querySelectorAll('.nota-questao[data-automatica="false"]').forEach(input => {
         input.addEventListener('change', function() {
-            const perguntaId = this.dataset.perguntaId;
+            const pId = this.dataset.perguntaId;
             const nota = parseFloat(this.value) || 0;
-            notasPorQuestao[perguntaId] = nota;
+            notasPorQuestao[pId] = nota;
             
-            if (nota > 0) {
-                questoesCorrigidas.add(parseInt(perguntaId));
-            } else {
-                questoesCorrigidas.delete(parseInt(perguntaId));
-            }
+            if (nota > 0) { questoesCorrigidas.add(parseInt(pId)); } 
+            else { questoesCorrigidas.delete(parseInt(pId)); }
             
-            atualizarStatusQuestao(perguntaId);
+            atualizarStatusQuestao(pId);
             atualizarResumoCorrecao();
         });
     });
 
-    // Event listeners para sliders de peso
     document.querySelectorAll('.peso-questao').forEach(slider => {
-        const perguntaId = slider.dataset.perguntaId;
-        const valorDisplay = document.getElementById(`peso-valor-${perguntaId}`);
-        
         slider.addEventListener('input', function() {
-            pesosPorQuestao[perguntaId] = parseInt(this.value);
-            if (valorDisplay) {
-                valorDisplay.textContent = this.value;
-            }
+            const pId = this.dataset.perguntaId;
+            pesosPorQuestao[pId] = parseInt(this.value);
+            const valDisplay = document.getElementById(`peso-valor-${pId}`);
+            if (valDisplay) valDisplay.textContent = this.value;
             atualizarResumoCorrecao();
         });
     });
 
-    // Event listeners para feedback
-    document.querySelectorAll('.feedback-questao').forEach(textarea => {
-        textarea.addEventListener('blur', function() {
-            const perguntaId = this.dataset.perguntaId;
-            salvarQuestaoIndividual(perguntaId);
-        });
-    });
-
-    // Prevenir envio duplo do formulário
+    // Interceptar form
     document.getElementById('formCorrecao').addEventListener('submit', function(e) {
         e.preventDefault();
-        mostrarModalConfirmacao();
+        atualizarResumoCorrecao();
+        new bootstrap.Modal(document.getElementById('confirmacaoModal')).show();
     });
 
-    // Inicializar tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+    // Inicializar Tooltips
+    [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).map(function(el) {
+        return new bootstrap.Tooltip(el);
     });
 }
 
@@ -807,11 +706,7 @@ function atualizarStatusQuestao(perguntaId) {
             statusElement.className = 'badge bg-success';
         }
         if (salvaElement) {
-            if (questoesAutomaticas.has(parseInt(perguntaId))) {
-                salvaElement.innerHTML = '<i class="fas fa-robot text-info"></i> Correção automática';
-            } else {
-                salvaElement.innerHTML = '<i class="fas fa-check text-success"></i> Correção salva';
-            }
+            salvaElement.innerHTML = questoesAutomaticas.has(parseInt(perguntaId)) ? '<i class="fas fa-robot text-info"></i> Correção automática' : '<i class="fas fa-pen text-primary"></i> Nota atribuída';
         }
     } else {
         if (statusElement) {
@@ -819,7 +714,7 @@ function atualizarStatusQuestao(perguntaId) {
             statusElement.className = 'badge bg-warning';
         }
         if (salvaElement) {
-            salvaElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Alterações não salvas';
+            salvaElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Aguardando avaliação';
         }
     }
 }
@@ -828,207 +723,63 @@ function atualizarResumoCorrecao() {
     const totalQuestoes = {{ perguntas_com_respostas|length }};
     const corrigidas = questoesCorrigidas.size;
     const automaticas = questoesAutomaticas.size;
-    const comArquivo = questoesComArquivo.size;
-    const manuaisCorrigidas = corrigidas - automaticas;
     
-    // Atualizar contadores
-    const totalRespondidas = document.getElementById('total-respondidas');
-    const totalCorrigidas = document.getElementById('total-corrigidas');
-    const questoesCorrigidasElement = document.getElementById('questoes-corrigidas');
-    const modalCorrigidas = document.getElementById('modal-corrigidas');
-    const questoesAutomaticasElement = document.getElementById('questoes-automaticas');
-    const modalAutomaticas = document.getElementById('modal-automaticas');
-    const questoesComArquivoElement = document.getElementById('questoes-com-arquivo');
-    const modalArquivos = document.getElementById('modal-arquivos');
+    const fieldsToUpdate = {
+        'total-respondidas': totalQuestoes,
+        'total-corrigidas': corrigidas,
+        'questoes-corrigidas': corrigidas,
+        'modal-corrigidas': corrigidas,
+        'questoes-automaticas': automaticas,
+    };
     
-    if (totalRespondidas) totalRespondidas.textContent = totalQuestoes;
-    if (totalCorrigidas) totalCorrigidas.textContent = corrigidas;
-    if (questoesCorrigidasElement) questoesCorrigidasElement.textContent = corrigidas;
-    if (modalCorrigidas) modalCorrigidas.textContent = corrigidas;
-    if (questoesAutomaticasElement) questoesAutomaticasElement.textContent = automaticas;
-    if (modalAutomaticas) modalAutomaticas.textContent = automaticas;
-    if (questoesComArquivoElement) questoesComArquivoElement.textContent = comArquivo;
-    if (modalArquivos) modalArquivos.textContent = comArquivo;
+    for (const [id, value] of Object.entries(fieldsToUpdate)) {
+        if (document.getElementById(id)) document.getElementById(id).textContent = value;
+    }
     
-    // Calcular nota projetada
-    let somaNotas = 0;
-    let somaPesos = 0;
-    
-    for (const perguntaId in notasPorQuestao) {
-        const nota = notasPorQuestao[perguntaId] || 0;
-        const peso = pesosPorQuestao[perguntaId] || 1;
-        somaNotas += nota * peso;
-        somaPesos += peso;
+    let somaNotas = 0; let somaPesos = 0;
+    for (const pId in notasPorQuestao) {
+        somaNotas += (notasPorQuestao[pId] || 0) * (pesosPorQuestao[pId] || 1);
+        somaPesos += (pesosPorQuestao[pId] || 1);
     }
     
     const notaProjetada = somaPesos > 0 ? (somaNotas / somaPesos) : 0;
+    document.getElementById('nota-projetada').textContent = notaProjetada.toFixed(1);
+    document.getElementById('modal-nota-final').textContent = notaProjetada.toFixed(1);
     
-    const notaProjetadaElement = document.getElementById('nota-projetada');
-    const modalNotaFinal = document.getElementById('modal-nota-final');
-    
-    if (notaProjetadaElement) notaProjetadaElement.textContent = notaProjetada.toFixed(1);
-    if (modalNotaFinal) modalNotaFinal.textContent = notaProjetada.toFixed(1);
-    
-    // Mostrar alerta se houver questões pendentes (apenas manuais)
     const alertPendentes = document.getElementById('alert-questoes-pendentes');
-    if (alertPendentes) {
-        const pendentes = totalQuestoes - corrigidas;
-        alertPendentes.style.display = (pendentes > 0) ? 'block' : 'none';
-    }
+    if (alertPendentes) alertPendentes.style.display = (totalQuestoes - corrigidas > 0) ? 'block' : 'none';
 }
 
-function salvarQuestaoIndividual(perguntaId) {
-    const statusElement = document.getElementById(`status-salvamento-${perguntaId}`);
-    if (statusElement && !questoesAutomaticas.has(parseInt(perguntaId))) {
-        statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Alterações salvas';
-        
-        setTimeout(() => {
-            statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Correção salva';
-        }, 2000);
-    }
-}
-
-function salvarRascunho() {
-    // Salvar todas as questões manuais
-    document.querySelectorAll('.nota-questao[data-automatica="false"]').forEach(input => {
-        const perguntaId = input.dataset.perguntaId;
-        salvarQuestaoIndividual(perguntaId);
-    });
-    
-    // Feedback visual
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-check me-1"></i>Salvo!';
-    btn.disabled = true;
-    
-    setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }, 2000);
-}
-
-function mostrarModalConfirmacao() {
-    atualizarResumoCorrecao();
-    const modal = new bootstrap.Modal(document.getElementById('confirmacaoModal'));
-    modal.show();
-}
-
-// Configurar botão de confirmação no modal
 document.addEventListener('DOMContentLoaded', function() {
     const btnConfirmar = document.getElementById('btn-confirmar-correcao');
     if (btnConfirmar) {
         btnConfirmar.addEventListener('click', function() {
-            // Desabilitar botão para evitar múltiplos cliques
             this.disabled = true;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
-            
-            // Enviar formulário
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando e Finalizando...';
             document.getElementById('formCorrecao').submit();
         });
     }
-    
     inicializarCorrecao();
 });
 </script>
 
 <style>
-.questao-correcao {
-    border-left: 4px solid #6c757d;
-}
-
-.questao-correcao .card-header {
-    background-color: #f8f9fa !important;
-}
-
-.enunciado-questao, .gabarito-oficial, .resposta-aluno {
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-.gabarito-oficial {
-    border-left: 3px solid #198754 !important;
-}
-
-.resposta-aluno {
-    border-left: 3px solid #0dcaf0 !important;
-}
-
+.questao-correcao { border-left: 4px solid #6c757d; }
+.questao-correcao .card-header { background-color: #f8f9fa !important; }
+.enunciado-questao, .gabarito-oficial, .resposta-aluno { font-size: 0.95rem; line-height: 1.5; }
+.gabarito-oficial { border-left: 3px solid #198754 !important; }
+.resposta-aluno { border-left: 3px solid #0dcaf0 !important; }
 .nota-questao:focus, .feedback-questao:focus {
-    border-color: #ffc107;
-    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
-
-.peso-questao {
-    accent-color: #0d6efd;
-}
-
 .correcao-area {
-    background-color: #fff9e6;
+    background-color: #f8f9fa;
     padding: 1.5rem;
     border-radius: 0.375rem;
-    border: 1px solid #ffeaa7;
+    border: 1px solid #dee2e6;
 }
-
-.form-range::-webkit-slider-thumb {
-    background-color: #0d6efd;
-}
-
-.form-range::-moz-range-thumb {
-    background-color: #0d6efd;
-}
-
-/* Destaque para questões corrigidas automaticamente */
-.questao-correcao .bg-info {
-    background-color: #0dcaf0 !important;
-}
-
-/* Botões de IA */
-.correcao-ia-btn, .correcao-ia-completa-btn {
-    transition: all 0.3s ease;
-}
-
-.correcao-ia-btn:hover, .correcao-ia-completa-btn:hover {
-    background-color: #0dcaf0;
-    border-color: #0dcaf0;
-    color: white;
-}
-
-/* Loading spinner personalizado */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-}
-
-/* Imagens clicáveis */
-img[onclick] {
-    transition: transform 0.2s ease;
-}
-
-img[onclick]:hover {
-    transform: scale(1.02);
-    cursor: pointer;
-}
-
-/* Badge para upload */
-.badge.bg-warning {
-    background-color: #ffc107 !important;
-    color: #000 !important;
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-    .card-header .d-flex {
-        flex-direction: column;
-        align-items: flex-start !important;
-    }
-    
-    .card-header .badge {
-        margin-top: 0.25rem;
-    }
-    
-    .input-group {
-        max-width: 100% !important;
-    }
-}
+.questao-correcao .bg-info { background-color: #0dcaf0 !important; color: #000; }
+.correcao-ia-btn, .correcao-ia-completa-btn { transition: all 0.2s ease; }
 </style>
 {% endblock %}
