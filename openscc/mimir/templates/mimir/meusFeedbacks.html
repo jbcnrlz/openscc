@@ -115,15 +115,19 @@
                                         {% if feedback.tipo == 'problema' %}
                                             <h5 class="mb-1 fw-bold text-dark">
                                                 <i class="fas fa-tasks text-muted me-2"></i>
-                                                <a href="{% url 'mimir:problemaDetail' feedback.parte.problema.id %}" class="text-decoration-none text-dark hover-primary">
-                                                    {{ feedback.parte.problema.titulo }}
-                                                </a>
+                                                {% if feedback.problema %}
+                                                    <a href="{% url 'mimir:problemaDetail' feedback.problema.id %}" class="text-decoration-none text-dark hover-primary">
+                                                        {{ feedback.problema.titulo }}
+                                                    </a>
+                                                {% else %}
+                                                    <span class="text-muted">Problema não encontrado (Registro Antigo)</span>
+                                                {% endif %}
                                             </h5>
                                             <div class="text-muted small">
-                                                <span class="badge bg-light text-secondary border me-2">Parte {{ feedback.parte.ordem }}</span>
+                                                <span class="badge bg-light text-secondary border me-2">Caso Completo</span>
                                                 Avaliação solicitada a: <strong class="text-dark">{{ feedback.especialista.get_full_name|default:feedback.especialista.username }}</strong>
                                             </div>
-                                        {% else %}
+                                        {% elif feedback.tipo == 'pergunta' %}
                                             <h5 class="mb-1 fw-bold text-dark">
                                                 <i class="fas fa-question-circle text-muted me-2"></i>
                                                 {% with prova=feedback.pergunta.get_primeira_prova %}
@@ -158,10 +162,12 @@
 
                                 <div class="row g-4 mb-3">
                                     <div class="col-md-6">
-                                        <h6 class="text-uppercase small fw-bold text-secondary mb-2"><i class="fas fa-file-alt me-1"></i> Conteúdo Original (Preview)</h6>
+                                        <h6 class="text-uppercase small fw-bold text-secondary mb-2"><i class="fas fa-file-alt me-1"></i> Contexto (Preview)</h6>
                                         <div class="p-3 bg-light rounded text-muted small" style="max-height: 120px; overflow: hidden; position: relative;">
                                             {% if feedback.tipo == 'problema' %}
-                                                {{ feedback.parte.enunciado|linebreaks }}
+                                                <p class="mb-0 text-dark"><i class="fas fa-microscope text-primary me-1"></i> <strong>Revisão Global do Caso Clínico</strong></p>
+                                                <p class="mb-0 mt-1">O especialista avaliará todas as partes e fatias da estrutura do problema 
+                                                {% if feedback.problema %}"{{ feedback.problema.titulo }}"{% else %}selecionado{% endif %}.</p>
                                             {% else %}
                                                 {{ feedback.pergunta.pergunta|linebreaks }}
                                             {% endif %}
@@ -198,9 +204,15 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         {% if feedback.tipo == 'problema' %}
-                                            <a href="{% url 'mimir:problemaDetail' feedback.parte.problema.id %}" class="btn btn-outline-secondary btn-sm">
-                                                <i class="fas fa-external-link-alt me-1"></i> Abrir Problema
-                                            </a>
+                                            {% if feedback.problema %}
+                                                <a href="{% url 'mimir:problemaDetail' feedback.problema.id %}" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-external-link-alt me-1"></i> Abrir Problema
+                                                </a>
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled>
+                                                    <i class="fas fa-archive me-1"></i> Problema Legado (Inacessível)
+                                                </button>
+                                            {% endif %}
                                         {% else %}
                                             {% with prova=feedback.pergunta.get_primeira_prova %}
                                                 {% if prova %}
@@ -222,52 +234,62 @@
                             </div>
                         </div>
 
-                        <!-- Modal de Comparação -->
+                        <!-- Modal de Comparação (DIFF VIEWER) -->
                         {% if feedback.comentarios and feedback.status == 'respondido' %}
                         <div class="modal fade" id="compararModal{{ feedback.id }}" tabindex="-1">
-                            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                            <div class="modal-dialog modal-xl modal-dialog-centered">
                                 <div class="modal-content shadow-lg border-0">
-                                    <div class="modal-header bg-light">
+                                    <div class="modal-header bg-light border-bottom">
                                         <h5 class="modal-title fw-bold">
-                                            <i class="fas fa-exchange-alt me-2 text-orange"></i> Comparar Feedback - 
-                                            {% if feedback.tipo == 'problema' %}Parte {{ feedback.parte.ordem }}{% else %}Pergunta{% endif %}
+                                            <i class="fas fa-columns me-2 text-orange"></i> Comparação de Conteúdo
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body bg-light p-4">
+                                        
                                         {% if feedback.mensagem_solicitacao %}
                                         <div class="alert bg-white border shadow-sm mb-4">
                                             <strong class="text-primary"><i class="fas fa-paper-plane me-1"></i> O que você pediu:</strong>
-                                            <p class="mb-0 mt-2 text-dark">{{ feedback.mensagem_solicitacao|linebreaks }}</p>
+                                            <p class="mb-0 mt-1 text-dark small">{{ feedback.mensagem_solicitacao|linebreaksbr }}</p>
                                         </div>
                                         {% endif %}
 
-                                        <div class="row g-4">
+                                        <!-- Container de Rolagem Sincronizada -->
+                                        <div class="row g-3 sync-scroll-container">
+                                            
                                             <!-- Lado Esquerdo: Original -->
                                             <div class="col-md-6">
                                                 <div class="card h-100 border-secondary shadow-sm">
-                                                    <div class="card-header bg-secondary text-white fw-bold">
-                                                        <i class="fas fa-file-alt me-1"></i> Conteúdo Original
+                                                    <div class="card-header bg-secondary text-white fw-bold py-2">
+                                                        <i class="fas fa-file-alt me-1"></i> Original
                                                     </div>
-                                                    <div class="card-body bg-white">
-                                                        {% if feedback.tipo == 'problema' %}
-                                                            <div class="mb-3">
-                                                                <strong class="text-muted d-block mb-2 text-uppercase small tracking-wider">Enunciado Atual:</strong>
-                                                                <div class="text-dark">{{ feedback.parte.enunciado|linebreaks }}</div>
-                                                            </div>
-                                                        {% else %}
-                                                            <div class="mb-3">
-                                                                <strong class="text-muted d-block mb-2 text-uppercase small tracking-wider">Pergunta Atual:</strong>
-                                                                <div class="text-dark">{{ feedback.pergunta.pergunta|linebreaks }}</div>
-                                                            </div>
-                                                            {% if feedback.pergunta.gabarito %}
-                                                            <hr class="text-muted">
-                                                            <div>
-                                                                <strong class="text-muted d-block mb-2 text-uppercase small tracking-wider">Gabarito Atual:</strong>
-                                                                <div class="text-dark">{{ feedback.pergunta.gabarito|linebreaks }}</div>
-                                                            </div>
+                                                    <div class="card-body bg-white p-0">
+                                                        <!-- Container de texto esquerdo -->
+                                                        <div class="sync-left p-3 font-monospace text-dark" style="height: 450px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;">
+                                                            {% if feedback.tipo == 'problema' %}
+                                                                {% if feedback.problema %}
+                                                                    {% for p in feedback.problema.partes.all %}
+                                                                        <div class="mb-3">
+                                                                            <strong class="text-primary d-block mb-1">Parte {{ p.ordem }}:</strong>
+                                                                            {{ p.enunciado|linebreaksbr }}
+                                                                        </div>
+                                                                    {% empty %}
+                                                                        <em>Nenhuma parte cadastrada.</em>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    <em>Problema legado. Conteúdo não disponível para visualização.</em>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <strong class="text-primary d-block mb-1">Pergunta Atual:</strong>
+                                                                {{ feedback.pergunta.pergunta|linebreaksbr }}
+                                                                
+                                                                {% if feedback.pergunta.gabarito %}
+                                                                <hr class="text-muted my-3">
+                                                                <strong class="text-primary d-block mb-1">Gabarito Atual:</strong>
+                                                                {{ feedback.pergunta.gabarito|linebreaksbr }}
+                                                                {% endif %}
                                                             {% endif %}
-                                                        {% endif %}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -275,30 +297,28 @@
                                             <!-- Lado Direito: Especialista -->
                                             <div class="col-md-6">
                                                 <div class="card h-100 border-orange shadow-sm">
-                                                    <div class="card-header bg-orange text-white fw-bold">
-                                                        <i class="fas fa-user-md me-1"></i> Sugestão do Especialista ({{ feedback.especialista.first_name }})
+                                                    <div class="card-header bg-orange text-white fw-bold py-2">
+                                                        <i class="fas fa-user-md me-1"></i> Sugestão ({{ feedback.especialista.first_name }})
                                                     </div>
-                                                    <div class="card-body bg-orange bg-opacity-10">
-                                                        {% if feedback.tipo == 'pergunta' and feedback.comentarios|has_gabarito %}
-                                                            {% with partes=feedback.comentarios|split_feedback %}
-                                                                <div class="mb-3">
-                                                                    <strong class="text-orange d-block mb-2 text-uppercase small tracking-wider">Pergunta Revisada:</strong>
-                                                                    <div class="text-dark">{{ partes|get_part:0|linebreaks }}</div>
-                                                                </div>
-                                                                {% if partes|get_part:1 %}
-                                                                <hr class="border-orange opacity-25">
-                                                                <div>
-                                                                    <strong class="text-orange d-block mb-2 text-uppercase small tracking-wider">Gabarito Revisado:</strong>
-                                                                    <div class="text-dark">{{ partes|get_part:1|linebreaks }}</div>
-                                                                </div>
-                                                                {% endif %}
-                                                            {% endwith %}
-                                                        {% else %}
-                                                            <div>
-                                                                <strong class="text-orange d-block mb-2 text-uppercase small tracking-wider">Revisão Completa:</strong>
-                                                                <div class="text-dark">{{ feedback.comentarios|linebreaks }}</div>
-                                                            </div>
-                                                        {% endif %}
+                                                    <div class="card-body bg-orange bg-opacity-10 p-0">
+                                                        <!-- Container de texto direito -->
+                                                        <div class="sync-right p-3 font-monospace text-dark" style="height: 450px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;">
+                                                            {% if feedback.tipo == 'pergunta' and feedback.comentarios|has_gabarito %}
+                                                                {% with partes=feedback.comentarios|split_feedback %}
+                                                                    <strong class="text-orange d-block mb-1">Pergunta Revisada:</strong>
+                                                                    {{ partes|get_part:0|linebreaksbr }}
+                                                                    
+                                                                    {% if partes|get_part:1 %}
+                                                                    <hr class="border-orange opacity-50 my-3">
+                                                                    <strong class="text-orange d-block mb-1">Gabarito Revisado:</strong>
+                                                                    {{ partes|get_part:1|linebreaksbr }}
+                                                                    {% endif %}
+                                                                {% endwith %}
+                                                            {% else %}
+                                                                <strong class="text-orange d-block mb-1">Revisão do Especialista:</strong>
+                                                                {{ feedback.comentarios|linebreaksbr }}
+                                                            {% endif %}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -310,12 +330,12 @@
                                                 <div class="card-body bg-danger bg-opacity-10">
                                                     <form method="post" action="{% url 'mimir:rejeitarFeedback' feedback.id %}">
                                                         {% csrf_token %}
-                                                        <label for="resposta_autor{{ feedback.id }}" class="form-label text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Motivo da Rejeição (Opcional mas recomendado):</label>
+                                                        <label for="resposta_autor{{ feedback.id }}" class="form-label text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Motivo da Rejeição (Opcional):</label>
                                                         <textarea class="form-control mb-3" id="resposta_autor{{ feedback.id }}" 
-                                                                  name="resposta_autor" rows="3" 
+                                                                  name="resposta_autor" rows="2" 
                                                                   placeholder="Explique por que não irá utilizar esta sugestão..."></textarea>
                                                         <div class="text-end">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#formRejeicao{{ feedback.id }}">Cancelar Rejeição</button>
+                                                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#formRejeicao{{ feedback.id }}">Cancelar</button>
                                                             <button type="submit" class="btn btn-danger px-4 shadow-sm"><i class="fas fa-trash-alt me-1"></i> Confirmar Rejeição</button>
                                                         </div>
                                                     </form>
@@ -326,16 +346,16 @@
                                     </div>
                                     <div class="modal-footer bg-white justify-content-between p-3">
                                         <div class="text-muted small">
-                                            <i class="fas fa-info-circle text-primary"></i> Ao aceitar, o seu conteúdo original será substituído automaticamente.
+                                            <i class="fas fa-info-circle text-primary"></i> Ao aceitar, marcas este feedback como resolvido.
                                         </div>
                                         <div>
                                             <button type="button" class="btn btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#formRejeicao{{ feedback.id }}" aria-expanded="false">
-                                                <i class="fas fa-times me-1"></i> Rejeitar Feedback
+                                                <i class="fas fa-times me-1"></i> Rejeitar
                                             </button>
                                             <form method="post" action="{% url 'mimir:aceitarFeedback' feedback.id %}" class="d-inline ms-2">
                                                 {% csrf_token %}
                                                 <button type="submit" class="btn btn-success px-4 shadow-sm">
-                                                    <i class="fas fa-check-double me-1"></i> Aceitar e Substituir
+                                                    <i class="fas fa-check-double me-1"></i> Aceitar / Utilizar
                                                 </button>
                                             </form>
                                         </div>
@@ -373,12 +393,16 @@
                                         {% if feedback.tipo == 'problema' %}
                                             <h5 class="mb-1 fw-bold text-dark">
                                                 <i class="fas fa-tasks text-muted me-2"></i>
-                                                <a href="{% url 'mimir:problemaDetail' feedback.parte.problema.id %}" class="text-decoration-none text-dark hover-primary">
-                                                    {{ feedback.parte.problema.titulo }}
-                                                </a>
+                                                {% if feedback.problema %}
+                                                    <a href="{% url 'mimir:problemaDetail' feedback.problema.id %}" class="text-decoration-none text-dark hover-primary">
+                                                        {{ feedback.problema.titulo }}
+                                                    </a>
+                                                {% else %}
+                                                    <span class="text-muted">Problema não encontrado (Registro Antigo)</span>
+                                                {% endif %}
                                             </h5>
                                             <div class="text-muted small">
-                                                <span class="badge bg-light text-secondary border me-2">Parte {{ feedback.parte.ordem }}</span>
+                                                <span class="badge bg-light text-secondary border me-2">Caso Completo</span>
                                                 Solicitado por: <strong class="text-dark">{{ feedback.solicitante.get_full_name|default:feedback.solicitante.username }}</strong>
                                             </div>
                                         {% else %}
@@ -422,7 +446,8 @@
                                         <h6 class="text-uppercase small fw-bold text-secondary mb-2"><i class="fas fa-file-alt me-1"></i> Conteúdo para Revisão</h6>
                                         <div class="p-3 bg-light border rounded text-muted small" style="max-height: 150px; overflow: hidden; position: relative;">
                                             {% if feedback.tipo == 'problema' %}
-                                                {{ feedback.parte.enunciado|linebreaks }}
+                                                <p class="mb-0 text-dark"><i class="fas fa-microscope text-primary me-1"></i> <strong>Revisão Global do Caso Clínico</strong></p>
+                                                <p class="mb-0 mt-1">Abra o problema completo clicando no botão abaixo para ler todas as fatias do caso e emitir o seu parecer técnico.</p>
                                             {% else %}
                                                 {{ feedback.pergunta.pergunta|linebreaks }}
                                             {% endif %}
@@ -453,7 +478,7 @@
                                 
                                 {% if feedback.resposta_autor %}
                                 <div class="mt-3 p-3 bg-secondary bg-opacity-10 border border-secondary rounded">
-                                    <strong class="text-dark"><i class="fas fa-reply me-1"></i> O autor rejeitou a sua sugestão e respondeu:</strong>
+                                    <strong class="text-dark"><i class="fas fa-reply me-1"></i> O autor justificou:</strong>
                                     <p class="mb-0 small text-dark mt-1">"{{ feedback.resposta_autor }}"</p>
                                 </div>
                                 {% endif %}
@@ -461,16 +486,39 @@
 
                             <!-- Rodapé de Ações -->
                             <div class="card-footer bg-white border-top p-3">
-                                <div class="d-flex justify-content-end gap-2">
-                                    {% if not feedback.comentarios %}
-                                        <a href="{% url 'mimir:fornecerFeedback' feedback.id %}" class="btn btn-danger btn-sm px-4 shadow-sm">
-                                            <i class="fas fa-edit me-1"></i> Redigir Feedback Agora
-                                        </a>
-                                    {% else %}
-                                        <a href="{% url 'mimir:fornecerFeedback' feedback.id %}" class="btn btn-outline-success btn-sm px-4">
-                                            <i class="fas fa-edit me-1"></i> Alterar meu Feedback
-                                        </a>
-                                    {% endif %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        {% if feedback.tipo == 'problema' %}
+                                            {% if feedback.problema %}
+                                                <a href="{% url 'mimir:problemaDetail' feedback.problema.id %}" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-external-link-alt me-1"></i> Ver Problema Completo
+                                                </a>
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled>
+                                                    <i class="fas fa-archive me-1"></i> Problema Legado
+                                                </button>
+                                            {% endif %}
+                                        {% else %}
+                                            {% with prova=feedback.pergunta.get_primeira_prova %}
+                                                {% if prova %}
+                                                    <a href="{% url 'mimir:visualizarProvaEspecialistaComFeedback' prova.id feedback.id %}" class="btn btn-outline-secondary btn-sm">
+                                                        <i class="fas fa-external-link-alt me-1"></i> Ver Prova
+                                                    </a>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        {% if not feedback.comentarios %}
+                                            <a href="{% url 'mimir:fornecerFeedback' feedback.id %}" class="btn btn-danger btn-sm px-4 shadow-sm">
+                                                <i class="fas fa-edit me-1"></i> Redigir Feedback Agora
+                                            </a>
+                                        {% else %}
+                                            <a href="{% url 'mimir:fornecerFeedback' feedback.id %}" class="btn btn-outline-success btn-sm px-4">
+                                                <i class="fas fa-edit me-1"></i> Alterar meu Feedback
+                                            </a>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -565,13 +613,60 @@
     border-style: dashed !important;
 }
 
-/* Fix modal scroll quebrando conteúdo original */
-.modal-body .card-body div {
-    white-space: pre-wrap;
-    word-break: break-word;
-}
+/* Fixes visuais para modal de comparação diff */
 .tracking-wider {
     letter-spacing: 0.05em;
 }
+.sync-left, .sync-right {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
 </style>
+
+<script>
+// Script de Sincronização de Scroll para o Diff Viewer
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Ouve o evento de exibição de qualquer modal do Bootstrap
+    document.addEventListener('shown.bs.modal', function (event) {
+        const modal = event.target;
+        const syncContainers = modal.querySelectorAll('.sync-scroll-container');
+        
+        syncContainers.forEach(container => {
+            const left = container.querySelector('.sync-left');
+            const right = container.querySelector('.sync-right');
+            
+            if(left && right) {
+                // Remove listeners antigos para evitar repetição (limpeza preventiva)
+                left.replaceWith(left.cloneNode(true));
+                right.replaceWith(right.cloneNode(true));
+                
+                const newLeft = container.querySelector('.sync-left');
+                const newRight = container.querySelector('.sync-right');
+
+                newLeft.addEventListener('scroll', function(e) {
+                    if(e.target.isSyncing) {
+                        e.target.isSyncing = false;
+                        return;
+                    }
+                    newRight.isSyncing = true;
+                    // Usa porcentagem para garantir precisão se houver pequenas diferenças de altura
+                    const percentage = this.scrollTop / (this.scrollHeight - this.clientHeight);
+                    newRight.scrollTop = percentage * (newRight.scrollHeight - newRight.clientHeight);
+                });
+                
+                newRight.addEventListener('scroll', function(e) {
+                    if(e.target.isSyncing) {
+                        e.target.isSyncing = false;
+                        return;
+                    }
+                    newLeft.isSyncing = true;
+                    const percentage = this.scrollTop / (this.scrollHeight - this.clientHeight);
+                    newLeft.scrollTop = percentage * (newLeft.scrollHeight - newLeft.clientHeight);
+                });
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

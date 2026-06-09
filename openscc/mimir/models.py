@@ -254,39 +254,28 @@ class Problema(models.Model):
     tema = models.ForeignKey(Tema, on_delete=models.CASCADE)
     fontes = models.ManyToManyField('Fontes', blank=True)
 
-class Parte(models.Model):
-    problema = models.ForeignKey(Problema, on_delete=models.CASCADE, related_name='partes')
-    enunciado = models.TextField(blank=False, null=False)    
-    ordem = models.IntegerField(default=1)
-
     def get_feedbacks_pendentes(self):
-        """Retorna feedbacks pendentes para esta parte"""
+        """Retorna feedbacks pendentes para este problema"""
         return self.feedbacks.filter(status='pendente')
     
     def get_feedbacks_utilizados(self):
-        """Retorna feedbacks utilizados para esta parte"""
+        """Retorna feedbacks utilizados para este problema"""
         return self.feedbacks.filter(status='utilizado')
     
     def tem_feedbacks_pendentes(self):
         """Verifica se há feedbacks pendentes"""
         return self.feedbacks.filter(status='pendente').exists()
-    
-    def aplicar_feedback(self, feedback):
-        """
-        Aplica o feedback do especialista sobrepondo o enunciado
-        """
-        if feedback.comentarios:
-            self.enunciado = feedback.comentarios.strip()
-            self.save()
-    
-    def get_enunciado_com_feedback(self):
-        """
-        Retorna o enunciado com feedback aplicado ou o original
-        """
-        feedback_utilizado = self.feedbacks.filter(status='utilizado').first()
-        if feedback_utilizado and feedback_utilizado.comentarios:
-            return feedback_utilizado.comentarios.strip()
-        return self.enunciado
+
+
+class Parte(models.Model):
+    problema = models.ForeignKey(Problema, on_delete=models.CASCADE, related_name='partes')
+    enunciado = models.TextField(blank=False, null=False)    
+    ordem = models.IntegerField(default=1)
+
+    @property
+    def midias(self):
+        """Property para acessar as mídias da parte"""
+        return self.midiaparte_set.all()
 
     @property
     def midias(self):
@@ -361,7 +350,7 @@ class GuiaTutor(models.Model):
 
 class FeedbackEspecialista(models.Model):
     """
-    Model para armazenar feedbacks de especialistas sobre partes de problemas OU perguntas de provas
+    Model para armazenar feedbacks de especialistas sobre problemas inteiros OU perguntas de provas
     """
     STATUS_CHOICES = [
         ('pendente', 'Pendente'),
@@ -374,9 +363,9 @@ class FeedbackEspecialista(models.Model):
         ('pergunta', 'Pergunta'),
     ]
 
-    # Campos para problemas
-    parte = models.ForeignKey(
-        Parte, 
+    # Campos para problemas (Atualizado de 'parte' para 'problema')
+    problema = models.ForeignKey(
+        Problema, 
         on_delete=models.CASCADE, 
         related_name='feedbacks',
         null=True,
@@ -443,7 +432,7 @@ class FeedbackEspecialista(models.Model):
 
     def __str__(self):
         if self.tipo == 'problema':
-            return f"Feedback para Parte {self.parte.ordem} - {self.especialista.get_full_name()}"
+            return f"Feedback para Problema '{self.problema.titulo}' - {self.especialista.get_full_name()}"
         else:
             return f"Feedback para Pergunta - {self.especialista.get_full_name()}"
 
@@ -466,34 +455,57 @@ class FeedbackEspecialista(models.Model):
         return self.status == 'pendente'
 
     def clean(self):
-        if not self.parte and not self.pergunta:
-            raise ValidationError('Deve ser associado a uma parte de problema ou uma pergunta.')
-        if self.parte and self.pergunta:
-            raise ValidationError('Não pode estar associado a uma parte e uma pergunta simultaneamente.')
+        if not self.problema and not self.pergunta:
+            raise ValidationError('Deve ser associado a um problema ou uma pergunta.')
+        if self.problema and self.pergunta:
+            raise ValidationError('Não pode estar associado a um problema e uma pergunta simultaneamente.')
         
     def aceitar_feedback(self):
         """
-        Aceita e aplica o feedback do especialista, sobrepondo o conteúdo original
+        Aceita e aplica o feedback do especialista.
         """
-        if self.tipo == 'problema' and self.parte:
-            self.parte.aplicar_feedback(self)
-        elif self.tipo == 'pergunta' and self.pergunta:
+        import re
+
+        if self.tipo == 'pergunta' and self.pergunta:
             self.pergunta.aplicar_feedback(self)
-        
+            
+        elif self.tipo == 'problema' and self.problema:
+            # Pega o texto redigido pelo especialista
+            texto_feedback = self.comentarios
+            
+            # Tenta fatiar o texto automaticamente caso o especialista tenha usado 
+            # marcadores no início das linhas como "Parte 1:", "Parte 2 -", etc.
+            partes_split = re.split(r'(?im)^\s*parte\s+\d+[\:\-\.]?\s*', texto_feedback)
+            
+            # Remove elementos vazios gerados no início do split
+            partes_limpas = [p.strip() for p in partes_split if p.strip()]
+            
+            # Apaga as partes antigas do problema original
+            self.problema.partes.all().delete()
+            
+            # Se o sistema identificou múltiplas partes no texto do especialista
+            if len(partes_limpas) > 1:
+                for i, texto in enumerate(partes_limpas, 1):
+                    self.problema.partes.create(
+                        enunciado=texto,
+                        ordem=i
+                    )
+            else:
+                # Se não houver divisão explícita, salva tudo como a "Parte 1"
+                self.problema.partes.create(
+                    enunciado=texto_feedback,
+                    ordem=1
+                )
+
         self.status = 'utilizado'
         self.respondido_em = timezone.now()
         self.save()
 
     def rejeitar_feedback(self, resposta_autor=None):
-        """
-        Rejeita o feedback (opcionalmente com resposta do autor)
-        """
         self.resposta_autor = resposta_autor
         self.status = 'respondido'
         self.respondido_em = timezone.now()
         self.save()
-
-# Adicione ao models.py
 class ProvaAluno(models.Model):
     """
     Model para gerenciar a relação aluno-prova (modelo intermediário)

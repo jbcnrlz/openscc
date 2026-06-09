@@ -34,7 +34,8 @@ class ProblemaDetailView(LoginRequiredMixin, DetailView):
         # Verifica as permissões
         user = self.request.user
         eh_autor = obj.assunto.user == user
-        tem_feedback = obj.partes.filter(feedbacks__especialista=user).exists()
+        # CORREÇÃO: Consulta os feedbacks diretamente a partir do objeto problema
+        tem_feedback = obj.feedbacks.filter(especialista=user).exists()
         
         if not (eh_autor or tem_feedback):            
             raise Http404("Problema não encontrado ou você não tem permissão para visualizá-lo.")
