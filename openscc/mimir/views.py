@@ -909,15 +909,12 @@ def temaDelete(request, pk):
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
-def solicitarFeedback(request, problema_id, parte_ordem):
+def solicitarFeedback(request, problema_id):
     """
-    View para solicitar feedback de um especialista para uma parte específica
+    View para solicitar feedback de um especialista para um problema inteiro
     """
     problema = get_object_or_404(Problema, id=problema_id)
-    parte = get_object_or_404(Parte, problema=problema, ordem=parte_ordem)
     
-    # Obter lista de especialistas (usuários com permissão específica ou todos os usuários ativos)
-    # Aqui você pode ajustar a lógica para selecionar especialistas específicos
     especialistas = User.objects.filter(
         is_active=True,
         groups__name='Especialista'
@@ -933,37 +930,52 @@ def solicitarFeedback(request, problema_id, parte_ordem):
             
             especialista = get_object_or_404(User, id=especialista_id)
             
-            # Criar o feedback
             feedback = FeedbackEspecialista.objects.create(
-                parte=parte,
+                problema=problema,
+                tipo='problema',
                 especialista=especialista,
                 solicitante=request.user,
                 mensagem_solicitacao=mensagem,
-                comentarios='',  # Será preenchido pelo especialista
+                comentarios='',
                 status='pendente'
             )
-            
-            # Aqui você pode adicionar notificação por email
-            # enviar_notificacao_feedback(feedback)
             
             messages.success(
                 request, 
                 f'Feedback solicitado com sucesso para {especialista.get_full_name()}.'
             )
-            
             return redirect('mimir:problemaDetail', pk=problema.id)
-    
     else:
         form = SolicitarFeedbackForm()
     
     context = {
         'problema': problema,
-        'parte': parte,
         'especialistas': especialistas,
         'form': form,
     }
-    
     return render(request, 'mimir/solicitarFeedback.html', context)
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def visualizarFeedbacksProblema(request, problema_id):
+    """
+    View para visualizar todos os feedbacks de um problema específico
+    """
+    problema = get_object_or_404(Problema, id=problema_id)
+    
+    if not (request.user == problema.tema.usuario or 
+            problema.feedbacks.filter(especialista=request.user).exists()):
+        return HttpResponseForbidden("Você não tem permissão para visualizar estes feedbacks.")
+    
+    feedbacks = problema.feedbacks.all().order_by('-criado_em')
+    
+    context = {
+        'problema': problema,
+        'feedbacks': feedbacks,
+    }
+    return render(request, 'mimir/visualizarFeedbacks.html', context)
+
 
 @login_required
 @acesso_mimir_requerido
@@ -994,66 +1006,47 @@ def visualizarFeedbacksParte(request, problema_id, parte_ordem):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def marcarFeedbackUtilizado(request, feedback_id):
-    """
-    View para marcar um feedback como utilizado (tanto problemas quanto perguntas)
-    """
-    # Pré-carrega os relacionamentos baseado no tipo
     feedback = get_object_or_404(
         FeedbackEspecialista.objects.select_related(
-            'parte__problema__tema',
+            'problema__tema',
             'pergunta'
         ),
         id=feedback_id
     )
     
-    # Verificar se o usuário tem permissão para marcar como utilizado
     if feedback.tipo == 'problema':
-        # Para problemas: verifica se é o autor do problema
-        if not request.user == feedback.parte.problema.tema.usuario:
+        if not request.user == feedback.problema.tema.usuario:
             return HttpResponseForbidden("Você não tem permissão para marcar este feedback como utilizado.")
     else:
-        # Para perguntas: verifica se é o user da prova
-        # Precisamos obter a prova que contém esta pergunta
         prova = Prova.objects.filter(perguntas=feedback.pergunta, user=request.user).first()
         if not prova:
             return HttpResponseForbidden("Você não tem permissão para marcar este feedback como utilizado.")
     
-    # Só pode marcar como utilizado se já tiver comentários
     if not feedback.comentarios:
         messages.error(request, 'Não é possível marcar como utilizado um feedback que ainda não foi respondido.')
     else:
         feedback.marcar_como_utilizado()
         messages.success(request, 'Feedback marcado como utilizado.')
     
-    # Redireciona para a página apropriada baseada no tipo
     if feedback.tipo == 'problema':
-        return redirect('mimir:problemaDetail', pk=feedback.parte.problema.id)
+        return redirect('mimir:problemaDetail', pk=feedback.problema.id)
     else:
-        # Tenta encontrar a prova do usuário que contém esta pergunta
         prova = Prova.objects.filter(perguntas=feedback.pergunta, user=request.user).first()
         if prova:
             return redirect('mimir:editarProva', prova_id=prova.id)
         else:
-            # Fallback: redireciona para meus feedbacks
             return redirect('mimir:meusFeedbacks')
 
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def responderFeedback(request, feedback_id):
-    """
-    View para responder a um feedback recebido (tanto problemas quanto perguntas)
-    """
     feedback = get_object_or_404(FeedbackEspecialista, id=feedback_id)
     
-    # Verificar se o usuário tem permissão para responder
-    # Para problemas: verifica se é o autor do problema
-    # Para perguntas: verifica se é o user da prova
     if feedback.tipo == 'problema':
-        if not request.user == feedback.parte.problema.tema.usuario:
+        if not request.user == feedback.problema.tema.usuario:
             return HttpResponseForbidden("Você não tem permissão para responder este feedback.")
     else:
-        # Para perguntas, verifica se é o user da primeira prova que contém a pergunta
         prova = feedback.pergunta.prova_set.first()
         if not prova or not request.user == prova.user:
             return HttpResponseForbidden("Você não tem permissão para responder este feedback.")
@@ -1063,12 +1056,10 @@ def responderFeedback(request, feedback_id):
         if form.is_valid():
             form.save()
             feedback.responder(form.cleaned_data['resposta_autor'])
-            
             messages.success(request, 'Resposta enviada com sucesso.')
             
-            # Redireciona para a página apropriada baseada no tipo
             if feedback.tipo == 'problema':
-                return redirect('mimir:problemaDetail', pk=feedback.parte.problema.id)
+                return redirect('mimir:problemaDetail', pk=feedback.problema.id)
             else:
                 prova = feedback.pergunta.prova_set.first()
                 if prova:
@@ -1078,66 +1069,42 @@ def responderFeedback(request, feedback_id):
     else:
         form = ResponderFeedbackForm(instance=feedback)
     
-    context = {
-        'feedback': feedback,
-        'form': form,
-    }    
-    return render(request, 'mimir/responderFeedback.html', context)
+    return render(request, 'mimir/responderFeedback.html', {'feedback': feedback, 'form': form})
 
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def meusFeedbacks(request):
-    """
-    View para listar todos os feedbacks do usuário
-    """
-    # Feedbacks que o usuário solicitou
     feedbacks_solicitados = FeedbackEspecialista.objects.filter(
         solicitante=request.user
-    ).select_related('parte', 'parte__problema', 'pergunta', 'especialista').prefetch_related('pergunta__prova_set').order_by('-criado_em')
+    ).select_related('problema', 'pergunta', 'especialista').prefetch_related('pergunta__prova_set').order_by('-criado_em')
     
-    # Feedbacks onde o usuário é especialista
     feedbacks_como_especialista = FeedbackEspecialista.objects.filter(
         especialista=request.user
-    ).select_related('parte', 'parte__problema', 'pergunta', 'solicitante').prefetch_related('pergunta__prova_set').order_by('-criado_em')
-
-    # Estatísticas
-    total_solicitados = feedbacks_solicitados.count()
-    pendentes = feedbacks_solicitados.filter(comentarios='').count()
-    para_responder = feedbacks_como_especialista.filter(comentarios='').count()
-    utilizados = feedbacks_solicitados.filter(status='utilizado').count()
-    
-    # Contagem por tipo
-    problemas_count = feedbacks_solicitados.filter(tipo='problema').count()
-    perguntas_count = feedbacks_solicitados.filter(tipo='pergunta').count()
+    ).select_related('problema', 'pergunta', 'solicitante').prefetch_related('pergunta__prova_set').order_by('-criado_em')
 
     context = {
         'feedbacks_solicitados': feedbacks_solicitados,
         'feedbacks_como_especialista': feedbacks_como_especialista,
-        'total_solicitados': total_solicitados,
-        'pendentes': pendentes,
-        'para_responder': para_responder,
-        'utilizados': utilizados,
-        'problemas_count': problemas_count,
-        'perguntas_count': perguntas_count,
+        'total_solicitados': feedbacks_solicitados.count(),
+        'pendentes': feedbacks_solicitados.filter(comentarios='').count(),
+        'para_responder': feedbacks_como_especialista.filter(comentarios='').count(),
+        'utilizados': feedbacks_solicitados.filter(status='utilizado').count(),
+        'problemas_count': feedbacks_solicitados.filter(tipo='problema').count(),
+        'perguntas_count': feedbacks_solicitados.filter(tipo='pergunta').count(),
     }
-    
     return render(request, 'mimir/meusFeedbacks.html', context)
 
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def fornecerFeedback(request, feedback_id):
-    """
-    View para especialista fornecer feedback para problemas ou perguntas
-    """
-    # Pré-carrega os relacionamentos baseado no tipo
     if request.method == 'GET':
         feedback = get_object_or_404(
             FeedbackEspecialista.objects.select_related(
                 'solicitante',
-                'parte__problema__tema',
-                'parte__problema__assunto',
+                'problema__tema',
+                'problema__assunto',
                 'pergunta__assunto',
                 'pergunta__tipoDePergunta'
             ),
@@ -1146,33 +1113,26 @@ def fornecerFeedback(request, feedback_id):
     else:
         feedback = get_object_or_404(FeedbackEspecialista, id=feedback_id)
     
-    # Verificar se o usuário é o especialista designado
     if not request.user == feedback.especialista:
         return HttpResponseForbidden("Você não tem permissão para fornecer feedback para esta solicitação.")
     
     if request.method == 'POST':
         if feedback.tipo == 'pergunta':
-            # Para perguntas, os campos vêm separados
             pergunta_revisada = request.POST.get('pergunta_revisada', '').strip()
             gabarito_revisado = request.POST.get('gabarito_revisado', '').strip()
             
             if not pergunta_revisada or not gabarito_revisado:
                 messages.error(request, 'Por favor, forneça tanto a pergunta revisada quanto o gabarito revisado.')
             else:
-                # Concatenar com o separador
                 comentarios = f"{pergunta_revisada}\n\n---GABARITO---\n\n{gabarito_revisado}"
                 feedback.comentarios = comentarios
                 feedback.status = 'respondido'
                 feedback.respondido_em = timezone.now()
                 feedback.save()
-                
                 messages.success(request, 'Feedback enviado com sucesso!')
                 return redirect('mimir:meusFeedbacks')
-                
         else:
-            # Para problemas, usa o campo comentários diretamente
             comentarios = request.POST.get('comentarios', '').strip()
-            
             if not comentarios:
                 messages.error(request, 'Por favor, forneça seus comentários.')
             else:
@@ -1180,27 +1140,24 @@ def fornecerFeedback(request, feedback_id):
                 feedback.status = 'respondido'
                 feedback.respondido_em = timezone.now()
                 feedback.save()
-                
                 messages.success(request, 'Feedback enviado com sucesso!')
                 return redirect('mimir:meusFeedbacks')
     
-    # Preparar contexto para o template
-    context = {
-        'feedback': feedback,
-    }
+    context = { 'feedback': feedback }
     
-    # Se já existe feedback e é do tipo pergunta, separar os campos
+    # Se o tipo for problema, mandamos as partes para a view para o especialista ler tudo
+    if feedback.tipo == 'problema' and feedback.problema:
+        context['partes'] = feedback.problema.partes.all().order_by('ordem')
+
     if feedback.tipo == 'pergunta' and feedback.comentarios:
         if '---GABARITO---' in feedback.comentarios:
             partes = feedback.comentarios.split('---GABARITO---')
             context['pergunta_revisada'] = partes[0].strip()
             context['gabarito_revisado'] = partes[1].strip() if len(partes) > 1 else ''
         else:
-            # Se não tem separador, colocar tudo na pergunta
             context['pergunta_revisada'] = feedback.comentarios
             context['gabarito_revisado'] = feedback.pergunta.gabarito if feedback.pergunta else ''
     elif feedback.tipo == 'pergunta':
-        # Se não tem comentários ainda, preencher com os originais
         context['pergunta_revisada'] = feedback.pergunta.pergunta if feedback.pergunta else ''
         context['gabarito_revisado'] = feedback.pergunta.gabarito if feedback.pergunta else ''
     
@@ -1210,27 +1167,17 @@ def fornecerFeedback(request, feedback_id):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def excluirFeedback(request, feedback_id):
-    """
-    View para excluir um feedback (apenas autor ou admin)
-    """
     feedback = get_object_or_404(FeedbackEspecialista, id=feedback_id)
-    
-    # Verificar permissão - apenas autor do problema ou admin
     if not (request.user == feedback.solicitante or request.user.is_staff):
         return HttpResponseForbidden("Você não tem permissão para excluir este feedback.")
     
-    problema_id = feedback.parte.problema.id
-    
+    problema_id = feedback.problema.id
     if request.method == 'POST':
         feedback.delete()
         messages.success(request, 'Feedback excluído com sucesso.')
         return redirect('mimir:problemaDetail', pk=problema_id)
     
-    context = {
-        'feedback': feedback,
-    }
-    
-    return render(request, 'mimir/excluirFeedback.html', context)
+    return render(request, 'mimir/excluirFeedback.html', {'feedback': feedback})
 
 @login_required
 @acesso_mimir_requerido

@@ -294,13 +294,31 @@ class ResponderFeedbackForm(forms.ModelForm):
 
 # forms.py
 class AplicacaoProvaForm(forms.ModelForm):
-    alunos = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(groups__name='Aluno'),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-        required=False,  # Tornar opcional
-        help_text="Selecione alunos individualmente (opcional)"
+    # Declaramos explicitamente os campos de data para forçar os formatos aceitos (input_formats)
+    data_disponivel = forms.DateTimeField(
+        label="Data de Início",
+        required=True,
+        widget=forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S']
     )
     
+    data_limite = forms.DateTimeField(
+        label="Data Limite",
+        required=True,
+        widget=forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S']
+    )
+
+    class Meta:
+        model = AplicacaoProva
+        fields = ['data_disponivel', 'data_limite', 'tempo_limite', 'disponivel', 'alunos']
+        widgets = {
+            'tempo_limite': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': '02:00:00'
+            }),
+            'disponivel': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
     class Meta:
         model = AplicacaoProva
         fields = ['data_disponivel', 'data_limite', 'tempo_limite', 'disponivel', 'alunos']
