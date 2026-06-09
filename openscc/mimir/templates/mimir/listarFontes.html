@@ -2,72 +2,172 @@
 
 {% block mainContent %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-file-pdf me-2 text-primary"></i> Banco de Fontes</h2>
-        <!-- Atenção: Se a sua URL no urls.py for 'addFonte' sem o 's', mude aqui -->
-        <a href="{% url 'mimir:addFontes' %}" class="btn btn-primary">
-            <i class="fas fa-upload me-1"></i> Nova Fonte
-        </a>
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <h2 class="h4 mb-0 text-dark fw-bold">
+            <i class="fas fa-file-alt me-2 text-primary"></i> Banco de Fontes Base
+        </h2>
+        <div>
+            <a href="{% url 'mimir:addFontes' %}" class="btn btn-primary btn-sm shadow-sm fw-bold">
+                <i class="fas fa-plus me-1"></i> Adicionar Nova Fonte
+            </a>
+        </div>
     </div>
 
+    <!-- Mensagens de Sucesso/Erro -->
     {% if messages %}
+    <div class="messages mb-4">
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
         {% endfor %}
+    </div>
     {% endif %}
 
-    <div class="card shadow-sm border-0">
+    <!-- Barra de Pesquisa e Filtros -->
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body">
+            <form method="GET" action="{% url 'mimir:visualizarFontes' %}" class="row g-2 align-items-center">
+                <div class="col-md-9 col-sm-12">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" 
+                               placeholder="Buscar fonte pelo nome..." value="{{ query }}">
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-12 d-grid d-md-flex gap-2 justify-content-md-end">
+                    <button type="submit" class="btn btn-primary shadow-sm fw-bold">Pesquisar</button>
+                    {% if query %}
+                    <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-outline-secondary">Limpar</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de Resultados -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 fw-bold text-dark fs-6">Arquivos Cadastrados</h5>
+            <span class="badge bg-primary rounded-pill">{{ total_fontes }} encontrados</span>
+        </div>
+        
         <div class="card-body p-0">
             {% if sources %}
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 30%;" class="ps-4">Nome do Arquivo</th>
-                                <th style="width: 40%;">Descrição</th>
-                                <th style="width: 15%;">Data de Upload</th>
-                                <th style="width: 15%;" class="text-end pe-4">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for source in sources %}
-                                <tr>
-                                    <td class="text-dark fw-bold ps-4">
-                                        <i class="fas fa-file-alt text-primary me-2"></i>{{ source.nome }}
-                                    </td>
-                                    <td class="text-muted small">
-                                        {{ source.descricao|default:"<em>Nenhuma descrição</em>"|safe|truncatewords:15 }}
-                                    </td>
-                                    <td class="text-muted small">
-                                        {{ source.dataCriacao|date:"d/m/Y H:i" }}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <a href="{{ source.fonte.url }}" class="btn btn-outline-primary btn-sm me-1" target="_blank" title="Visualizar Arquivo">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
-                                        <a href="{% url 'mimir:updateFonte' source.id %}" class="btn btn-outline-secondary btn-sm me-1" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="{% url 'mimir:deletarFonte' source.id %}" class="btn btn-outline-danger btn-sm" title="Excluir">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-secondary small text-uppercase" style="letter-spacing: 0.05em;">
+                        <tr>
+                            <th class="ps-4">Nome da Fonte</th>
+                            <th>Descrição</th>
+                            <th>Data de Criação</th>
+                            <th class="text-end pe-4">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for source in sources %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 text-primary p-2 rounded me-3">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </div>
+                                    <span class="fw-bold text-dark">{{ source.nome }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-muted small">{{ source.descricao|default:"Sem descrição"|truncatewords:10 }}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted small"><i class="far fa-calendar-alt me-1"></i> {{ source.dataCriacao|date:"d/m/Y H:i" }}</span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group btn-group-sm shadow-sm" role="group">
+                                    <a href="{{ source.fonte.url }}" target="_blank" class="btn btn-outline-primary" title="Abrir Arquivo">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:updateFonte' source.id %}" class="btn btn-outline-secondary" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:deletarFonte' source.id %}" class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             {% else %}
-                <div class="text-center py-5 text-secondary">
-                    <i class="fas fa-folder-open fa-3x mb-3 text-muted"></i>
-                    <h5>Nenhuma fonte cadastrada</h5>
-                    <p class="small text-muted">Faça o upload de materiais de referência (PDFs) para que o Mimir possa consultá-los.</p>
-                </div>
+            <div class="text-center py-5">
+                <i class="fas fa-folder-open fa-3x text-muted mb-3 opacity-50"></i>
+                {% if query %}
+                    <h5 class="text-dark">Nenhuma fonte encontrada</h5>
+                    <p class="text-muted small">Não encontramos nenhum arquivo contendo o termo "<strong>{{ query }}</strong>".</p>
+                    <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-outline-primary btn-sm mt-2">Limpar Pesquisa</a>
+                {% else %}
+                    <h5 class="text-dark">Banco de Fontes Vazio</h5>
+                    <p class="text-muted small">Você ainda não enviou nenhum material base (PDF/TXT) para uso com a IA.</p>
+                    <a href="{% url 'mimir:addFontes' %}" class="btn btn-primary btn-sm shadow-sm fw-bold mt-2">
+                        <i class="fas fa-plus me-1"></i> Adicionar Primeiro Arquivo
+                    </a>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
+
+        <!-- Componente de Paginação -->
+        {% if sources.has_other_pages %}
+        <div class="card-footer bg-white border-top py-3 d-flex justify-content-center">
+            <nav aria-label="Navegação de páginas">
+                <ul class="pagination pagination-sm mb-0">
+                    <!-- Anterior -->
+                    {% if sources.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ sources.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" aria-label="Anterior">
+                            <span aria-hidden="true">&laquo; Anterior</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">&laquo; Anterior</span>
+                    </li>
+                    {% endif %}
+
+                    <!-- Números das Páginas -->
+                    {% for num in sources.paginator.page_range %}
+                        {% if sources.number == num %}
+                        <li class="page-item active" aria-current="page">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Próximo -->
+                    {% if sources.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ sources.next_page_number }}{% if query %}&q={{ query }}{% endif %}" aria-label="Próximo">
+                            <span aria-hidden="true">Próxima &raquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">Próxima &raquo;</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

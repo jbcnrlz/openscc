@@ -7,6 +7,7 @@ from .viewsClasses.TemaListView import TemaListView
 from .viewsClasses.ProblemasView import ProblemaListView, ProblemaDetailView, GerarProblemaView, ProblemaCreateView, RegerarParteView, ProblemaDeleteView, ProblemaDeleteAjaxView
 from .viewsClasses.GuiaTutorView import GerarGuiaTutorView, VisualizarGuiaTutorView, AtualizarGuiaTutorView, EditarGuiaTutorView
 from .viewsClasses.ExportarPDFView import ExportarProblemaPDFView, ExportarGuiaTutorPDFView, ExportarCompletoPDFView
+from .viewsClasses.LLMLogListView import LLMLogListView
 app_name = 'mimir'
 
 urlpatterns = [    
@@ -54,8 +55,8 @@ urlpatterns = [
      path('problema/<int:problema_id>/exportar-pdf/', ExportarProblemaPDFView.as_view(), name='exportarPDF'),
      path('problema/<int:problema_id>/exportar-guia-pdf/', ExportarGuiaTutorPDFView.as_view(), name='exportarGuiaPDF'),
      path('problema/<int:problema_id>/exportar-completo-pdf/', ExportarCompletoPDFView.as_view(), name='exportarCompletoPDF'),
-     path('problema/<int:problema_id>/parte/<int:parte_ordem>/solicitar-feedback/', views.solicitarFeedback, name='solicitarFeedback'),
-     path('problema/<int:problema_id>/parte/<int:parte_ordem>/feedbacks/', views.visualizarFeedbacksParte, name='visualizarFeedbacksParte'),
+     path('problema/<int:problema_id>/solicitar-feedback/', views.solicitarFeedback, name='solicitarFeedback'),
+     path('problema/<int:problema_id>/feedbacks/', views.visualizarFeedbacksParte, name='visualizarFeedbacksParte'),
      path('feedback/<int:feedback_id>/marcar-utilizado/', views.marcarFeedbackUtilizado, name='marcarFeedbackUtilizado'),
      path('feedback/<int:feedback_id>/responder/', views.responderFeedback, name='responderFeedback'),
      path('feedback/<int:feedback_id>/fornecer/', views.fornecerFeedback, name='fornecerFeedback'),
@@ -104,4 +105,6 @@ urlpatterns = [
      path('objetivos/criar/', views.criarObjetivo, name='criarObjetivo'),
      path('objetivos/<int:pk>/editar/', views.atualizarObjetivo, name='atualizarObjetivo'),
      path('objetivos/<int:pk>/deletar/', views.deletarObjetivo, name='deletarObjetivo'),
+     path('logs-ia/', LLMLogListView.as_view(), name='listarLogsLLM'),
+     path('problema/<int:problema_id>/exportar-como-fonte/', views.exportarProblemaComoFonte, name='exportarProblemaComoFonte'),
 ]

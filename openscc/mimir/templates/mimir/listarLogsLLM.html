@@ -1,0 +1,319 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <h2 class="h4 mb-0 text-dark fw-bold">
+            <i class="fas fa-microchip me-2 text-indigo"></i> Monitoramento de Inteligência Artificial
+        </h2>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm fw-bold shadow-sm" onclick="location.reload();">
+                <i class="fas fa-sync-alt me-1"></i> Atualizar Logs
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-start border-indigo border-4 shadow-sm h-100 py-2 border-0">
+                <div class="card-body px-3 py-2">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-indigo text-uppercase mb-1 small">Requisições (Total)</div>
+                            <div class="h4 mb-0 fw-bold text-gray-800">{{ stats.total }}</div>
+                            <small class="text-success fw-bold"><i class="fas fa-check-circle"></i> {{ stats.taxa_sucesso }}% sucesso</small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-network-wired fa-2x text-muted opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-start border-danger border-4 shadow-sm h-100 py-2 border-0">
+                <div class="card-body px-3 py-2">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-danger text-uppercase mb-1 small">Falhas na API</div>
+                            <div class="h4 mb-0 fw-bold text-gray-800">{{ stats.erros }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-start border-warning border-4 shadow-sm h-100 py-2 border-0">
+                <div class="card-body px-3 py-2">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1 small">Tempo Médio (Latência)</div>
+                            <div class="h4 mb-0 fw-bold text-gray-800">{{ stats.tempo_medio|default:"0" }} <span class="fs-6 text-muted">ms</span></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-stopwatch fa-2x text-muted opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-start border-success border-4 shadow-sm h-100 py-2 border-0 bg-light">
+                <div class="card-body px-3 py-2">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1 small">Consumo (Tokens)</div>
+                            <div class="h4 mb-0 fw-bold text-gray-800">{{ stats.tokens_total }}</div>
+                            <small class="text-muted"><i class="fas fa-sign-in-alt"></i> {{ stats.tokens_in|default:"0" }} In | <i class="fas fa-sign-out-alt"></i> {{ stats.tokens_out|default:"0" }} Out</small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-coins fa-2x text-muted opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 fs-6 fw-bold text-secondary">
+                <i class="fas fa-list me-2"></i> Histórico de Chamadas
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-secondary small text-uppercase tracking-wider">
+                            <tr>
+                                <th class="ps-4">Data / Hora</th>
+                                <th>Modelo Utilizado</th>
+                                <th>Desempenho</th>
+                                <th>Tokens (In/Out)</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-bold text-dark d-block">{{ log.created_at|date:"d/m/Y" }}</span>
+                                    <small class="text-muted"><i class="far fa-clock me-1"></i> {{ log.created_at|date:"H:i:s" }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border"><i class="fas fa-robot text-indigo me-1"></i> {{ log.model_used|default:"Desconhecido" }}</span>
+                                    {% if log.user %}
+                                    <small class="d-block mt-1 text-muted">User: {{ log.user.username }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.duration_ms %}
+                                        <span class="text-dark fw-bold">{{ log.duration_ms }} ms</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        <span class="text-muted" title="Tokens Enviados (Prompt)"><i class="fas fa-arrow-up text-secondary"></i> {{ log.tokens_input|default:"-" }}</span><br>
+                                        <span class="text-primary" title="Tokens Recebidos (Resposta)"><i class="fas fa-arrow-down text-indigo"></i> {{ log.tokens_output|default:"-" }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fas fa-check me-1"></i> Sucesso</span>
+                                    {% else %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="fas fa-times me-1"></i> Erro</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-outline-indigo btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#logModal{{ log.id }}">
+                                        <i class="fas fa-search-plus"></i> Ver Dados
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="logModal{{ log.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-xl modal-dialog-centered">
+                                    <div class="modal-content shadow-lg border-0">
+                                        <div class="modal-header bg-light border-bottom">
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="fas fa-bug me-2 text-indigo"></i> Detalhes da Requisição #{{ log.id }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body bg-light p-4">
+                                            
+                                            <div class="d-flex justify-content-between align-items-center bg-white p-3 border rounded shadow-sm mb-4">
+                                                <div>
+                                                    <span class="badge bg-indigo text-white me-2">{{ log.model_used }}</span>
+                                                    <span class="text-muted small">Executado em: {{ log.created_at|date:"d/m/Y H:i:s" }}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-muted small border-end pe-2 me-2">Duração: <strong>{{ log.duration_ms|default:"0" }}ms</strong></span>
+                                                    <span class="text-muted small border-end pe-2 me-2">Prompt: <strong>{{ log.tokens_input|default:"0" }}</strong> tk</span>
+                                                    <span class="text-muted small">Resposta: <strong>{{ log.tokens_output|default:"0" }}</strong> tk</span>
+                                                </div>
+                                            </div>
+
+                                            {% if log.status == 'error' %}
+                                            <div class="alert alert-danger shadow-sm border-danger">
+                                                <h6 class="fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Mensagem de Erro Retornada:</h6>
+                                                <div class="font-monospace small mt-2">{{ log.error_message|linebreaksbr }}</div>
+                                            </div>
+                                            {% endif %}
+
+                                            <div class="row g-4">
+                                                <div class="col-md-6">
+                                                    <div class="card h-100 border-secondary shadow-sm">
+                                                        <div class="card-header bg-secondary text-white fw-bold py-2 d-flex justify-content-between align-items-center">
+                                                            <span><i class="fas fa-upload me-1"></i> Prompt Enviado</span>
+                                                            <button class="btn btn-sm btn-light py-0 px-2 text-secondary" onclick="copiarTexto('prompt-{{ log.id }}')" title="Copiar Prompt">
+                                                                <i class="fas fa-copy"></i>
+                                                            </button>
+                                                        </div>
+                                                        <div class="card-body bg-white p-0">
+                                                            <pre class="m-0 p-3 text-dark custom-scrollbar" id="prompt-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.prompt }}</pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-6">
+                                                    <div class="card h-100 border-indigo shadow-sm">
+                                                        <div class="card-header bg-indigo text-white fw-bold py-2 d-flex justify-content-between align-items-center">
+                                                            <span><i class="fas fa-download me-1"></i> Retorno do Modelo (Payload)</span>
+                                                            <button class="btn btn-sm btn-light py-0 px-2 text-indigo" onclick="copiarTexto('response-{{ log.id }}')" title="Copiar Resposta">
+                                                                <i class="fas fa-copy"></i>
+                                                            </button>
+                                                        </div>
+                                                        <div class="card-body bg-indigo bg-opacity-10 p-0">
+                                                            <pre class="m-0 p-3 text-dark custom-scrollbar" id="response-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.response|default:"Nenhuma resposta recebida." }}</pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if is_paginated %}
+                <div class="card-footer bg-white border-top py-3">
+                    <nav aria-label="Navegação de páginas">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+                            {% endif %}
+                            
+                            <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5 text-secondary">
+                    <i class="fas fa-server fa-3x mb-3 text-muted opacity-50"></i>
+                    <h5 class="text-dark">Nenhum log registrado</h5>
+                    <p class="small text-muted mb-0">Ainda não foram realizadas chamadas para os modelos de linguagem.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+/* Identidade Visual Índigo para o Módulo de IA */
+:root {
+    --bs-indigo: #6610f2;
+}
+.text-indigo { color: var(--bs-indigo) !important; }
+.bg-indigo { background-color: var(--bs-indigo) !important; }
+.border-indigo { border-color: var(--bs-indigo) !important; }
+
+.btn-outline-indigo {
+    color: var(--bs-indigo);
+    border-color: var(--bs-indigo);
+}
+.btn-outline-indigo:hover {
+    background-color: var(--bs-indigo);
+    color: white;
+}
+
+.tracking-wider { letter-spacing: 0.05em; }
+
+/* Scrollbar personalizada para o código (estilo editor/terminal) */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; 
+}
+pre {
+    font-family: 'Consolas', 'Courier New', monospace;
+    word-break: break-all;
+}
+</style>
+
+<script>
+// Função para copiar o conteúdo dos blocos <pre>
+function copiarTexto(elementoId) {
+    const texto = document.getElementById(elementoId).innerText;
+    navigator.clipboard.writeText(texto).then(function() {
+        showToast('Conteúdo copiado para a área de transferência!');
+    }).catch(function(err) {
+        showToast('Erro ao copiar texto.', 'danger');
+    });
+}
+
+function showToast(message, type='success') {
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed bottom-0 end-0 p-3';
+    toast.style.zIndex = '9999';
+    
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-times-circle';
+    const bg = type === 'success' ? 'bg-success' : 'bg-danger';
+    
+    toast.innerHTML = `
+        <div class="toast show shadow-lg border-0" role="alert">
+            <div class="toast-header ${bg} text-white border-0">
+                <i class="fas ${icon} me-2"></i>
+                <strong class="me-auto">Aviso</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body bg-white text-dark fw-bold small">
+                ${message}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3000);
+}
+</script>
+{% endblock %}
