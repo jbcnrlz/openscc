@@ -173,6 +173,16 @@
                 </div>
                 <div class="card-body bg-light">
                     <div class="d-grid gap-2">
+
+                        {% if eh_autor %}
+                        <form method="post" action="{% url 'mimir:exportarProblemaComoFonte' problema.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-primary btn-sm bg-white shadow-sm fw-bold text-start w-100 mb-2">
+                                <i class="fas fa-recycle me-2 text-primary"></i> Reusar como Fonte (TXT)
+                            </button>
+                        </form>
+                        {% endif %}
+
                         <a href="{% url 'mimir:exportarPDF' problema.pk %}" class="btn btn-outline-danger btn-sm bg-white shadow-sm fw-bold text-start">
                             <i class="fas fa-file-pdf me-2"></i> Apenas Problema (Aluno)
                         </a>

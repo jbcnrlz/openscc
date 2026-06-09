@@ -17,6 +17,8 @@ from weasyprint import HTML
 from django.db.models import Count, Avg, Q
 from .decorators import acesso_mimir_requerido, grupo_requerido
 from django.contrib.auth.models import User
+from django.utils.text import slugify
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 def acessoNegado(request):
     """View para página de acesso negado"""
@@ -272,8 +274,34 @@ def dashboardProfessor(request):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def visualizarFontes(request):
-    sources = Fontes.objects.filter(user=request.user)
-    return render(request, "mimir/listarFontes.html", {"sources": sources})
+    # Recupera as fontes do usuário ordenadas da mais recente para a mais antiga
+    sources_list = Fontes.objects.filter(user=request.user).order_by('-dataCriacao')
+    
+    # Captura o termo de busca (se houver)
+    query = request.GET.get('q')
+    if query:
+        # Filtra pelo nome usando case-insensitive (icontains)
+        sources_list = sources_list.filter(nome__icontains=query)
+        
+    # Paginação: 10 fontes por página
+    paginator = Paginator(sources_list, 10)
+    page = request.GET.get('page')
+    
+    try:
+        sources = paginator.page(page)
+    except PageNotAnInteger:
+        # Se a página não for um inteiro, entrega a primeira página.
+        sources = paginator.page(1)
+    except EmptyPage:
+        # Se a página estiver fora do limite, entrega a última página de resultados.
+        sources = paginator.page(paginator.num_pages)
+        
+    context = {
+        'sources': sources,
+        'query': query or '',
+        'total_fontes': paginator.count
+    }
+    return render(request, "mimir/listarFontes.html", context)
 
 @login_required(login_url='/login')
 @acesso_mimir_requerido
@@ -2577,3 +2605,52 @@ def deletarObjetivo(request, pk):
         messages.success(request, 'Objetivo de aprendizagem excluído com sucesso!')
         return redirect('mimir:listarObjetivos')
     return render(request, 'mimir/deletarObjetivo.html', {'objective': objetivo})
+
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def exportarProblemaComoFonte(request, problema_id):
+    problema = get_object_or_404(Problema, id=problema_id)
+    
+    # Validação de segurança
+    if problema.assunto.user != request.user:
+        messages.error(request, "Você não tem permissão para exportar este problema.")
+        return redirect('mimir:problemaDetail', pk=problema.id)
+        
+    # Construção do texto estruturado
+    linhas = []
+    linhas.append(f"TÍTULO DO PROBLEMA: {problema.titulo}")
+    linhas.append(f"TEMA: {problema.tema.nome}")
+    linhas.append(f"ASSUNTO: {problema.assunto.nome}")
+    linhas.append("\nOBJETIVOS DE APRENDIZAGEM:")
+    
+    for obj in problema.objetivos.all():
+        linhas.append(f"- {obj.descricao}")
+        
+    linhas.append("\nESTRUTURA DO CASO CLÍNICO:")
+    for parte in problema.partes.all().order_by('ordem'):
+        linhas.append(f"\n--- PARTE {parte.ordem} ---")
+        linhas.append(parte.enunciado)
+        
+    # Inclui o Guia do Tutor se existir para dar mais contexto à IA
+    if hasattr(problema, 'guia_tutor') and problema.guia_tutor:
+        linhas.append("\n--- GUIA DO TUTOR ---")
+        linhas.append(problema.guia_tutor.conteudo)
+        
+    conteudo_final = "\n".join(linhas)
+    nome_arquivo = f"export_{slugify(problema.titulo)}.txt"
+    
+    # Cria a nova fonte e salva o arquivo em txt
+    nova_fonte = Fontes(
+        nome=f"[Problema] {problema.titulo}",
+        descricao=f"Problema exportado em {timezone.now().strftime('%d/%m/%Y')} para retroalimentação da IA.",
+        user=request.user
+    )
+    
+    # A MÁGICA ACONTECE AQUI: 'utf-8-sig' força o BOM no início do arquivo
+    nova_fonte.fonte.save(nome_arquivo, ContentFile(conteudo_final.encode('utf-8-sig')))
+    nova_fonte.save()
+    
+    messages.success(request, f"Sucesso! O problema foi convertido na fonte '{nova_fonte.nome}' e já está disponível para uso.")
+    return redirect('mimir:visualizarFontes')

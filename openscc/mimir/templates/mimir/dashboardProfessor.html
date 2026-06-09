@@ -83,6 +83,7 @@
     </div>
 
     <div class="row">
+        <!-- Aplicações de Prova -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -101,6 +102,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Fontes -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -119,6 +122,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Templates -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -138,6 +143,7 @@
             </div>
         </div>
 
+        <!-- Objetivos Pedagógicos -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -157,6 +163,7 @@
             </div>
         </div>
 
+        <!-- Perguntas -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -175,6 +182,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Problemas -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -193,6 +202,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Provas -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -211,6 +222,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Temas -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -229,6 +242,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- Feedbacks -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
@@ -247,19 +262,41 @@
                 </div>
             </div>
         </div>
+
+        <!-- Vínculos -->
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card feature-card h-100 shadow-sm border-0">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-3">
                         <div class="feature-icon bg-orange bg-opacity-10 p-3 rounded-circle me-3">
-                            <i class="fas fa-comments text-orange"></i>
+                            <i class="fas fa-link text-orange"></i>
                         </div>
-                        <h5 class="card-title mb-0">Vinculos</h5>
+                        <h5 class="card-title mb-0">Vínculos</h5>
                     </div>
                     <p class="card-text text-muted">Gerenciar os vínculos dos assuntos com os alunos.</p>
                     <div class="mt-3">
                         <a href="{% url 'mimir:listarAssuntosVinculos' %}" class="btn btn-orange text-white">
                             <i class="fas fa-cog me-1"></i> Gerenciar vínculos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOVO CARD: Monitoramento de Inteligência Artificial -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card feature-card h-100 shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon bg-indigo bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-microchip text-indigo"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Monitor de IA</h5>
+                    </div>
+                    <p class="card-text text-muted">Visualize o histórico de chamadas aos modelos de linguagem (LLMs), monitore erros, latência e consumo de tokens em tempo real.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'mimir:listarLogsLLM' %}" class="btn btn-indigo text-white">
+                            <i class="fas fa-network-wired me-1"></i> Acessar Logs
                         </a>
                     </div>
                 </div>
@@ -273,24 +310,24 @@
         --bs-purple: #6f42c1;
         --bs-teal: #20c997;
         --bs-orange: #fd7e14;
-        --bs-indigo: #4e73df; /* Inserida variável de cor indigo */
+        --bs-indigo: #6610f2;
         --bs-btn-hover-bg: #ccc;
     }
     
     .bg-purple { background-color: var(--bs-purple) !important; }
     .bg-teal { background-color: var(--bs-teal) !important; }
     .bg-orange { background-color: var(--bs-orange) !important; }
-    .bg-indigo { background-color: var(--bs-indigo) !important; } /* Inserida classe de fundo */
+    .bg-indigo { background-color: var(--bs-indigo) !important; }
     
     .text-purple { color: var(--bs-purple) !important; }
     .text-teal { color: var(--bs-teal) !important; }
     .text-orange { color: var(--bs-orange) !important; }
-    .text-indigo { color: var(--bs-indigo) !important; } /* Inserida classe de texto */
+    .text-indigo { color: var(--bs-indigo) !important; }
     
     .btn-purple { background-color: var(--bs-purple); border-color: var(--bs-purple); }
     .btn-teal { background-color: var(--bs-teal); border-color: var(--bs-teal); }
     .btn-orange { background-color: var(--bs-orange); border-color: var(--bs-orange); }
-    .btn-indigo { background-color: var(--bs-indigo); border-color: var(--bs-indigo); } /* Inserida classe de botão */
+    .btn-indigo { background-color: var(--bs-indigo); border-color: var(--bs-indigo); }
     
     .feature-card {
         transition: transform 0.2s, box-shadow 0.2s;

@@ -7,6 +7,7 @@ from .viewsClasses.TemaListView import TemaListView
 from .viewsClasses.ProblemasView import ProblemaListView, ProblemaDetailView, GerarProblemaView, ProblemaCreateView, RegerarParteView, ProblemaDeleteView, ProblemaDeleteAjaxView
 from .viewsClasses.GuiaTutorView import GerarGuiaTutorView, VisualizarGuiaTutorView, AtualizarGuiaTutorView, EditarGuiaTutorView
 from .viewsClasses.ExportarPDFView import ExportarProblemaPDFView, ExportarGuiaTutorPDFView, ExportarCompletoPDFView
+from .viewsClasses.LLMLogListView import LLMLogListView
 app_name = 'mimir'
 
 urlpatterns = [    
@@ -104,4 +105,6 @@ urlpatterns = [
      path('objetivos/criar/', views.criarObjetivo, name='criarObjetivo'),
      path('objetivos/<int:pk>/editar/', views.atualizarObjetivo, name='atualizarObjetivo'),
      path('objetivos/<int:pk>/deletar/', views.deletarObjetivo, name='deletarObjetivo'),
+     path('logs-ia/', LLMLogListView.as_view(), name='listarLogsLLM'),
+     path('problema/<int:problema_id>/exportar-como-fonte/', views.exportarProblemaComoFonte, name='exportarProblemaComoFonte'),
 ]
