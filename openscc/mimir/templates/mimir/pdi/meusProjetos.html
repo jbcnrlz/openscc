@@ -1,0 +1,93 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4 mb-5">
+    
+    <!-- CABEÇALHO -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+            <h1 class="h3 mb-1 text-dark fw-bold">
+                <i class="fas fa-folder-open text-primary me-2"></i> Meus Projetos
+            </h1>
+            <p class="text-muted mb-0">Gerencie suas propostas de pesquisa e submissões em andamento.</p>
+        </div>
+        <div>
+            <a href="{% url 'mimir:listarEditais' %}" class="btn btn-success fw-bold shadow-sm">
+                <i class="fas fa-plus me-1"></i> Nova Proposta (Ver Editais)
+            </a>
+        </div>
+    </div>
+
+    <!-- LISTAGEM DE PROJETOS -->
+    <div class="row g-4">
+        {% for projeto in projetos %}
+        <div class="col-md-6 col-xl-4">
+            <div class="card shadow-sm border-0 h-100 hover-elevate 
+                {% if projeto.status == 'rascunho' %}border-top border-warning border-4
+                {% elif projeto.status == 'revisao' %}border-top border-info border-4
+                {% else %}border-top border-success border-4{% endif %}">
+                
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge 
+                                {% if projeto.status == 'rascunho' %}bg-warning text-dark
+                                {% elif projeto.status == 'revisao' %}bg-info text-dark
+                                {% else %}bg-success{% endif %} fw-bold mb-2">
+                                {{ projeto.get_status_display }}
+                            </span>
+                            <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ projeto.criado_em|date:"d M Y" }}</small>
+                        </div>
+                        
+                        <h5 class="fw-bold text-dark mb-1">{{ projeto.titulo }}</h5>
+                        <p class="text-muted small mb-3">
+                            <i class="fas fa-university me-1"></i> Edital: {{ projeto.edital.orgao_fomento }}
+                        </p>
+                        
+                        <div class="d-flex align-items-center gap-2 mb-4">
+                            {% if request.user == projeto.proponente %}
+                                <span class="badge bg-light text-secondary border"><i class="fas fa-crown text-warning me-1"></i> Proponente (Você)</span>
+                            {% else %}
+                                <span class="badge bg-light text-secondary border"><i class="fas fa-users text-primary me-1"></i> Equipe</span>
+                            {% endif %}
+                            
+                            {% if projeto.equipe.count > 0 %}
+                                <span class="badge bg-light text-secondary border">+ {{ projeto.equipe.count }} membro(s)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Ações -->
+                    <div class="mt-auto border-top pt-3">
+                        {% if projeto.status == 'rascunho' or projeto.status == 'revisao' %}
+                            <a href="{% url 'mimir:editarProjeto' projeto.id %}" class="btn btn-outline-primary w-100 fw-bold shadow-sm">
+                                <i class="fas fa-edit me-1"></i> Continuar Edição
+                            </a>
+                        {% else %}
+                            <button class="btn btn-outline-success w-100 fw-bold shadow-sm" disabled>
+                                <i class="fas fa-check-double me-1"></i> Projeto Submetido
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 bg-white shadow-sm rounded border">
+            <i class="fas fa-folder-minus fa-4x text-muted opacity-25 mb-3"></i>
+            <h4 class="text-dark fw-bold">Nenhum projeto encontrado</h4>
+            <p class="text-muted mb-4">Você ainda não iniciou nenhuma proposta de fomento.</p>
+            <a href="{% url 'mimir:listarEditais' %}" class="btn btn-primary px-4 shadow-sm fw-bold">
+                <i class="fas fa-search me-1"></i> Explorar Editais Abertos
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<style>
+    .hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .hover-elevate:hover { transform: translateY(-5px); box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important; }
+</style>
+{% endblock %}

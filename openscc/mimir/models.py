@@ -4,7 +4,13 @@ from django.core.validators import ValidationError
 import datetime
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
+import re
 # Create your models here.
+def isTutor(self):
+    """Verifica se o usuário pertence ao grupo Tutor"""
+    return self.groups.filter(name="Tutor").exists()
+
+User.add_to_class('isTutor', isTutor)
 
 def isProfessor(self):
     """
@@ -253,6 +259,13 @@ class Problema(models.Model):
     objetivos = models.ManyToManyField(ObjetivosAprendizagem)
     tema = models.ForeignKey(Tema, on_delete=models.CASCADE)
     fontes = models.ManyToManyField('Fontes', blank=True)
+    titulo_apresentacao = models.CharField(
+            max_length=200, 
+            verbose_name="Título para Alunos (Anti-Spoiler)", 
+            null=True, 
+            blank=True, 
+            help_text="Nome fantasia para o caso. Ex: 'Dor na barriga' em vez de 'Apendicite'."
+    )
 
     def get_feedbacks_pendentes(self):
         """Retorna feedbacks pendentes para este problema"""
@@ -462,28 +475,34 @@ class FeedbackEspecialista(models.Model):
         
     def aceitar_feedback(self):
         """
-        Aceita e aplica o feedback do especialista.
+        Aceita e aplica o feedback do especialista (Lidando com marcações de Editor Visual).
         """
-        import re
 
         if self.tipo == 'pergunta' and self.pergunta:
             self.pergunta.aplicar_feedback(self)
             
         elif self.tipo == 'problema' and self.problema:
-            # Pega o texto redigido pelo especialista
             texto_feedback = self.comentarios
             
-            # Tenta fatiar o texto automaticamente caso o especialista tenha usado 
-            # marcadores no início das linhas como "Parte 1:", "Parte 2 -", etc.
-            partes_split = re.split(r'(?im)^\s*parte\s+\d+[\:\-\.]?\s*', texto_feedback)
+            # 1. LIMPEZA DE REVISÃO (TRACK CHANGES)
+            # Remove qualquer texto que o especialista marcou com a ferramenta "Riscado" (<del>, <s>, <strike>)
+            texto_limpo = re.sub(r'<s\b[^>]*>.*?</s>', '', texto_feedback, flags=re.IGNORECASE|re.DOTALL)
+            texto_limpo = re.sub(r'<del\b[^>]*>.*?</del>', '', texto_limpo, flags=re.IGNORECASE|re.DOTALL)
+            texto_limpo = re.sub(r'<strike\b[^>]*>.*?</strike>', '', texto_limpo, flags=re.IGNORECASE|re.DOTALL)
             
-            # Remove elementos vazios gerados no início do split
+            # Remove as formatações de cor inseridas para destacar a correção, 
+            # mantendo o texto que estava dentro delas.
+            texto_limpo = re.sub(r'color:\s*(?:red|green|#[0-9a-fA-F]{3,6}|rgb\([^)]+\));?', '', texto_limpo, flags=re.IGNORECASE)
+            
+            # 2. FATIAMENTO DAS PARTES
+            # Busca padrões como <p><strong>Parte 1:</strong></p> ou apenas Parte 1:
+            partes_split = re.split(r'(?im)(?:<[^>]+>)*\s*parte\s+\d+[\:\-\.]?\s*(?:</[^>]+>)*', texto_limpo)
             partes_limpas = [p.strip() for p in partes_split if p.strip()]
             
-            # Apaga as partes antigas do problema original
+            # Apaga as partes antigas
             self.problema.partes.all().delete()
             
-            # Se o sistema identificou múltiplas partes no texto do especialista
+            # Salva o texto novo e limpo
             if len(partes_limpas) > 1:
                 for i, texto in enumerate(partes_limpas, 1):
                     self.problema.partes.create(
@@ -491,9 +510,8 @@ class FeedbackEspecialista(models.Model):
                         ordem=i
                     )
             else:
-                # Se não houver divisão explícita, salva tudo como a "Parte 1"
                 self.problema.partes.create(
-                    enunciado=texto_feedback,
+                    enunciado=texto_limpo,
                     ordem=1
                 )
 
@@ -746,3 +764,167 @@ class TemplateContexto(models.Model):
 
     def __str__(self):
         return self.titulo
+    
+class PequenoGrupo(models.Model):
+    nome = models.CharField(max_length=100, verbose_name="Nome do Grupo (Ex: Turma A - Grupo 1)")
+    assunto = models.ForeignKey('Assunto', on_delete=models.CASCADE, related_name='pequenos_grupos')
+    tutor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='grupos_tutorados', limit_choices_to={'groups__name': 'Tutor'})
+    alunos = models.ManyToManyField(User, related_name='meus_pequenos_grupos', limit_choices_to={'groups__name': 'Aluno'})
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Pequeno Grupo"
+        verbose_name_plural = "Pequenos Grupos"
+
+    def __str__(self):
+        return f"{self.nome} ({self.assunto.nome})"
+
+class LiberacaoParte(models.Model):
+    """Controla quais partes de um problema estão visíveis para um grupo específico."""
+    grupo = models.ForeignKey(PequenoGrupo, on_delete=models.CASCADE, related_name='partes_liberadas')
+    parte = models.ForeignKey('Parte', on_delete=models.CASCADE, related_name='liberacoes_grupos')
+    liberada_em = models.DateTimeField(auto_now_add=True)
+    liberada_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        unique_together = ('grupo', 'parte') # Evita duplicidade de liberação
+
+class PerguntaAprendizado(models.Model):
+    """Perguntas (Learning Issues) levantadas pelos alunos em cada parte."""
+    grupo = models.ForeignKey(PequenoGrupo, on_delete=models.CASCADE, related_name='perguntas_aprendizado')
+    parte = models.ForeignKey('Parte', on_delete=models.CASCADE, related_name='perguntas_aprendizado')
+    aluno = models.ForeignKey(User, on_delete=models.CASCADE)
+    texto = models.TextField(verbose_name="Pergunta de Aprendizado")
+    resposta = models.TextField(verbose_name="Resposta da Dúvida", null=True, blank=True)
+    respondida_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='respostas_pbl')
+    respondida_em = models.DateTimeField(null=True, blank=True)
+    resolvida = models.BooleanField(default=False)
+    criada_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['criada_em']
+
+class Edital(models.Model):
+    titulo = models.CharField(max_length=255, verbose_name="Título do Edital")
+    orgao_fomento = models.CharField(max_length=100, verbose_name="Órgão de Fomento (Ex: FAPESP, FINEP)")
+    arquivo_edital = models.FileField(upload_to='editais/pdfs/', verbose_name="PDF Completo do Edital")
+    
+    # Armazenamento dos processamentos automáticos do LLM
+    resumo_llm = models.TextField(verbose_name="Resumo Estruturado (IA)", null=True, blank=True)
+    insights_llm = models.TextField(verbose_name="Insights de Elegibilidade (IA)", null=True, blank=True)
+    
+    data_publicacao = models.DateField(verbose_name="Data de Publicação")
+    data_limite = models.DateTimeField(verbose_name="Prazo Final de Submissão")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Edital"
+        verbose_name_plural = "Editais"
+
+    def __str__(self):
+        return f"{self.orgao_fomento} - {self.titulo}"
+
+
+class DocumentoEdital(models.Model):
+    """Documentos exigidos pelo edital. Podem ser PDFs estáticos ou templates fatiados."""
+    TIPO_CHOICES = (
+        ('arquivo', 'Arquivo Estático (Upload Comum)'),
+        ('template', 'Template Estruturado (Preenchimento em Tela)'),
+    )
+    edital = models.ForeignKey(Edital, on_delete=models.CASCADE, related_name='documentos_exigidos')
+    nome = models.CharField(max_length=150, verbose_name="Nome do Documento (Ex: Projeto de Pesquisa)")
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='arquivo')
+    
+    # Se for arquivo estático, o admin faz o upload do modelo (ex: PDF/Word de instrução)
+    arquivo_modelo = models.FileField(upload_to='editais/modelos/', null=True, blank=True, verbose_name="Modelo de Arquivo")
+
+    def __str__(self):
+        return f"{self.nome} ({self.get_tipo_display()})"
+
+
+class CampoTemplate(models.Model):
+    """Se o documento for do tipo 'template', aqui definimos os campos/seções dele."""
+    TIPO_CAMPO_CHOICES = (
+        ('texto_curto', 'Texto Curto (CharField)'),
+        ('texto_longo', 'Texto Longo / Parágrafos (TextField)'),
+    )
+    documento = models.ForeignKey(DocumentoEdital, on_delete=models.CASCADE, related_name='campos_template')
+    label = models.CharField(max_length=150, verbose_name="Nome do Campo (Ex: Justificativa, Cronograma)")
+    tipo_campo = models.CharField(max_length=20, choices=TIPO_CAMPO_CHOICES, default='texto_longo')
+    ordem = models.IntegerField(default=1, verbose_name="Ordem de Exibição")
+    instrucoes_originais = models.TextField(verbose_name="Instruções de preenchimento do Edital para este campo")
+
+    class Meta:
+        ordering = ['ordem']
+
+class PerfilCurriculo(models.Model):
+    """Armazena o resumo do currículo do pesquisador (Texto puro do Lattes ou extraído)"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='curriculo')
+    texto_lattes = models.TextField(verbose_name="Resumo Estruturado do Currículo Lattes / C.V.")
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class Projeto(models.Model):
+    STATUS_CHOICES = (
+        ('rascunho', 'Em Elaboração'),
+        ('revisao', 'Em Revisão por Pares'),
+        ('submetido', 'Submetido'),
+    )
+    edital = models.ForeignKey(Edital, on_delete=models.PROTECT, related_name='projetos_submetidos')
+    titulo = models.CharField(max_length=255, verbose_name="Título da Proposta de Projeto")
+    proponente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meus_projetos_criados')
+    
+    # Compartilhamento / Trabalho em Equipe
+    equipe = models.ManyToManyField(User, related_name='projetos_coautoria', blank=True)
+    
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='rascunho')
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.titulo
+
+
+class PreenchimentoCampo(models.Model):
+    """Armazena o conteúdo atual escrito pela equipe para cada campo de um template."""
+    projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='respostas_campos')
+    campo = models.ForeignKey(CampoTemplate, on_delete=models.CASCADE)
+    valor = models.TextField(blank=True, null=True, verbose_name="Conteúdo Redigido")
+    modificado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    modificado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('projeto', 'campo')
+
+class RevisaoPares(models.Model):
+    """Controle de solicitações de revisão cega ou aberta de parceiros externos."""
+    projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='revisoes_recebidas')
+    revisor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projetos_para_revisar')
+    comentarios = models.TextField(verbose_name="Parecer / Críticas do Revisor", null=True, blank=True)
+    concluida = models.BooleanField(default=False)
+    solicitada_em = models.DateTimeField(auto_now_add=True)
+    concluida_em = models.DateTimeField(null=True, blank=True)
+
+class ReferenciaProjeto(models.Model):
+    projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='referencias')
+    citacao_curta = models.CharField(max_length=150, help_text="Ex: (SILVA et al., 2026)")
+    referencia_completa = models.TextField(help_text="Referência completa ABNT/APA")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['citacao_curta']
+
+class ComentarioRevisao(models.Model):
+    projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='comentarios')
+    campo = models.ForeignKey(CampoTemplate, on_delete=models.CASCADE)
+    revisor = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    # Este ID é crucial: ele vai ligar o banco de dados à tag <span> no texto do TinyMCE
+    marker_id = models.CharField(max_length=50, unique=True) 
+    
+    texto_selecionado = models.TextField(help_text="O trecho que o professor grifou")
+    texto_comentario = models.TextField(help_text="O comentário/orientação em si")
+    resolvido = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-criado_em']

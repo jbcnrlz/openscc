@@ -1,0 +1,112 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4 mb-5">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="h4 mb-1 text-dark fw-bold">
+                <i class="fas fa-users me-2 text-primary"></i> Gestão de Pequenos Grupos (PBL)
+            </h2>
+            <p class="text-muted mb-0">Crie os grupos e vincule tutores e alunos para as sessões tutoriais.</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalCriarGrupo">
+                <i class="fas fa-plus me-1"></i> Criar Novo Grupo
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensagens -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Grid de Grupos -->
+    <div class="row g-4">
+        {% for grupo in grupos %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm border-0 h-100 hover-elevate">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark fs-6 text-truncate" title="{{ grupo.nome }}">
+                        <i class="fas fa-users text-primary me-2"></i> {{ grupo.nome }}
+                    </h5>
+                </div>
+                <div class="card-body bg-light">
+                    <p class="mb-2 small"><strong class="text-secondary">Assunto:</strong><br>{{ grupo.assunto.nome }}</p>
+                    <p class="mb-2 small"><strong class="text-secondary">Tutor:</strong><br>
+                        {% if grupo.tutor %}
+                            <span class="badge bg-info text-white"><i class="fas fa-chalkboard-teacher me-1"></i> {{ grupo.tutor.first_name }} {{ grupo.tutor.last_name }}</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i> Sem tutor vinculado</span>
+                        {% endif %}
+                    </p>
+                    <p class="mb-0 small"><strong class="text-secondary">Alunos:</strong> {{ grupo.alunos.count }} vinculados</p>
+                </div>
+                <div class="card-footer bg-white border-top p-3 text-center">
+                    <a href="{% url 'mimir:gerenciarPequenoGrupo' grupo.id %}" class="btn btn-outline-primary btn-sm w-100 fw-bold">
+                        <i class="fas fa-cog me-1"></i> Gerenciar Vínculos
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5 bg-white shadow-sm rounded border">
+                <i class="fas fa-users-slash fa-3x mb-3 text-muted opacity-50"></i>
+                <h5 class="text-dark fw-bold">Nenhum grupo cadastrado</h5>
+                <p class="small text-muted mb-4">Você ainda não criou nenhum pequeno grupo de PBL para as suas disciplinas.</p>
+                <button type="button" class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCriarGrupo">
+                    Criar Primeiro Grupo
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal de Criação de Grupo -->
+<div class="modal fade" id="modalCriarGrupo" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i> Criar Pequeno Grupo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'mimir:listarPequenosGrupos' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4 bg-light">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark">Nome do Grupo *</label>
+                        <input type="text" name="nome" class="form-control" placeholder="Ex: Turma A - Grupo 1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark">Assunto Vinculado *</label>
+                        <select name="assunto_id" class="form-select" required>
+                            <option value="">-- Selecione o Assunto --</option>
+                            {% for assunto in assuntos %}
+                                <option value="{{ assunto.id }}">{{ assunto.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted mt-1 d-block"><i class="fas fa-info-circle"></i> O grupo só terá acesso aos problemas gerados para este assunto.</small>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">Confirmar Criação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-elevate:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+</style>
+{% endblock %}

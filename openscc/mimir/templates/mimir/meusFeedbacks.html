@@ -316,7 +316,7 @@
                                                                 {% endwith %}
                                                             {% else %}
                                                                 <strong class="text-orange d-block mb-1">Revisão do Especialista:</strong>
-                                                                {{ feedback.comentarios|linebreaksbr }}
+                                                                {{ feedback.comentarios|safe }}
                                                             {% endif %}
                                                         </div>
                                                     </div>

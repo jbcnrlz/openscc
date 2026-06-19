@@ -1,8 +1,11 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <!-- Cabeçalho Principal -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+
+<div class="container-fluid px-4 mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
         <h2 class="h4 mb-0 text-dark fw-bold">
             <i class="fas fa-edit me-2 text-orange"></i> Emissão de Parecer Técnico
@@ -14,270 +17,179 @@
         </div>
     </div>
 
-    <!-- Mensagens -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <div class="row g-4">
-        <!-- COLUNA ESQUERDA: INFORMAÇÕES E CONTEÚDO ORIGINAL -->
-        <div class="col-lg-6">
-            
-            <!-- Card de Detalhes da Solicitação -->
-            <div class="card shadow-sm border-0 mb-4 border-start border-info border-4">
-                <div class="card-body bg-light">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <h6 class="fw-bold text-dark mb-1">
-                                <i class="fas fa-user-graduate text-info me-1"></i> Autor: {{ feedback.solicitante.get_full_name|default:feedback.solicitante.username }}
-                            </h6>
-                            <span class="badge bg-info text-white me-2">
-                                {% if feedback.tipo == 'problema' %}Revisão de Caso Completo{% else %}Revisão de Pergunta{% endif %}
-                            </span>
-                        </div>
-                        <span class="badge {% if feedback.comentarios %}bg-success{% else %}bg-warning text-dark{% endif %} px-3 py-2 shadow-sm">
-                            Status: {{ feedback.get_status_display }}
-                        </span>
-                    </div>
-
-                    <div class="small text-muted border-top pt-2">
-                        {% if feedback.tipo == 'problema' %}
-                            <p class="mb-1"><strong class="text-dark">Problema:</strong> {{ feedback.problema.titulo }}</p>
-                            <p class="mb-0"><strong class="text-dark">Assunto:</strong> {{ feedback.problema.assunto.nome }}</p>
-                        {% else %}
-                            <p class="mb-1"><strong class="text-dark">Prova:</strong> {{ feedback.pergunta.get_primeira_prova.titulo|default:"Não vinculada" }}</p>
-                            <p class="mb-0"><strong class="text-dark">Assunto:</strong> {{ feedback.pergunta.assunto.nome }}</p>
-                            {% with prova=feedback.pergunta.get_primeira_prova %}
-                                {% if prova %}
-                                    <div class="mt-3">
-                                        <a href="{% url 'mimir:visualizarProvaEspecialistaComFeedback' prova.id feedback.id %}" class="btn btn-outline-info btn-sm fw-bold bg-white">
-                                            <i class="fas fa-external-link-alt me-1"></i> Abrir Prova Completa
-                                        </a>
-                                    </div>
-                                {% endif %}
-                            {% endwith %}
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Card de Mensagem do Solicitante -->
-            {% if feedback.mensagem_solicitacao %}
-            <div class="card shadow-sm border-0 mb-4 border-start border-primary border-4">
-                <div class="card-body bg-primary bg-opacity-10">
-                    <strong class="text-primary small text-uppercase tracking-wider d-block mb-2">
-                        <i class="fas fa-comment-dots me-1"></i> Recado do Autor:
-                    </strong>
-                    <p class="mb-0 text-dark small fst-italic">"{{ feedback.mensagem_solicitacao|linebreaksbr }}"</p>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Card do Conteúdo Original para Análise -->
-            <div class="card shadow-sm border-secondary mb-4">
-                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="card-title mb-0 fw-bold">
-                        <i class="fas fa-file-alt me-2"></i> Conteúdo Submetido para Análise
+    <div class="card shadow-sm border-0 mb-4 border-start border-info border-4 bg-light">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">
+                        <i class="fas fa-user-graduate text-info me-1"></i> Autor: {{ feedback.solicitante.get_full_name|default:feedback.solicitante.username }}
                     </h6>
-                    <button type="button" class="btn btn-light btn-sm fw-bold text-secondary shadow-sm" onclick="copiarConteudoOriginal()">
-                        <i class="fas fa-copy me-1"></i> Copiar Texto
-                    </button>
+                    <span class="badge bg-info text-white me-2">Revisão Inteligente (Auto-Track)</span>
                 </div>
-                <div class="card-body bg-light">
-                    {% if feedback.tipo == 'problema' %}
-                        <div class="mb-3">
-                            <strong class="small text-secondary text-uppercase tracking-wider">Estrutura Completa do Caso Clínico:</strong>
-                            <div class="mt-2 p-3 bg-white rounded border text-dark font-monospace small" id="conteudoOriginal" style="max-height: 500px; overflow-y: auto;">
-                                {% if partes %}
-                                    {% for p in partes %}
-                                        <div class="mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
-                                            <strong class="text-primary">Parte {{ p.ordem }}:</strong><br>
-                                            {{ p.enunciado|linebreaksbr }}
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <em>Problema sem conteúdo ou registro antigo.</em>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="mb-3">
-                            <strong class="small text-secondary text-uppercase tracking-wider">Pergunta:</strong>
-                            <div class="mt-2 p-3 bg-white rounded border text-dark font-monospace small" id="perguntaOriginal">
-                                {{ feedback.pergunta.pergunta|linebreaksbr }}
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <strong class="small text-secondary text-uppercase tracking-wider">Gabarito:</strong>
-                            <div class="mt-2 p-3 bg-white rounded border text-dark font-monospace small" id="gabaritoOriginal">
-                                {{ feedback.pergunta.gabarito|linebreaksbr }}
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
+                <span class="badge {% if feedback.comentarios %}bg-success{% else %}bg-warning text-dark{% endif %} px-3 py-2 shadow-sm">
+                    Status: {{ feedback.get_status_display }}
+                </span>
             </div>
-        </div>
-
-        <!-- COLUNA DIREITA: FORMULÁRIO DE FEEDBACK DO ESPECIALISTA -->
-        <div class="col-lg-6">
-            <form method="post" id="feedbackForm" class="sticky-top" style="top: 20px; z-index: 1;">
-                {% csrf_token %}
-                
-                <div class="card shadow-lg border-orange mb-4">
-                    <div class="card-header bg-orange text-white py-3">
-                        <h6 class="card-title mb-0 fw-bold">
-                            <i class="fas fa-user-md me-2"></i> 
-                            {% if feedback.tipo == 'problema' %}Seu Parecer Técnico Global{% else %}Sua Revisão da Pergunta{% endif %}
-                        </h6>
-                    </div>
-                    <div class="card-body bg-white p-4">
-                        
-                        <!-- Dicas -->
-                        <div class="alert bg-orange bg-opacity-10 border border-orange text-dark small mb-4">
-                            <h6 class="fw-bold text-orange mb-2"><i class="fas fa-lightbulb me-1"></i> Guia para um bom parecer:</h6>
-                            <ul class="mb-0 ps-3">
-                                {% if feedback.tipo == 'problema' %}
-                                    <li>Avalie a <strong>coerência clínica e cronológica</strong> do caso como um todo.</li>
-                                    <li>Aponte especificamente quais "Partes" necessitam de ajustes.</li>
-                                    <li>Você pode colar trechos do texto original e sugerir a reescrita.</li>
-                                {% else %}
-                                    <li>Corrija eventuais erros e melhore a clareza do enunciado.</li>
-                                    <li>Assegure-se de que o <strong>Gabarito</strong> está preciso.</li>
-                                    <li>O autor receberá a versão exata que você digitar nos campos abaixo.</li>
-                                {% endif %}
-                            </ul>
-                        </div>
-
-                        {% if feedback.tipo == 'problema' %}
-                            <!-- Input para Problemas (Avaliação Global) -->
-                            <div class="mb-4">
-                                <label for="comentarios" class="form-label fw-bold text-dark">
-                                    Redija o seu Feedback *
-                                </label>
-                                <textarea name="comentarios" class="form-control border-secondary" id="comentarios" 
-                                          rows="15" placeholder="Inicie o seu parecer técnico aqui... Ex: 'O caso clínico está bem estruturado, porém, na Parte 2, os exames laboratoriais solicitados não condizem com a suspeita principal...'" required>{{ feedback.comentarios|default:'' }}</textarea>
-                            </div>
-                        {% else %}
-                            <!-- Input para Perguntas (Pergunta + Gabarito) -->
-                            <div class="mb-4">
-                                <label for="pergunta_revisada" class="form-label fw-bold text-dark">
-                                    Pergunta Revisada *
-                                    <small class="text-muted fw-normal d-block">Edite o texto abaixo para sugerir a versão final da questão.</small>
-                                </label>
-                                <textarea name="pergunta_revisada" class="form-control font-monospace border-secondary" id="pergunta_revisada" 
-                                          rows="8" required>{{ pergunta_revisada|default:feedback.pergunta.pergunta }}</textarea>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="gabarito_revisado" class="form-label fw-bold text-dark">
-                                    Gabarito Revisado *
-                                    <small class="text-muted fw-normal d-block">Edite o gabarito ou o padrão de resposta esperado.</small>
-                                </label>
-                                <textarea name="gabarito_revisado" class="form-control font-monospace border-secondary" id="gabarito_revisado" 
-                                          rows="6" required>{{ gabarito_revisado|default:feedback.pergunta.gabarito }}</textarea>
-                            </div>
-                        {% endif %}
-
-                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                            <span class="small text-muted"><i class="fas fa-eye me-1"></i> O autor será notificado imediatamente.</span>
-                            <button type="submit" class="btn btn-orange text-white px-5 shadow-sm fw-bold btn-lg">
-                                <i class="fas fa-paper-plane me-2"></i> 
-                                {% if feedback.comentarios %}Atualizar Parecer{% else %}Enviar Parecer{% endif %}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </form>
         </div>
     </div>
+
+    <form method="post" id="feedbackForm">
+        {% csrf_token %}
+        <input type="hidden" name="comentarios" id="comentarios_hidden">
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card shadow-lg border-secondary h-100">
+                    <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0 fw-bold">
+                            <i class="fas fa-keyboard me-2"></i> 1. Edite o Texto Livremente
+                        </h6>
+                        <span class="badge bg-white text-secondary">Editor</span>
+                    </div>
+                    <div class="card-body bg-white p-0 d-flex flex-column">
+                        <div class="bg-light p-3 border-bottom text-muted small">
+                            <i class="fas fa-magic text-warning me-1"></i> <strong>Não se preocupe com cores:</strong> Apenas reescreva, apague ou adicione o texto desejado. O sistema fará a marcação das alterações ao lado automaticamente.
+                        </div>
+                        
+                        <div id="editor" style="flex-grow: 1; min-height: 400px; font-size: 0.95rem; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-lg border-orange h-100">
+                    <div class="card-header bg-orange text-white py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0 fw-bold">
+                            <i class="fas fa-eye me-2"></i> 2. Como o Autor Verá
+                        </h6>
+                        <span class="badge bg-white text-orange" id="status-sync">
+                            <i class="fas fa-sync fa-spin me-1"></i> Sincronizando...
+                        </span>
+                    </div>
+                    <div class="card-body bg-orange bg-opacity-10 p-0">
+                        <div class="p-3 border-bottom border-orange border-opacity-25 text-dark small bg-white">
+                            <strong>Legenda Automática:</strong> 
+                            <del style="color: red;" class="mx-2">Texto que você apagou</del> | 
+                            <ins style="color: green; text-decoration: underline;" class="mx-2">Texto que você adicionou</ins>
+                        </div>
+                        
+                        <div id="previewDiff" class="p-4 font-monospace text-dark bg-white" style="height: 400px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-lg border-0 bg-light mb-5">
+            <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                <div class="text-muted small">
+                    <i class="fas fa-info-circle text-primary me-1"></i> O autor poderá aceitar essa revisão com apenas 1 clique, e o texto verde integrará o sistema.
+                </div>
+                <button type="submit" class="btn btn-orange text-white px-5 shadow-sm fw-bold btn-lg">
+                    <i class="fas fa-paper-plane me-2"></i> Enviar Revisão Técnica
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 
 <style>
-/* Cores do Módulo */
-:root {
-    --bs-orange: #fd7e14;
-}
+:root { --bs-orange: #fd7e14; }
 .text-orange { color: var(--bs-orange) !important; }
 .bg-orange { background-color: var(--bs-orange) !important; }
 .border-orange { border-color: var(--bs-orange) !important; }
+.btn-orange { background-color: var(--bs-orange); border-color: var(--bs-orange); color: white; }
+.btn-orange:hover { background-color: #e06a09; color: white; }
 
-.btn-orange {
-    background-color: var(--bs-orange);
-    border-color: var(--bs-orange);
-}
-.btn-orange:hover {
-    background-color: #e06a09;
-    border-color: #e06a09;
-    color: white;
-}
-.btn-outline-orange {
-    color: var(--bs-orange);
-    border-color: var(--bs-orange);
-}
-.btn-outline-orange:hover {
-    background-color: var(--bs-orange);
-    color: white;
-}
+/* Remove a barra de ferramentas do Quill para focar apenas na digitação de texto puro */
+.ql-toolbar.ql-snow { display: none; }
+.ql-container.ql-snow { border: none !important; }
 
-/* Utilitários Extras */
-.tracking-wider { letter-spacing: 0.05em; }
-textarea.form-control:focus {
-    border-color: var(--bs-orange);
-    box-shadow: 0 0 0 0.25rem rgba(253, 126, 20, 0.25);
-}
-#conteudoOriginal, #perguntaOriginal, #gabaritoOriginal {
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-
-/* Fix para manter o card de formulário acompanhando o scroll */
-.sticky-top {
-    transition: all 0.3s ease;
-}
+/* Customização para o visualizador de Diff */
+#previewDiff ins { background-color: #e8f5e9; padding: 2px 0; }
+#previewDiff del { background-color: #ffebee; padding: 2px 0; }
 </style>
 
 <script>
-function copiarConteudoOriginal() {
+document.addEventListener("DOMContentLoaded", function() {
+    
+    // 1. EXTRAÇÃO SEGURA DO TEXTO ORIGINAL DIRETAMENTE DO DJANGO
+    let originalText = "";
     {% if feedback.tipo == 'problema' %}
-        // Extrai o texto limpo da div que contém as partes
-        const conteudo = document.getElementById('conteudoOriginal').innerText;
-        navigator.clipboard.writeText(conteudo).then(function() {
-            showToast('O caso clínico completo foi copiado para a sua área de transferência!');
-        });
+        {% for p in partes %}
+            originalText += "Parte {{ p.ordem }}:\n{{ p.enunciado|escapejs }}\n\n";
+        {% endfor %}
     {% else %}
-        const pergunta = document.getElementById('perguntaOriginal').innerText;
-        const gabarito = document.getElementById('gabaritoOriginal').innerText;
-        const conteudoCompleto = "PERGUNTA:\n" + pergunta + "\n\n---GABARITO---\n\n" + gabarito;
-        
-        navigator.clipboard.writeText(conteudoCompleto).then(function() {
-            showToast('A pergunta e o gabarito foram copiados para a sua área de transferência!');
-        });
+        originalText += "Pergunta:\n{{ feedback.pergunta.pergunta|escapejs }}\n\n";
+        originalText += "Gabarito:\n{{ feedback.pergunta.gabarito|escapejs }}\n";
     {% endif %}
-}
+    
+    // Limpa espaços extras no começo e no fim
+    originalText = originalText.trim();
 
-function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'position-fixed bottom-0 end-0 p-3';
-    toast.style.zIndex = '9999';
-    toast.innerHTML = `
-        <div class="toast show shadow-lg border-0" role="alert">
-            <div class="toast-header bg-success text-white border-0">
-                <i class="fas fa-check-circle me-2"></i>
-                <strong class="me-auto">Copiado!</strong>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body bg-white text-dark fw-bold small">
-                ${message}
-            </div>
-        </div>
-    `;
-    document.body.appendChild(toast);
-    setTimeout(() => { toast.remove(); }, 3500);
-}
+    // 2. INICIALIZAÇÃO DO EDITOR
+    var quill = new Quill('#editor', {
+        theme: 'snow',
+        placeholder: 'Comece a editar o caso clínico...',
+    });
+
+    // Carrega o texto original automaticamente no editor
+    quill.setText(originalText + '\n');
+
+    // 3. MOTOR DE DIFF (TRACK CHANGES AUTOMÁTICO)
+    var dmp = new diff_match_patch();
+    
+    function updateDiff() {
+        document.getElementById('status-sync').innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> Calculando...';
+        
+        // Pega o texto que o especialista editou
+        var currentText = quill.getText().trim();
+        
+        // Calcula as diferenças
+        var diffs = dmp.diff_main(originalText, currentText);
+        dmp.diff_cleanupSemantic(diffs);
+        
+        var html = '';
+        
+        // Percorre as diferenças para pintar de verde ou vermelho
+        for (var i = 0; i < diffs.length; i++) {
+            var op = diffs[i][0];    // 1 = Inserção, -1 = Exclusão, 0 = Igual
+            var text = diffs[i][1];  // O texto modificado
+            
+            // Segurança e quebra de linhas para o HTML
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            
+            if (op === 1) { 
+                // TEXTO ADICIONADO -> VERDE E SUBLINHADO
+                html += '<ins style="color: green;">' + text + '</ins>';
+            } else if (op === -1) { 
+                // TEXTO APAGADO -> VERMELHO E RISCADO
+                html += '<del style="color: red;">' + text + '</del>';
+            } else { 
+                // TEXTO MANTIDO -> NORMAL
+                html += '<span>' + text + '</span>';
+            }
+        }
+        
+        // Mostra o resultado na tela direita
+        document.getElementById('previewDiff').innerHTML = html;
+        
+        // Salva o HTML gerado no input oculto que irá para o Banco de Dados
+        document.getElementById('comentarios_hidden').value = html;
+        
+        setTimeout(() => {
+            document.getElementById('status-sync').innerHTML = '<i class="fas fa-check text-success me-1"></i> Sincronizado';
+        }, 300);
+    }
+
+    // Atualiza as cores automaticamente toda vez que o especialista digitar algo
+    quill.on('text-change', function() {
+        updateDiff();
+    });
+
+    // Roda a primeira vez para inicializar
+    updateDiff();
+});
 </script>
 {% endblock %}

@@ -26,18 +26,18 @@
                         <!-- Abas de Organização do Formulário -->
                         <ul class="nav nav-pills nav-justified mb-4 border-bottom pb-2" id="formTabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active fw-bold py-2" id="config-tab" data-bs-toggle="tab" data-bs-target="#tab-config" type="button" role="tab">
+                                <button class="nav-link custom-tab active fw-bold py-2" id="config-tab" data-bs-target="#tab-config" type="button" role="tab">
                                     <i class="fas fa-sliders-h me-2"></i>1. Configurações Iniciais
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link fw-bold py-2" id="objetivos-tab" data-bs-toggle="tab" data-bs-target="#tab-objetivos" type="button" role="tab">
+                                <button class="nav-link custom-tab fw-bold py-2" id="objetivos-tab" data-bs-target="#tab-objetivos" type="button" role="tab">
                                     <i class="fas fa-bullseye me-2"></i>2. Objetivos 
                                     <span class="badge bg-secondary ms-1" id="count-objetivos">0</span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link fw-bold py-2" id="fontes-tab" data-bs-toggle="tab" data-bs-target="#tab-fontes" type="button" role="tab">
+                                <button class="nav-link custom-tab fw-bold py-2" id="fontes-tab" data-bs-target="#tab-fontes" type="button" role="tab">
                                     <i class="fas fa-book me-2"></i>3. Fontes de Referência
                                     <span class="badge bg-secondary ms-1" id="count-fontes">0</span>
                                 </button>
@@ -48,7 +48,27 @@
                         <div class="tab-content min-vh-50" id="formTabsContent">
                             
                             <!-- ABA 1: CONFIGURAÇÕES INICIAIS -->
-                            <div class="tab-pane fade show active" id="tab-config" role="tabpanel">
+                            <div class="tab-pane custom-pane fade show active" id="tab-config" role="tabpanel">
+                                
+                                <!-- NOVOS CAMPOS: TÍTULOS DO PROBLEMA -->
+                                <div class="row g-3 mb-4 bg-light p-3 rounded border">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-dark">Título do Problema (Professor) *</label>
+                                            <input type="text" name="titulo" class="form-control shadow-sm" placeholder="Ex: Caso 04 - Apendicite Aguda" required>
+                                            <small class="text-muted small">Nome técnico para sua organização.</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label fw-bold text-info">Título de Apresentação (Visão do Aluno) <span class="badge bg-secondary fw-normal">Opcional</span></label>
+                                            <input type="text" name="titulo_apresentacao" class="form-control shadow-sm border-info" placeholder="Ex: Dor na barriga do Joãozinho">
+                                            <small class="text-muted small">Anti-spoiler. Se vazio, usa o título do professor.</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr class="text-muted mb-4">
+
                                 <div class="row g-3 mb-3">
                                     <div class="col-md-6">
                                         <div class="form-group">
@@ -124,7 +144,7 @@
                             </div>
 
                             <!-- ABA 2: OBJETIVOS DE APRENDIZAGEM -->
-                            <div class="tab-pane fade" id="tab-objetivos" role="tabpanel">
+                            <div class="tab-pane custom-pane fade" id="tab-objetivos" role="tabpanel">
                                 <div class="card border mb-3">
                                     <div class="card-header bg-light py-2">
                                         <div class="input-group">
@@ -154,7 +174,7 @@
                             </div>
 
                             <!-- ABA 3: FONTES DE REFERÊNCIA -->
-                            <div class="tab-pane fade" id="tab-fontes" role="tabpanel">
+                            <div class="tab-pane custom-pane fade" id="tab-fontes" role="tabpanel">
                                 <div class="card border mb-3">
                                     {% if form.fontes.field.queryset.exists %}
                                         <div class="card-header bg-light py-2">
@@ -231,15 +251,42 @@
 </div>
 
 <script>
-// Troca de Abas Manual via Botão
+// Troca de Abas Manual via Botão "Avançar/Voltar"
 function switchTab(tabId) {
-    const triggerEl = document.querySelector(`#${tabId}`);
+    const triggerEl = document.getElementById(tabId);
     if (triggerEl) {
-        bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        triggerEl.click();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- SCRIPT À PROVA DE FALHAS PARA ALTERNÂNCIA DE ABAS ---
+    const tabs = document.querySelectorAll('.custom-tab');
+    const panes = document.querySelectorAll('.custom-pane');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // 1. Remove 'active' de todas as abas
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // 2. Remove 'show' e 'active' de todos os painéis
+            panes.forEach(p => p.classList.remove('show', 'active'));
+            
+            // 3. Adiciona 'active' na aba clicada
+            this.classList.add('active');
+            
+            // 4. Exibe o painel correspondente
+            const targetSelector = this.getAttribute('data-bs-target');
+            const targetPane = document.querySelector(targetSelector);
+            if (targetPane) {
+                targetPane.classList.add('active');
+                setTimeout(() => targetPane.classList.add('show'), 50);
+            }
+        });
+    });
     
     // --- LÓGICA DE INJEÇÃO DO TEMPLATE DO CONTEXTO ---
     const selectTemplate = document.getElementById('selectTemplateContexto');
@@ -341,11 +388,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('gerarProblemaForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
+        // Pega os campos soltos que inserimos (Títulos)
+        const tituloInput = document.querySelector('input[name="titulo"]');
+        
         const tema = document.getElementById('{{ form.tema.id_for_label }}');
         const assunto = document.getElementById('{{ form.assunto.id_for_label }}');
         const objetivosSelecionados = document.querySelectorAll('input[name="objetivos"]:checked');
         const contexto = document.getElementById('{{ form.contexto_inicial.id_for_label }}');
         
+        if (!tituloInput.value.trim()) {
+            switchTab('config-tab');
+            tituloInput.focus();
+            alert('Atenção: O Título do Problema é obrigatório.');
+            return false;
+        }
+
         if (!tema.value || !assunto.value) {
             switchTab('config-tab');
             alert('Atenção: Escolha o Tema e o Assunto do problema.');
@@ -383,7 +440,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* Container principal com rolagem vertical livre */
 .list-container {
-    max-height: 400px;
+    min-height: 450px; /* Garante uma altura mínima para não ficar espremido vazio */
+    max-height: 65vh;  /* Expande até 65% da altura total do monitor do usuário */
     overflow-y: auto;
     background-color: #f8f9fc;
     border-radius: 8px;
