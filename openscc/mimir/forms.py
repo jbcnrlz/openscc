@@ -248,7 +248,11 @@ class ProblemaForm(forms.ModelForm):
     )
     class Meta:
         model = Problema
-        fields = ['titulo', 'assunto', 'tema', 'dataAplicacao', 'objetivos', 'fontes']
+        fields = ['titulo', 'assunto', 'tema', 'dataAplicacao', 'objetivos', 'fontes','titulo_apresentacao']
+        labels = {
+            'titulo': 'Título Real (Apenas Professor)',
+            'titulo_apresentacao': 'Título de Apresentação (Visão do Aluno)',
+        }
         widgets = {
             'dataAplicacao': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'objetivos': forms.CheckboxSelectMultiple(),

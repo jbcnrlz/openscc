@@ -11,12 +11,13 @@ from .viewsClasses.LLMLogListView import LLMLogListView
 app_name = 'mimir'
 
 urlpatterns = [    
-     path("",views.dashboardProfessor,name='home'),
+     path("",views.dashboard_unificado,name='home'),
+     path("",views.dashboard_unificado,name='dashboardProfessor'),
      path('upload/', views.uploadFile, name='uploadFile'),
      path("gerarPerguntas/",views.generateQuestions,name='gerarPerguntas'),    
      path("removerUploadSource/",views.deleteFile,name='excluirFonte'),
      path("salvarPerguntas/",views.saveQuestion,name='salvarPerguntas'),
-     path("dashboardProfessor/",views.dashboardProfessor,name='dashboardProfessor'),
+     #path("dashboardProfessor/",views.dashboardProfessor,name='dashboardProfessor'),
      path("listarFontes/",views.visualizarFontes,name='visualizarFontes'),
      path("adicionarFonte/",views.addFonte,name='addFontes'),
      path('alterarFonte/<int:fonte_id>/', views.updateFonte, name='updateFonte'),
@@ -71,7 +72,7 @@ urlpatterns = [
      path('rejeitar-feedback/<int:feedback_id>/', views.rejeitarFeedback, name='rejeitarFeedback'),
      path('visualizar-prova/<int:prova_id>/', views.visualizarProvaEspecialista, name='visualizarProvaEspecialista'),
      path('visualizar-prova/<int:prova_id>/feedback/<int:feedback_id>/', views.visualizarProvaEspecialista, name='visualizarProvaEspecialistaComFeedback'),
-     path('aluno/dashboard/', views.dashboardAluno, name='dashboardAluno'),
+     #path('aluno/dashboard/', views.dashboardAluno, name='dashboardAluno'),
      path('aluno/provas/', views.listarProvasDisponiveis, name='listarProvasDisponiveis'),
      path('aluno/prova/<int:prova_aluno_id>/iniciar/', views.iniciarProva, name='iniciarProva'),
      path('aluno/prova/<int:prova_aluno_id>/salvar-resposta/', views.salvarResposta, name='salvarResposta'),
@@ -107,4 +108,32 @@ urlpatterns = [
      path('objetivos/<int:pk>/deletar/', views.deletarObjetivo, name='deletarObjetivo'),
      path('logs-ia/', LLMLogListView.as_view(), name='listarLogsLLM'),
      path('problema/<int:problema_id>/exportar-como-fonte/', views.exportarProblemaComoFonte, name='exportarProblemaComoFonte'),
+     path('grupo/<int:grupo_id>/painel-tutor/', views.painelTutorGrupo, name='painelTutorGrupo'),
+     path('grupo/<int:grupo_id>/parte/<int:parte_id>/liberar/', views.alternarLiberacaoParte, name='alternarLiberacaoParte'),
+     path('grupo/<int:grupo_id>/problema/<int:problema_id>/sessao/', views.problemaSessaoAluno, name='problemaSessaoAluno'),
+     path('grupo/<int:grupo_id>/parte/<int:parte_id>/adicionar-pergunta/', views.adicionarPerguntaAprendizado, name='adicionarPerguntaAprendizado'),
+     # Gestão de Grupos (Professor)
+     path('pbl/grupos/', views.listarPequenosGrupos, name='listarPequenosGrupos'),
+     path('pbl/grupos/<int:grupo_id>/gerenciar/', views.gerenciarPequenoGrupo, name='gerenciarPequenoGrupo'),
+    
+     # Dashboards
+     #path('tutor/dashboard/', views.dashboardTutor, name='dashboardTutor'),
+     path('aluno/pbl/', views.indexPblAluno, name='indexPblAluno'),
+     path('pbl/pergunta/<int:pergunta_id>/responder/', views.responderPerguntaAprendizado, name='responderPerguntaAprendizado'),
+     # Módulo PD&I
+     path('pdi/editais/', views.listarEditais, name='listarEditais'),
+     path('pdi/editais/<int:edital_id>/iniciar/', views.iniciarProjeto, name='iniciarProjeto'),
+     path('pdi/projeto/<int:projeto_id>/editar/', views.editarProjeto, name='editarProjeto'),
+     # Módulo PD&I: Edição e IA
+     path('pdi/projeto/<int:projeto_id>/editar/', views.editarProjeto, name='editarProjeto'),
+     path('pdi/projeto/ajax/salvar-campo/', views.salvarCampoProjeto, name='salvarCampoProjeto'),
+     path('pdi/projeto/ajax/copiloto-campo/', views.gerarSugestaoConteudoCampo, name='copilotoCampo'), # A view da IA criada anteriormente
+     # Módulo PD&I: Edição e IA
+     path('pdi/meus-projetos/', views.meusProjetos, name='meusProjetos'), # <-- NOVA ROTA
+     path('pdi/projeto/ajax/referencia/adicionar/', views.adicionarReferenciaProjeto, name='adicionarReferenciaProjeto'),
+     path('pdi/projeto/<int:projeto_id>/exportar-pdf/', views.exportarProjetoPDF, name='exportarProjetoPDF'),
+     path('pdi/projeto/ajax/buscar-usuarios/', views.buscarUsuariosAjax, name='buscarUsuariosAjax'),
+     path('pdi/projeto/ajax/gerenciar-equipe/', views.gerenciarEquipeProjeto, name='gerenciarEquipeProjeto'),
+     path('pdi/projeto/ajax/revisao/adicionar/', views.adicionarComentarioRevisao, name='adicionarComentarioRevisao'),
+     path('pdi/projeto/ajax/revisao/resolver/', views.resolverComentarioRevisao, name='resolverComentarioRevisao'),
 ]

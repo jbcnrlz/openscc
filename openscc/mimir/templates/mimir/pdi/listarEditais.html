@@ -1,0 +1,153 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4 mb-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+            <h1 class="h3 mb-1 text-dark fw-bold">
+                <i class="fas fa-search-dollar text-success me-2"></i> Vitrine de Fomento e Editais
+            </h1>
+            <p class="text-muted mb-0">Explore as oportunidades abertas. O Mimir extraiu as diretrizes para facilitar sua submissão.</p>
+        </div>
+        <div>
+            <a href="{% url 'mimir:meusProjetos' %}" class="btn btn-outline-primary fw-bold shadow-sm">
+                <i class="fas fa-folder-open me-1"></i> Meus Projetos
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <h5 class="text-success fw-bold mb-4"><i class="fas fa-door-open me-2"></i> Chamadas Abertas</h5>
+    
+    <div class="row g-4 mb-5">
+        {% for edital in editais_abertos %}
+        <div class="col-12">
+            <div class="card shadow-sm border-0 border-start border-success border-4 hover-elevate">
+                
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <span class="badge bg-light text-dark border mb-2 fw-bold text-uppercase tracking-wider">
+                            <i class="fas fa-university text-secondary me-1"></i> {{ edital.orgao_fomento }}
+                        </span>
+                        <h4 class="card-title mb-1 fw-bold text-dark">{{ edital.titulo }}</h4>
+                        <div class="text-muted small">
+                            <i class="fas fa-calendar-alt me-1"></i> Publicado em: {{ edital.data_publicacao|date:"d/m/Y" }} | 
+                            <span class="text-danger fw-bold ms-2"><i class="fas fa-hourglass-half me-1"></i> Prazo: {{ edital.data_limite|date:"d/m/Y às H:i" }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        {% if edital.arquivo_edital %}
+                        <a href="{{ edital.arquivo_edital.url }}" target="_blank" class="btn btn-outline-secondary btn-sm fw-bold">
+                            <i class="fas fa-file-pdf text-danger me-1"></i> Edital Original Completo
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    <div class="row g-0">
+                        
+                        <div class="col-lg-6 p-4 border-end border-light">
+                            <h6 class="fw-bold text-purple mb-3">
+                                <i class="fas fa-magic me-2"></i> Resumo Estruturado (Mimir IA)
+                            </h6>
+                            {% if edital.resumo_llm %}
+                                <div class="text-dark bg-purple bg-opacity-10 p-3 rounded" style="font-size: 0.95rem; line-height: 1.6; text-align: justify;">
+                                    {{ edital.resumo_llm|linebreaksbr }}
+                                </div>
+                            {% else %}
+                                <div class="text-muted small fst-italic p-3 bg-light rounded">
+                                    <i class="fas fa-sync fa-spin me-1"></i> A Inteligência Artificial ainda está processando este edital. Tente recarregar em instantes.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-lg-6 p-4 bg-light bg-opacity-50">
+                            <h6 class="fw-bold text-warning-emphasis mb-3">
+                                <i class="fas fa-lightbulb text-warning me-2"></i> Insights de Elegibilidade
+                            </h6>
+                            {% if edital.insights_llm %}
+                                <div class="text-dark bg-warning bg-opacity-10 p-3 rounded mb-4 border border-warning border-opacity-25" style="font-size: 0.95rem; line-height: 1.6; text-align: justify;">
+                                    {{ edital.insights_llm|linebreaksbr }}
+                                </div>
+                            {% else %}
+                                <div class="text-muted small fst-italic p-3 bg-white border rounded mb-4">Aguardando processamento...</div>
+                            {% endif %}
+
+                            <h6 class="fw-bold text-secondary mb-3 small text-uppercase tracking-wider">Estrutura Exigida para Submissão</h6>
+                            <ul class="list-group list-group-flush shadow-sm rounded">
+                                {% for doc in edital.documentos_exigidos.all %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center bg-white border-light px-3 py-2">
+                                    <span class="small fw-bold text-dark">
+                                        <i class="fas fa-file-alt text-primary me-2"></i> {{ doc.nome }}
+                                    </span>
+                                    {% if doc.tipo == 'template' %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary px-2"><i class="fas fa-pen-nib me-1"></i> Redação Interativa</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary px-2"><i class="fas fa-upload me-1"></i> Upload Manual</span>
+                                    {% endif %}
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted small fst-italic px-3 py-2">Nenhum documento/template vinculado ainda.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-white border-top p-4 d-flex justify-content-end align-items-center">
+                    <form method="post" action="{% url 'mimir:iniciarProjeto' edital.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm fw-bold rounded-pill">
+                            <i class="fas fa-rocket me-2"></i> Iniciar Submissão
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 bg-white shadow-sm rounded border">
+            <i class="fas fa-box-open fa-4x text-muted opacity-25 mb-3"></i>
+            <h4 class="text-dark fw-bold">Nenhum edital aberto</h4>
+            <p class="text-muted mb-0">Fique de olho. Novas oportunidades de fomento aparecerão aqui.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if editais_encerrados %}
+    <h5 class="text-secondary fw-bold mb-4 mt-5"><i class="fas fa-archive me-2"></i> Histórico de Chamadas Encerradas</h5>
+    <div class="row g-3">
+        {% for edital in editais_encerrados %}
+        <div class="col-md-6">
+            <div class="card border-0 bg-light opacity-75 h-100">
+                <div class="card-body p-3">
+                    <h6 class="fw-bold text-dark mb-1">{{ edital.titulo }}</h6>
+                    <small class="text-muted"><i class="fas fa-university me-1"></i> {{ edital.orgao_fomento }} | Encerrado em: {{ edital.data_limite|date:"d/m/Y" }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+<style>
+    :root { --bs-purple: #6f42c1; }
+    .text-purple { color: var(--bs-purple) !important; }
+    .bg-purple { background-color: var(--bs-purple) !important; }
+    .tracking-wider { letter-spacing: 0.05em; }
+    
+    .hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .hover-elevate:hover { transform: translateY(-4px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+</style>
+{% endblock %}

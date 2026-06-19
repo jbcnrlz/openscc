@@ -19,6 +19,11 @@ from .decorators import acesso_mimir_requerido, grupo_requerido
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from django.utils.html import strip_tags
+from commons.services import get_llm
+
 
 def acessoNegado(request):
     """View para página de acesso negado"""
@@ -246,7 +251,7 @@ def generateQuestions(request):
                 'status': 'erro',
                 'message': f"Ocorreu um erro ao gerar as perguntas: {str(e)}"
             })
-
+'''
 @login_required(login_url='/login')
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
@@ -269,7 +274,7 @@ def dashboardProfessor(request):
     }
     
     return render(request, "mimir/dashboardProfessor.html", context)
-
+'''
 @login_required(login_url='/login')
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
@@ -1394,7 +1399,7 @@ def visualizarProvaEspecialista(request, prova_id, feedback_id=None):
     }
     
     return render(request, 'mimir/visualizarProvaEspecialista.html', context)
-
+'''
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Aluno')
@@ -1413,7 +1418,7 @@ def dashboardAluno(request):
     }
     
     return render(request, 'mimir/dashboardAluno.html', context)
-
+'''
 @login_required
 @acesso_mimir_requerido
 @grupo_requerido('Aluno')
@@ -2654,3 +2659,586 @@ def exportarProblemaComoFonte(request, problema_id):
     
     messages.success(request, f"Sucesso! O problema foi convertido na fonte '{nova_fonte.nome}' e já está disponível para uso.")
     return redirect('mimir:visualizarFontes')
+
+# ==========================================
+# VIEWS DO TUTOR / PROFESSOR
+# ==========================================
+
+@login_required
+def painelTutorGrupo(request, grupo_id):
+    """Painel onde o Tutor gerencia o grupo e os problemas."""
+    grupo = get_object_or_404(PequenoGrupo, id=grupo_id)
+    
+    # Validação: Só o tutor do grupo ou professor do assunto podem acessar
+    if not (request.user == grupo.tutor or request.user == grupo.assunto.user or request.user.is_superuser):
+        return redirect('mimir:acessoNegado')
+        
+    problemas = Problema.objects.filter(assunto=grupo.assunto).order_by('-criado_em')
+    
+    context = {
+        'grupo': grupo,
+        'problemas': problemas,
+        'partes_liberadas': LiberacaoParte.objects.filter(grupo=grupo).values_list('parte_id', flat=True)
+    }
+    return render(request, 'mimir/pbl/painelTutor.html', context)
+
+@login_required
+@require_POST
+def alternarLiberacaoParte(request, grupo_id, parte_id):
+    """View via AJAX para o Tutor liberar/ocultar partes em tempo real."""
+    grupo = get_object_or_404(PequenoGrupo, id=grupo_id)
+    parte = get_object_or_404(Parte, id=parte_id)
+    
+    # Validação de segurança
+    if not (request.user == grupo.tutor or request.user == grupo.assunto.user):
+        return JsonResponse({'status': 'error', 'message': 'Permissão negada'}, status=403)
+        
+    liberacao, created = LiberacaoParte.objects.get_or_create(
+        grupo=grupo, 
+        parte=parte,
+        defaults={'liberada_por': request.user}
+    )
+    
+    if not created:
+        liberacao.delete() # Se já existia, oculta (toggle)
+        status = 'ocultada'
+    else:
+        status = 'liberada'
+        
+    return JsonResponse({'status': 'success', 'acao': status})
+
+
+# ==========================================
+# VIEWS DO ALUNO
+# ==========================================
+
+@login_required
+def problemaSessaoAluno(request, grupo_id, problema_id):
+    """Interface do aluno onde ele lê apenas o que foi liberado e adiciona perguntas."""
+    grupo = get_object_or_404(PequenoGrupo, id=grupo_id)
+    problema = get_object_or_404(Problema, id=problema_id)
+    
+    if request.user not in grupo.alunos.all() and request.user != grupo.tutor:
+        return redirect('mimir:acessoNegado')
+        
+    # Pega apenas as partes que o tutor já liberou para este grupo
+    ids_liberados = LiberacaoParte.objects.filter(grupo=grupo).values_list('parte_id', flat=True)
+    partes_visiveis = problema.partes.filter(id__in=ids_liberados).order_by('ordem')
+    
+    perguntas_aprendizado = PerguntaAprendizado.objects.filter(grupo=grupo, parte__problema=problema)
+    
+    context = {
+        'grupo': grupo,
+        'problema': problema,
+        'partes': partes_visiveis,
+        'perguntas': perguntas_aprendizado
+    }
+    return render(request, 'mimir/pbl/sessaoAluno.html', context)
+
+@login_required
+@require_POST
+def adicionarPerguntaAprendizado(request, grupo_id, parte_id):
+    """View para o aluno submeter uma nova pergunta de aprendizado (AJAX ou Form tradicional)"""
+    grupo = get_object_or_404(PequenoGrupo, id=grupo_id)
+    parte = get_object_or_404(Parte, id=parte_id)
+    texto = request.POST.get('texto')
+    
+    if texto and request.user in grupo.alunos.all():
+        PerguntaAprendizado.objects.create(
+            grupo=grupo,
+            parte=parte,
+            aluno=request.user,
+            texto=texto
+        )
+        messages.success(request, "Pergunta de aprendizado registrada!")
+        
+    return redirect('mimir:problemaSessaoAluno', grupo_id=grupo.id, problema_id=parte.problema.id)
+
+# ==========================================
+# GESTÃO DE GRUPOS (PROFESSOR)
+# ==========================================
+
+@login_required
+@grupo_requerido('Professor')
+def listarPequenosGrupos(request):
+    """View para o Professor listar e criar novos pequenos grupos."""
+    grupos = PequenoGrupo.objects.filter(assunto__user=request.user).order_by('-criado_em')
+    assuntos = Assunto.objects.filter(user=request.user)
+    
+    if request.method == 'POST':
+        nome = request.POST.get('nome')
+        assunto_id = request.POST.get('assunto_id')
+        if nome and assunto_id:
+            assunto = get_object_or_404(Assunto, id=assunto_id, user=request.user)
+            PequenoGrupo.objects.create(nome=nome, assunto=assunto)
+            messages.success(request, f"Grupo '{nome}' criado com sucesso!")
+        return redirect('mimir:listarPequenosGrupos')
+        
+    return render(request, 'mimir/pbl/listarGrupos.html', {'grupos': grupos, 'assuntos': assuntos})
+
+@login_required
+@grupo_requerido('Professor')
+def gerenciarPequenoGrupo(request, grupo_id):
+    """View para o Professor vincular Tutor e Alunos ao grupo."""
+    grupo = get_object_or_404(PequenoGrupo, id=grupo_id, assunto__user=request.user)
+    tutores = User.objects.filter(groups__name='Tutor', is_active=True).order_by('first_name')
+    alunos = User.objects.filter(groups__name='Aluno', is_active=True).order_by('first_name')
+    
+    if request.method == 'POST':
+        tutor_id = request.POST.get('tutor')
+        alunos_selecionados = request.POST.getlist('alunos')
+        
+        grupo.tutor_id = tutor_id if tutor_id else None
+        grupo.alunos.set(alunos_selecionados)
+        grupo.save()
+        
+        messages.success(request, "Vínculos atualizados com sucesso!")
+        return redirect('mimir:gerenciarPequenoGrupo', grupo_id=grupo.id)
+        
+    return render(request, 'mimir/pbl/gerenciarGrupo.html', {
+        'grupo': grupo,
+        'tutores': tutores,
+        'alunos': alunos
+    })
+
+'''
+# ==========================================
+# DASHBOARDS DE ENTRADA (TUTOR E ALUNO)
+# ==========================================
+
+@login_required
+def dashboardTutor(request):
+    """Dashboard de entrada do Tutor."""
+    if not request.user.isTutor() and not request.user.is_superuser:
+        return redirect('mimir:acessoNegado')
+        
+    grupos = PequenoGrupo.objects.filter(tutor=request.user).order_by('-criado_em')
+    return render(request, 'mimir/pbl/dashboardTutor.html', {'grupos': grupos})
+'''
+@login_required
+def indexPblAluno(request):
+    """Tela para o aluno escolher qual sessão de qual grupo ele quer acessar."""
+    grupos = PequenoGrupo.objects.filter(alunos=request.user).order_by('-criado_em')
+    return render(request, 'mimir/pbl/indexPblAluno.html', {'grupos': grupos})
+
+@login_required
+def dashboard_unificado(request):
+    user = request.user
+    
+    # Identifica os papéis do usuário (Superusers têm acesso a tudo por padrão)
+    is_superuser = user.is_superuser
+    is_professor = is_superuser or user.groups.filter(name='Professor').exists()
+    is_tutor = is_superuser or user.groups.filter(name='Tutor').exists()
+    is_aluno = is_superuser or user.groups.filter(name='Aluno').exists()
+    
+    context = {
+        'is_professor': is_professor,
+        'is_tutor': is_tutor,
+        'is_aluno': is_aluno,
+    }
+    
+    # Coleta de dados exclusiva para a Área do PROFESSOR
+    if is_professor:
+        context['fontes_ativas'] = Fontes.objects.filter(user=user).count()
+        context['problemas_criados'] = Problema.objects.filter(assunto__user=user).count()
+        context['questoes_geradas'] = Pergunta.objects.filter(assunto__user=user).count()
+        context['provas_criadas'] = Prova.objects.filter(assunto__user=user).count()
+        
+    # Coleta de dados exclusiva para a Área do TUTOR
+    if is_tutor:
+        context['grupos_tutorados'] = PequenoGrupo.objects.filter(tutor=user).order_by('-criado_em')
+        
+    # Coleta de dados exclusiva para a Área do ALUNO
+    if is_aluno:
+        context['grupos_aluno'] = PequenoGrupo.objects.filter(alunos=user).order_by('-criado_em')
+        
+    return render(request, 'mimir/dashboard.html', context)
+
+@login_required
+@require_POST
+def responderPerguntaAprendizado(request, pergunta_id):
+    """View para um aluno ou tutor responder uma questão de aprendizado."""
+    pergunta = get_object_or_404(PerguntaAprendizado, id=pergunta_id)
+    texto_resposta = request.POST.get('resposta')
+    
+    # Validação: Só quem está no grupo pode responder
+    if request.user in pergunta.grupo.alunos.all() or request.user == pergunta.grupo.tutor:
+        if texto_resposta:
+            pergunta.resposta = texto_resposta
+            pergunta.respondida_por = request.user
+            pergunta.respondida_em = timezone.now()
+            pergunta.resolvida = True
+            pergunta.save()
+            messages.success(request, "Resposta registrada e compartilhada com o grupo!")
+            
+    return redirect('mimir:problemaSessaoAluno', grupo_id=pergunta.grupo.id, problema_id=pergunta.parte.problema.id)
+
+@login_required
+@require_POST
+def gerarSugestaoConteudoCampo(request):
+    """
+    Aciona o LLM para sugerir/aprimorar o texto do campo atual, 
+    usando TODO o restante do projeto como contexto de coerência.
+    """
+    try:
+        data = json.loads(request.body)
+        projeto_id = data.get('projeto_id')
+        campo_id = data.get('campo_id')
+        conteudo_atual = data.get('conteudo_atual', '')
+
+        projeto = get_object_or_404(Projeto, id=projeto_id)
+        campo_alvo = get_object_or_404(CampoTemplate, id=campo_id)
+
+        # 1. Monta o Contexto Global (O que já foi escrito no projeto)
+        # Busca todos os campos já preenchidos, EXCETO o que estamos editando agora
+        outros_preenchimentos = PreenchimentoCampo.objects.filter(
+            projeto=projeto
+        ).exclude(campo=campo_alvo).select_related('campo').order_by('campo__ordem')
+        
+        contexto_projeto = ""
+        for preenchimento in outros_preenchimentos:
+            if preenchimento.valor.strip():
+                # strip_tags remove o HTML do TinyMCE para economizar tokens do LLM
+                texto_limpo = strip_tags(preenchimento.valor)
+                contexto_projeto += f"--- {preenchimento.campo.label} ---\n{texto_limpo}\n\n"
+
+        if not contexto_projeto.strip():
+            contexto_projeto = "O projeto está no início. Nenhuma outra seção foi preenchida ainda."
+
+        # 2. Definição do Prompt Contextualizado
+        prompt_copiloto = ChatPromptTemplate.from_messages([
+            ("system", (
+                "Você é um consultor sênior de escrita de projetos científicos e propostas de fomento institucional "
+                "para o edital: {titulo_edital}."
+            )),
+            ("user", """
+            Sua tarefa é redigir ou aprimorar de forma altamente profissional o texto para a seção: '{nome_secao}'.
+            
+            Instruções e exigências do Edital para este campo específico: 
+            {instrucoes_campo}
+            
+            -------------------------------------------------
+            CONTEXTO GLOBAL DO PROJETO (Outras seções já escritas):
+            {contexto_projeto}
+            -------------------------------------------------
+            
+            Rascunho atual elaborado pela equipe para a seção '{nome_secao}' (pode estar vazio):
+            {rascunho_atual}
+            
+            Diretrizes de geração:
+            1. COERÊNCIA: Baseie sua argumentação no Contexto Global do Projeto.
+            2. NÃO REPITA o que já foi dito detalhadamente nas outras seções, mas faça conexões inteligentes com elas para mostrar coesão.
+            3. Escreva de forma técnica, impessoal e formal.
+            4. IMPORTANTE: O sistema utiliza um editor Rich Text. Retorne a sua resposta formatada usando tags HTML básicas (como <p>, <strong>, <em>, <ul>, <li>). NÃO utilize formatação Markdown.
+            """)
+        ])
+
+        # 3. Execução do LangChain
+        cadeia = prompt_copiloto | get_llm() | StrOutputParser()
+        
+        resposta_ia = cadeia.invoke({
+            "titulo_edital": projeto.edital.titulo,
+            "nome_secao": campo_alvo.label,
+            "instrucoes_campo": campo_alvo.instrucoes_originais,
+            "contexto_projeto": contexto_projeto,
+            "rascunho_atual": conteudo_atual if conteudo_atual.strip() else "Nenhum rascunho iniciado."
+        })
+
+        return JsonResponse({
+            'success': True,
+            'sugestao': resposta_ia
+        })
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+@login_required
+def listarEditais(request):
+    """Vitrine onde os pesquisadores visualizam as oportunidades e insights da IA."""
+    agora = timezone.now()
+    
+    # Busca editais cujo prazo final é no futuro
+    editais_abertos = Edital.objects.filter(data_limite__gte=agora).order_by('data_limite')
+    
+    # Traz os últimos 5 encerrados apenas para histórico
+    editais_encerrados = Edital.objects.filter(data_limite__lt=agora).order_by('-data_limite')[:5]
+
+    context = {
+        'editais_abertos': editais_abertos,
+        'editais_encerrados': editais_encerrados,
+    }
+    return render(request, 'mimir/pdi/listarEditais.html', context)
+
+@login_required
+@require_POST
+def iniciarProjeto(request, edital_id):
+    """Cria um rascunho de projeto vinculado ao edital e envia para a área de escrita."""
+    edital = get_object_or_404(Edital, id=edital_id)
+
+    # Verifica se o pesquisador já tem um rascunho ativo para este edital (evita duplicatas acidentais)
+    projeto_existente = Projeto.objects.filter(edital=edital, proponente=request.user, status='rascunho').first()
+
+    if projeto_existente:
+        projeto = projeto_existente
+        messages.info(request, "Você já possui um rascunho para este edital. Retomando de onde parou.")
+    else:
+        projeto = Projeto.objects.create(
+            edital=edital,
+            proponente=request.user,
+            titulo=f"Nova Proposta - {edital.orgao_fomento}"
+        )
+        messages.success(request, "Rascunho de projeto iniciado! Vamos estruturar a sua proposta.")
+
+    return redirect('mimir:editarProjeto', projeto_id=projeto.id)
+
+@login_required
+def editarProjeto(request, projeto_id):
+    """Carrega o Workspace de edição do projeto com os campos exigidos."""
+    projeto = get_object_or_404(Projeto, id=projeto_id)
+    
+    # Validação de Segurança: Apenas o proponente ou membros da equipe podem editar
+    if request.user != projeto.proponente and request.user not in projeto.equipe.all():
+        messages.error(request, "Acesso negado. Você não faz parte da equipe deste projeto.")
+        return redirect('mimir:listarEditais')
+
+    # Busca os campos de template exigidos pelo edital
+    campos_template = CampoTemplate.objects.filter(documento__edital=projeto.edital).select_related('documento').order_by('documento', 'ordem')
+    
+    # Busca os documentos estáticos (uploads puros que ele precisará anexar depois)
+    documentos_estaticos = DocumentoEdital.objects.filter(edital=projeto.edital, tipo='arquivo')
+
+    # Busca o que já foi preenchido e converte em um dicionário para o template {campo_id: 'texto...'}
+    respostas = PreenchimentoCampo.objects.filter(projeto=projeto)
+    respostas_dict = {resp.campo_id: resp.valor for resp in respostas}
+
+    referencias = projeto.referencias.all()
+
+    comentarios = projeto.comentarios.filter(resolvido=False)
+
+    context = {
+        'projeto': projeto,
+        'edital': projeto.edital,
+        'campos_template': campos_template,
+        'respostas_dict': respostas_dict,
+        'documentos_estaticos': documentos_estaticos,
+        'referencias': referencias,
+        'comentarios': comentarios,
+    }
+    return render(request, 'mimir/pdi/editarProjeto.html', context)
+
+
+@login_required
+@require_POST
+def salvarCampoProjeto(request):
+    """View AJAX para salvamento em tempo real (Auto-save) dos campos."""
+    try:
+        data = json.loads(request.body)
+        projeto = get_object_or_404(Projeto, id=data.get('projeto_id'))
+        campo = get_object_or_404(CampoTemplate, id=data.get('campo_id'))
+        valor = data.get('valor', '')
+
+        # Segurança
+        if request.user != projeto.proponente and request.user not in projeto.equipe.all():
+            return JsonResponse({'success': False, 'message': 'Acesso negado'}, status=403)
+
+        # Atualiza ou cria o registro do campo
+        PreenchimentoCampo.objects.update_or_create(
+            projeto=projeto,
+            campo=campo,
+            defaults={
+                'valor': valor,
+                'modificado_por': request.user
+            }
+        )
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+# Adicione esta nova função junto das outras de PD&I
+@login_required
+def meusProjetos(request):
+    """Lista todos os projetos que o pesquisador iniciou ou foi convidado para a equipe."""
+    
+    projetos = Projeto.objects.filter(
+        Q(proponente=request.user) | Q(equipe=request.user)
+    ).distinct().order_by('-criado_em')
+    
+    return render(request, 'mimir/pdi/meusProjetos.html', {'projetos': projetos})
+
+# NOVA VIEW AJAX:
+@login_required
+@require_POST
+def adicionarReferenciaProjeto(request):
+    """Salva uma nova referência no repositório do projeto."""
+    try:
+        data = json.loads(request.body)
+        projeto = get_object_or_404(Projeto, id=data.get('projeto_id'))
+        
+        ref = ReferenciaProjeto.objects.create(
+            projeto=projeto,
+            citacao_curta=data.get('citacao_curta'),
+            referencia_completa=data.get('referencia_completa')
+        )
+        return JsonResponse({
+            'success': True, 
+            'id': ref.id, 
+            'citacao': ref.citacao_curta, 
+            'completa': ref.referencia_completa
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+# Adicione junto das outras views de PD&I
+@login_required
+def exportarProjetoPDF(request, projeto_id):
+    """Gera a visualização limpa do projeto para exportação em PDF."""
+    projeto = get_object_or_404(Projeto, id=projeto_id)
+    
+    # Segurança
+    if request.user != projeto.proponente and request.user not in projeto.equipe.all():
+        messages.error(request, "Acesso negado.")
+        return redirect('mimir:listarEditais')
+
+    # 1. Busca os campos ordenados pela estrutura do Edital
+    campos_template = CampoTemplate.objects.filter(
+        documento__edital=projeto.edital
+    ).select_related('documento').order_by('documento', 'ordem')
+
+    # 2. Busca as respostas e cria um dicionário para acesso rápido
+    preenchimentos = PreenchimentoCampo.objects.filter(projeto=projeto)
+    respostas_dict = {p.campo_id: p.valor for p in preenchimentos}
+
+    # 3. Estrutura a lista final mesclando o Título do Campo com o Texto Salvo
+    conteudo_projeto = []
+    for campo in campos_template:
+        valor = respostas_dict.get(campo.id, '<p class="text-muted fst-italic">Não preenchido.</p>')
+        conteudo_projeto.append({
+            'titulo': f"{campo.ordem}. {campo.label}",
+            'documento': campo.documento.nome,
+            'texto': valor
+        })
+
+    # 4. Busca as referências em ordem alfabética (Padrão ABNT)
+    referencias = projeto.referencias.all().order_by('referencia_completa')
+
+    context = {
+        'projeto': projeto,
+        'edital': projeto.edital,
+        'conteudo_projeto': conteudo_projeto,
+        'referencias': referencias,
+    }
+    
+    return render(request, 'mimir/pdi/exportar_pdf.html', context)
+
+@login_required
+def buscarUsuariosAjax(request):
+    """Retorna uma lista de usuários para adicionar à equipe (busca por nome ou email)."""
+    termo = request.GET.get('q', '').strip()
+    
+    # Exige pelo menos 3 caracteres para não sobrecarregar o banco
+    if len(termo) < 3:
+        return JsonResponse({'usuarios': []})
+        
+    # Busca usuários ignorando letras maiúsculas/minúsculas, e exclui o próprio usuário logado
+    usuarios = User.objects.filter(
+        (
+            Q(first_name__icontains=termo) | 
+            Q(last_name__icontains=termo) | 
+            Q(username__icontains=termo) |
+            Q(email__icontains=termo)
+        ) &
+        Q(groups__name='Professor')
+    ).exclude(id=request.user.id)[:10] # Limita a 10 resultados
+
+    data = [{
+        'id': u.id, 
+        'nome': u.get_full_name() or u.username, 
+        'email': u.email or 'Sem e-mail cadastrado'
+    } for u in usuarios]
+    
+    return JsonResponse({'usuarios': data})
+
+@login_required
+@require_POST
+def gerenciarEquipeProjeto(request):
+    """Adiciona ou remove um usuário da equipe do projeto."""
+    try:
+        data = json.loads(request.body)
+        projeto = get_object_or_404(Projeto, id=data.get('projeto_id'))
+        
+        # Apenas o DONO (proponente) pode alterar a equipe
+        if request.user != projeto.proponente:
+            return JsonResponse({'success': False, 'message': 'Apenas o proponente pode gerenciar a equipe.'}, status=403)
+            
+        usuario_alvo = get_object_or_404(User, id=data.get('usuario_id'))
+        acao = data.get('acao')
+
+        if acao == 'adicionar':
+            projeto.equipe.add(usuario_alvo)
+            mensagem = f"{usuario_alvo.get_full_name() or usuario_alvo.username} adicionado(a) à equipe."
+        elif acao == 'remover':
+            projeto.equipe.remove(usuario_alvo)
+            mensagem = "Membro removido da equipe."
+        else:
+            return JsonResponse({'success': False, 'message': 'Ação inválida.'}, status=400)
+            
+        return JsonResponse({'success': True, 'message': mensagem})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+@login_required
+@require_POST
+def adicionarComentarioRevisao(request):
+    """View AJAX para salvar um comentário de revisão num trecho de texto."""
+    try:
+        data = json.loads(request.body)
+        projeto = get_object_or_404(Projeto, id=data.get('projeto_id'))
+        campo = get_object_or_404(CampoTemplate, id=data.get('campo_id'))
+        
+        # 1. VALIDAÇÃO DE SEGURANÇA: Apenas Professores revisam
+        is_professor = request.user.groups.filter(name='Professor').exists() # Adapte se necessário
+        
+        if not is_professor and not request.user.is_superuser:
+            return JsonResponse({'success': False, 'message': 'Acesso negado. Apenas professores podem fazer revisões por pares.'}, status=403)
+
+        # 2. Salva o comentário
+        comentario = ComentarioRevisao.objects.create(
+            projeto=projeto,
+            campo=campo,
+            revisor=request.user,
+            marker_id=data.get('marker_id'),
+            texto_selecionado=data.get('texto_selecionado'),
+            texto_comentario=data.get('texto_comentario')
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'id': comentario.id,
+            'revisor': request.user.get_full_name() or request.user.username,
+            'data': comentario.criado_em.strftime("%d/%m/%Y %H:%M")
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+@login_required
+@require_POST
+def resolverComentarioRevisao(request):
+    """Arquiva um comentário e permite que o JS limpe o highlight do texto."""
+    try:
+        data = json.loads(request.body)
+        comentario_id = data.get('comentario_id')
+        
+        comentario = get_object_or_404(ComentarioRevisao, id=comentario_id)
+        
+        # Trava de segurança: apenas o proponente ou o revisor podem resolver
+        if request.user != comentario.projeto.proponente and request.user != comentario.revisor:
+            return JsonResponse({'success': False, 'message': 'Apenas o proponente ou o revisor podem resolver este comentário.'}, status=403)
+
+        comentario.resolvido = True
+        comentario.save()
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)

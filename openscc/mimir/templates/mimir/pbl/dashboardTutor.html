@@ -1,0 +1,51 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="h4 mb-1 text-dark fw-bold">
+                <i class="fas fa-chalkboard-teacher me-2 text-info"></i> Dashboard do Tutor
+            </h2>
+            <p class="text-muted mb-0">Bem-vindo(a), {{ user.first_name }}. Selecione o grupo para iniciar a sessão.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        {% for grupo in grupos %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm border-0 border-start border-info border-4 h-100 hover-elevate">
+                <div class="card-body bg-white p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h5 class="fw-bold text-dark mb-0">{{ grupo.nome }}</h5>
+                        <span class="badge bg-light text-info border border-info"><i class="fas fa-users"></i> {{ grupo.alunos.count }}</span>
+                    </div>
+                    
+                    <div class="mb-4 bg-light p-3 rounded">
+                        <small class="text-uppercase text-muted fw-bold d-block mb-1" style="letter-spacing: 0.05em;">Assunto</small>
+                        <span class="text-dark fw-bold">{{ grupo.assunto.nome }}</span>
+                    </div>
+                    
+                    <a href="{% url 'mimir:painelTutorGrupo' grupo.id %}" class="btn btn-info text-white w-100 fw-bold shadow-sm">
+                        <i class="fas fa-play-circle me-2"></i> Abrir Painel da Sessão
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5 bg-white shadow-sm rounded border">
+                <i class="fas fa-mug-hot fa-3x mb-3 text-muted opacity-25"></i>
+                <h5 class="text-dark fw-bold">Nenhum grupo atribuído</h5>
+                <p class="small text-muted mb-0">Você ainda não foi designado como tutor de nenhum grupo pelo professor da disciplina.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-elevate:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+</style>
+{% endblock %}
