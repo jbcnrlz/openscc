@@ -5,11 +5,12 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from PIL import Image
-from django.core.files.storage import default_storage
+from langchain_core.output_parsers import StrOutputParser
 from django.conf import settings
 from langchain_ollama import ChatOllama
 from typing import List, Optional
 from mimir.models import LLMLog
+from mimir.models import Edital
 # Configuração do modelo LangChain
 def get_llm():
     """Retorna uma instância configurada do LLM"""
@@ -745,3 +746,126 @@ def extrair_json_da_resposta(texto):
         
         # Se não encontrar JSON válido, criar estrutura padrão
         return {"perguntas": [], "erro": "Não foi possível processar o JSON"}
+
+def processar_edital_business_logic(edital_id, user=None):
+    """
+    Extrai o texto, aciona o LangChain e registra no LLMLog calculando tokens e milissegundos.
+    """
+    try:
+        llm_instance = get_llm()
+        edital = Edital.objects.get(id=edital_id)
+        texto_completo = "\n".join(extrair_texto_pdf(edital.arquivo_edital.path))
+        contexto_ia = texto_completo[:12000] # Limite de segurança de contexto
+        
+        # 1. Definição dos Prompts
+        prompt_resumo = ChatPromptTemplate.from_messages([
+            ("system", "Você é um especialista em análise de editais públicos e propostas de fomento à pesquisa."),
+            ("user", "Analise o seguinte edital e faça um resumo direto focado em: Objeto do edital, Valores máximos, Prazos e Itens financiáveis.\n\nTexto:\n{texto}")
+        ])
+        
+        prompt_insights = ChatPromptTemplate.from_messages([
+            ("system", "Você é um avaliador sênior de projetos institucionais."),
+            ("user", "Com base no seguinte edital, levante os principais critérios de elegibilidade, restrições críticas e dicas estratégicas de aprovação.\n\nTexto:\n{texto}")
+        ])
+        
+        # 2. Cadeias LCEL (Sem o OutputParser final para mantermos o AIMessage e extrairmos tokens)
+        cadeia_resumo = prompt_resumo | llm_instance
+        cadeia_insights = prompt_insights | llm_instance
+        
+        # ==========================================
+        # EXECUÇÃO 1: RESUMO DO EDITAL
+        # ==========================================
+        start_time_resumo = time.time()
+        try:
+            prompt_resumo_formatado = prompt_resumo.format(texto=contexto_ia)
+            resposta_bruta_resumo = cadeia_resumo.invoke({"texto": contexto_ia})
+            
+            duracao_resumo_ms = int((time.time() - start_time_resumo) * 1000)
+
+            conteudo_resumo = resposta_bruta_resumo.content
+            if isinstance(conteudo_resumo, list):
+                # Percorre a lista e concatena tudo que for do tipo 'text'
+                texto_resumo_gerado = "".join(bloco.get('text', '') for bloco in conteudo_resumo if isinstance(bloco, dict))
+            else:
+                # Se o modelo retornou uma string direta
+                texto_resumo_gerado = str(conteudo_resumo)
+            
+            # Extração segura de metadados (tokens e modelo)
+            metadata = resposta_bruta_resumo.response_metadata or {}
+            token_usage = metadata.get('token_usage', {})
+            
+            LLMLog.objects.create(
+                user=user,
+                prompt=prompt_resumo_formatado,
+                response=texto_resumo_gerado,
+                model_used=metadata.get('model_name', 'Mimir Default LLM'),
+                tokens_input=token_usage.get('prompt_tokens', 0),
+                tokens_output=token_usage.get('completion_tokens', 0),
+                duration_ms=duracao_resumo_ms,
+                status='success',
+                endpoint='processar_edital_business_logic - resumo'
+            )
+        except Exception as e:
+            LLMLog.objects.create(
+                user=user,
+                prompt=prompt_resumo.format(texto=contexto_ia),
+                duration_ms=int((time.time() - start_time_resumo) * 1000),
+                status='error',
+                error_message=str(e),
+                endpoint='processar_edital_business_logic - resumo'
+            )
+            raise e # Repassa o erro para interromper o fluxo
+
+        # ==========================================
+        # EXECUÇÃO 2: INSIGHTS DO EDITAL
+        # ==========================================
+        start_time_insights = time.time()
+        try:
+            prompt_insights_formatado = prompt_insights.format(texto=contexto_ia)
+            resposta_bruta_insights = cadeia_insights.invoke({"texto": contexto_ia})
+            
+            duracao_insights_ms = int((time.time() - start_time_insights) * 1000)
+            conteudo_insights = resposta_bruta_insights.content
+            if isinstance(conteudo_insights, list):
+                texto_insights_gerado = "".join(bloco.get('text', '') for bloco in conteudo_insights if isinstance(bloco, dict))
+            else:
+                texto_insights_gerado = str(conteudo_insights)
+            
+            # Extração segura de metadados
+            metadata = resposta_bruta_insights.response_metadata or {}
+            token_usage = metadata.get('token_usage', {})
+            
+            LLMLog.objects.create(
+                user=user,
+                prompt=prompt_insights_formatado,
+                response=texto_insights_gerado,
+                model_used=metadata.get('model_name', 'Mimir Default LLM'),
+                tokens_input=token_usage.get('prompt_tokens', 0),
+                tokens_output=token_usage.get('completion_tokens', 0),
+                duration_ms=duracao_insights_ms,
+                status='success',
+                endpoint='processar_edital_business_logic - insights'
+            )
+        except Exception as e:
+            LLMLog.objects.create(
+                user=user,
+                prompt=prompt_insights.format(texto=contexto_ia),
+                duration_ms=int((time.time() - start_time_insights) * 1000),
+                status='error',
+                error_message=str(e),
+                endpoint='processar_edital_business_logic - insights'
+            )
+            raise e
+
+        # ==========================================
+        # ATUALIZAÇÃO DO BANCO DE DADOS
+        # ==========================================
+        edital.resumo_llm = texto_resumo_gerado
+        edital.insights_llm = texto_insights_gerado
+        edital.save()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Falha global ao processar o edital {edital_id}: {str(e)}")
+        return False

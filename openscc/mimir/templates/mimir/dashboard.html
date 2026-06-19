@@ -1,0 +1,361 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4 mb-5">
+    
+    <!-- CABEÇALHO GLOBAL -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+            <h1 class="h3 mb-1 text-dark fw-bold">Painel de Controle</h1>
+            <p class="text-muted mb-0">Bem-vindo(a), {{ user.first_name }}!</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            {% if is_professor %}<span class="badge bg-primary-subtle text-primary border border-primary fw-bold"><i class="fas fa-user-tie me-1"></i> Professor</span>{% endif %}
+            {% if is_tutor %}<span class="badge bg-info-subtle text-info border border-info fw-bold"><i class="fas fa-chalkboard-teacher me-1"></i> Tutor</span>{% endif %}
+            {% if is_aluno %}<span class="badge bg-success-subtle text-success border border-success fw-bold"><i class="fas fa-user-graduate me-1"></i> Aluno</span>{% endif %}
+        </div>
+    </div>
+
+    {% if is_aluno or is_tutor or is_professor %}
+    <!-- NAVEGAÇÃO POR ABAS (Hierarquia: Professor > Tutor > Aluno) -->
+    <ul class="nav nav-pills nav-fill mb-4 shadow-sm bg-white rounded border" id="dashboardTabs" role="tablist">
+        
+        {% if is_professor %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-tab {% if is_professor %}active{% endif %} fw-bold py-3" id="professor-tab" data-bs-target="#professor-pane" type="button" role="tab">
+                <i class="fas fa-cogs me-2"></i> Área do Professor
+            </button>
+        </li>
+        {% endif %}
+        
+        {% if is_tutor %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-tab {% if is_tutor and not is_professor %}active{% endif %} fw-bold py-3" id="tutor-tab" data-bs-target="#tutor-pane" type="button" role="tab">
+                <i class="fas fa-chalkboard-teacher me-2"></i> Área do Tutor
+            </button>
+        </li>
+        {% endif %}
+
+        {% if is_aluno %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-tab {% if is_aluno and not is_tutor and not is_professor %}active{% endif %} fw-bold py-3" id="aluno-tab" data-bs-target="#aluno-pane" type="button" role="tab">
+                <i class="fas fa-laptop-medical me-2"></i> Área do Aluno
+            </button>
+        </li>
+        {% endif %}
+        
+    </ul>
+
+    <!-- CONTEÚDO DAS ABAS -->
+    <div class="tab-content" id="dashboardTabsContent">
+        
+        <!-- ========================================== -->
+        <!-- ABA DO PROFESSOR                           -->
+        <!-- ========================================== -->
+        {% if is_professor %}
+        <div class="tab-pane custom-pane fade {% if is_professor %}show active{% endif %}" id="professor-pane" role="tabpanel">
+            
+            <!-- Cards Estatísticos -->
+            <div class="row mb-4 g-3">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-start border-primary border-4 shadow-sm h-100 py-2 border-0">
+                        <div class="card-body px-3 py-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">Fontes Ativas</div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ fontes_ativas }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-start border-success border-4 shadow-sm h-100 py-2 border-0">
+                        <div class="card-body px-3 py-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">Problemas Criados</div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ problemas_criados }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-start border-warning border-4 shadow-sm h-100 py-2 border-0">
+                        <div class="card-body px-3 py-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">Questões Geradas</div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ questoes_geradas }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-start border-info border-4 shadow-sm h-100 py-2 border-0">
+                        <div class="card-body px-3 py-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">Provas Criadas</div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ provas_criadas }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulos de Gestão -->
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-purple bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-clipboard-list text-purple"></i></div>
+                                <h5 class="card-title mb-0">Aplicações & Provas</h5>
+                            </div>
+                            <p class="card-text text-muted small">Crie provas, gerencie aplicações e corrija submissões.</p>
+                            <div class="mt-3 btn-group w-100 shadow-sm">
+                                <a href="{% url 'mimir:listarProvas' %}" class="btn btn-outline-purple w-50">Provas</a>
+                                <a href="{% url 'mimir:listarAplicacoesProva' %}" class="btn btn-purple text-white w-50">Aplicações</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-info bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-tasks text-info"></i></div>
+                                <h5 class="card-title mb-0">Problemas PBL</h5>
+                            </div>
+                            <p class="card-text text-muted small">Gerencie casos clínicos e pequenos grupos tutoriais.</p>
+                            <div class="mt-3 btn-group w-100 shadow-sm">
+                                <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-info w-50">Problemas</a>
+                                <a href="{% url 'mimir:listarPequenosGrupos' %}" class="btn btn-info text-white w-50">Grupos</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-primary bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-database text-primary"></i></div>
+                                <h5 class="card-title mb-0">Base de Dados</h5>
+                            </div>
+                            <p class="card-text text-muted small">Alimente a IA com Fontes, Temas, Vínculos e Perguntas.</p>
+                            <div class="mt-3 btn-group w-100 shadow-sm">
+                                <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-outline-primary">Fontes</a>
+                                <a href="{% url 'mimir:visualizarPerguntas'%}" class="btn btn-primary text-white">Questões</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-indigo bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-microchip text-indigo"></i></div>
+                                <h5 class="card-title mb-0">Monitor de IA</h5>
+                            </div>
+                            <p class="card-text text-muted small">Visualize histórico de chamadas (LLMs) e consumo.</p>
+                            <div class="mt-3">
+                                <a href="{% url 'mimir:listarLogsLLM' %}" class="btn btn-indigo text-white w-100 shadow-sm"><i class="fas fa-network-wired me-1"></i> Acessar Logs</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-orange bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-comments text-orange"></i></div>
+                                <h5 class="card-title mb-0">Feedbacks</h5>
+                            </div>
+                            <p class="card-text text-muted small">Verifique e responda aos feedbacks de revisão.</p>
+                            <div class="mt-3">
+                                <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-orange text-white w-100 shadow-sm"><i class="fas fa-edit me-1"></i> Gerenciar Feedbacks</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOVO CARD: PROJETOS E EDITAIS (PD&I) -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-teal bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-rocket text-teal"></i></div>
+                                <h5 class="card-title mb-0">Projetos & Editais</h5>
+                            </div>
+                            <p class="card-text text-muted small">Explore chamadas de fomento e redija propostas com IA.</p>
+                            <div class="mt-3">
+                                <a href="{% url 'mimir:listarEditais' %}" class="btn btn-teal text-white w-100 shadow-sm"><i class="fas fa-search-dollar me-1"></i> Acessar PD&I</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ========================================== -->
+        <!-- ABA DO TUTOR                               -->
+        <!-- ========================================== -->
+        {% if is_tutor %}
+        <div class="tab-pane custom-pane fade {% if is_tutor and not is_professor %}show active{% endif %}" id="tutor-pane" role="tabpanel">
+            <h5 class="text-info fw-bold mb-3"><i class="fas fa-chalkboard-teacher me-2"></i> Meus Grupos de Tutoria</h5>
+            <div class="row g-4">
+                {% for grupo in grupos_tutorados %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border-0 border-start border-info border-4 h-100 hover-elevate">
+                        <div class="card-body bg-white p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h5 class="fw-bold text-dark mb-0">{{ grupo.nome }}</h5>
+                                <span class="badge bg-light text-info border border-info"><i class="fas fa-users"></i> {{ grupo.alunos.count }}</span>
+                            </div>
+                            <div class="mb-4 bg-light p-3 rounded">
+                                <small class="text-uppercase text-muted fw-bold d-block mb-1" style="letter-spacing: 0.05em;">Assunto</small>
+                                <span class="text-dark fw-bold">{{ grupo.assunto.nome }}</span>
+                            </div>
+                            <a href="{% url 'mimir:painelTutorGrupo' grupo.id %}" class="btn btn-info text-white w-100 fw-bold shadow-sm">
+                                <i class="fas fa-play-circle me-1"></i> Abrir Painel do Tutor
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5 bg-white shadow-sm rounded border">
+                    <i class="fas fa-mug-hot fa-3x mb-3 text-muted opacity-25"></i>
+                    <p class="text-muted mb-0">Você não possui grupos de tutoria ativos no momento.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ========================================== -->
+        <!-- ABA DO ALUNO                               -->
+        <!-- ========================================== -->
+        {% if is_aluno %}
+        <div class="tab-pane custom-pane fade {% if is_aluno and not is_tutor and not is_professor %}show active{% endif %}" id="aluno-pane" role="tabpanel">
+            <h5 class="text-success fw-bold mb-3"><i class="fas fa-users me-2"></i> Minhas Sessões Tutoriais (PBL)</h5>
+            <div class="row g-4">
+                {% for grupo in grupos_aluno %}
+                <div class="col-lg-6">
+                    <div class="card shadow-sm border-0 border-top border-success border-4 h-100 hover-elevate">
+                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0 fw-bold text-dark">{{ grupo.nome }}</h5>
+                                <small class="text-muted">Assunto: {{ grupo.assunto.nome }}</small>
+                            </div>
+                        </div>
+                        <div class="card-body bg-light p-0">
+                            <div class="list-group list-group-flush">
+                                {% for problema in grupo.assunto.problema_set.all %}
+                                    <div class="list-group-item bg-transparent p-3 border-bottom">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                            <div>
+                                                <h6 class="fw-bold text-dark mb-1">{{ problema.titulo_apresentacao|default:problema.titulo }}</h6>
+                                                <small class="text-muted"><i class="fas fa-layer-group me-1"></i> {{ problema.partes.count }} partes</small>
+                                            </div>
+                                            <a href="{% url 'mimir:problemaSessaoAluno' grupo.id problema.id %}" class="btn btn-success btn-sm shadow-sm fw-bold">
+                                                Entrar na Sessão
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <div class="p-4 text-center text-muted small fst-italic">Nenhum caso cadastrado ainda.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5 bg-white shadow-sm rounded border">
+                    <i class="fas fa-user-clock fa-3x mb-3 text-muted opacity-25"></i>
+                    <p class="text-muted mb-0">Você ainda não foi alocado em nenhum grupo de PBL.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+    <!-- SEM ACESSO -->
+    {% if not is_professor and not is_tutor and not is_aluno %}
+    <div class="text-center py-5 bg-white shadow-sm rounded border mt-4">
+        <i class="fas fa-user-lock fa-4x text-muted opacity-25 mb-3"></i>
+        <h4 class="text-dark fw-bold">Acesso Restrito</h4>
+        <p class="text-muted">Sua conta ainda não possui permissões atribuídas. Contate o administrador.</p>
+    </div>
+    {% endif %}
+    
+</div>
+
+<style>
+    /* Variáveis de Cor */
+    :root {
+        --bs-purple: #6f42c1; --bs-teal: #20c997; --bs-orange: #fd7e14; --bs-indigo: #6610f2;
+    }
+    
+    /* Utilitários Extras para botões e fundos */
+    .bg-purple { background-color: var(--bs-purple) !important; }
+    .bg-indigo { background-color: var(--bs-indigo) !important; }
+    .bg-teal { background-color: var(--bs-teal) !important; } /* Adicionado Teal */
+    
+    .text-purple { color: var(--bs-purple) !important; }
+    .text-indigo { color: var(--bs-indigo) !important; }
+    .text-teal { color: var(--bs-teal) !important; } /* Adicionado Teal */
+    
+    .btn-purple { background-color: var(--bs-purple); border-color: var(--bs-purple); color: white;}
+    .btn-outline-purple { color: var(--bs-purple); border-color: var(--bs-purple); }
+    .btn-outline-purple:hover { background-color: var(--bs-purple); color: white; }
+    .btn-indigo { background-color: var(--bs-indigo); border-color: var(--bs-indigo); color: white;}
+    .btn-orange { background-color: var(--bs-orange); border-color: var(--bs-orange); color: white;}
+    .btn-teal { background-color: var(--bs-teal); border-color: var(--bs-teal); color: white;} /* Adicionado Teal */
+    
+    /* Animações e Cards */
+    .hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .hover-elevate:hover, .feature-card:hover { transform: translateY(-5px); box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important; }
+    .feature-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .feature-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;}
+
+    /* Customização das Abas (Pills) para padrão limpo */
+    .nav-pills .nav-link { color: #6c757d; border-radius: 0; border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; }
+    .nav-pills .nav-link:hover { background-color: #f8f9fa; }
+    
+    /* Cores ativas específicas para cada perfil */
+    .nav-pills #aluno-tab.active { color: #198754; background-color: transparent; border-bottom-color: #198754; }
+    .nav-pills #tutor-tab.active { color: #0dcaf0; background-color: transparent; border-bottom-color: #0dcaf0; }
+    .nav-pills #professor-tab.active { color: #0d6efd; background-color: transparent; border-bottom-color: #0d6efd; }
+</style>
+
+<!-- SCRIPT À PROVA DE FALHAS PARA ALTERNÂNCIA DE ABAS -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelectorAll('.custom-tab');
+    const panes = document.querySelectorAll('.custom-pane');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // 1. Remove a classe 'active' de todos os botões (abas)
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // 2. Remove as classes 'show' e 'active' de todos os conteúdos
+            panes.forEach(p => {
+                p.classList.remove('show', 'active');
+            });
+            
+            // 3. Adiciona a classe 'active' na aba que foi clicada
+            this.classList.add('active');
+            
+            // 4. Exibe apenas o conteúdo (pane) correspondente
+            const targetSelector = this.getAttribute('data-bs-target');
+            const targetPane = document.querySelector(targetSelector);
+            if(targetPane) {
+                // Pequeno delay no 'show' para garantir a transição suave (efeito fade)
+                targetPane.classList.add('active');
+                setTimeout(() => { targetPane.classList.add('show'); }, 50);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

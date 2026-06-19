@@ -1,0 +1,101 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4 mb-5">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="h4 mb-1 text-dark fw-bold">
+                <i class="fas fa-users-cog me-2 text-primary"></i> Gerenciar Grupo: {{ grupo.nome }}
+            </h2>
+            <p class="text-muted mb-0">Assunto: <strong>{{ grupo.assunto.nome }}</strong></p>
+        </div>
+        <div>
+            <a href="{% url 'mimir:listarPequenosGrupos' %}" class="btn btn-outline-secondary btn-sm shadow-sm fw-bold">
+                <i class="fas fa-arrow-left me-1"></i> Voltar aos Grupos
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'mimir:gerenciarPequenoGrupo' grupo.id %}">
+        {% csrf_token %}
+        <div class="row g-4">
+            
+            <!-- SELEÇÃO DE TUTOR -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-chalkboard-teacher text-primary me-2"></i>Tutor do Grupo</h6>
+                    </div>
+                    <div class="card-body bg-light">
+                        <label class="form-label text-muted small fw-bold">Selecione o responsável por guiar este grupo:</label>
+                        <select name="tutor" class="form-select shadow-sm" required>
+                            <option value="">-- Selecione um Tutor --</option>
+                            {% for tutor in tutores %}
+                                <option value="{{ tutor.id }}" {% if grupo.tutor_id == tutor.id %}selected{% endif %}>
+                                    {{ tutor.get_full_name|default:tutor.username }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SELEÇÃO DE ALUNOS -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-user-graduate text-success me-2"></i>Alunos Vinculados</h6>
+                        <span class="badge bg-success rounded-pill" id="contador-alunos">{{ grupo.alunos.count }} selecionados</span>
+                    </div>
+                    <div class="card-body bg-light p-0">
+                        <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                            {% for aluno in alunos %}
+                            <label class="list-group-item d-flex align-items-center p-3 cursor-pointer hover-bg-light">
+                                <input class="form-check-input me-3 checkbox-aluno" type="checkbox" name="alunos" value="{{ aluno.id }}" 
+                                       {% if aluno in grupo.alunos.all %}checked{% endif %} style="transform: scale(1.2);">
+                                <div>
+                                    <span class="fw-bold text-dark d-block">{{ aluno.get_full_name|default:aluno.username }}</span>
+                                    <small class="text-muted">{{ aluno.email }}</small>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA FLUTUANTE DE SALVAMENTO -->
+        <div class="card shadow-lg border-0 mt-4">
+            <div class="card-body p-4 d-flex justify-content-end align-items-center bg-white rounded">
+                <button type="submit" class="btn btn-primary px-5 shadow-sm fw-bold btn-lg">
+                    <i class="fas fa-save me-2"></i> Salvar Vínculos
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Atualiza o contador em tempo real
+    const checkboxes = document.querySelectorAll('.checkbox-aluno');
+    const contador = document.getElementById('contador-alunos');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            const ativos = document.querySelectorAll('.checkbox-aluno:checked').length;
+            contador.innerText = ativos + ' selecionados';
+        });
+    });
+</script>
+<style>.cursor-pointer { cursor: pointer; } .hover-bg-light:hover { background-color: #f8f9fa; }</style>
+{% endblock %}

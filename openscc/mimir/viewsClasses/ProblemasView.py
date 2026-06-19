@@ -84,6 +84,15 @@ class GerarProblemaView(LoginRequiredMixin, View):
     def post(self, request):
         form = GerarProblemaForm(request.user, request.POST)
         
+        # NOVO: Captura direta do campo que adicionamos no HTML (pois não estava no form original de geração)
+        titulo_apresentacao = request.POST.get('titulo_apresentacao')
+        if not titulo_apresentacao or titulo_apresentacao.strip() == "":
+            titulo_apresentacao = None
+            
+        # NOVO: Opcionalmente, você também pode ter colocado o "titulo" real solto no HTML
+        # Se for o caso, pegue ele aqui também. Se ele estiver atrelado ao GerarProblemaForm, ignore esta linha.
+        titulo_real = request.POST.get('titulo') 
+        
         if form.is_valid():
             try:
                 # Dados do formulário
@@ -94,6 +103,10 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 num_partes = form.cleaned_data['num_partes']
                 contexto_inicial = form.cleaned_data['contexto_inicial']
                 layout_instrucoes = ""
+                
+                # NOVO: Se o título real não veio direto do POST solto, constrói o título genérico
+                if not titulo_real:
+                    titulo_real = f"Problema em {tema.nome} - {assunto.nome}"
                 
                 if assunto.layoutProblema:
                     try:
@@ -106,10 +119,11 @@ class GerarProblemaView(LoginRequiredMixin, View):
             
                 # Criar problema base
                 problema = Problema.objects.create(
-                    titulo=f"Problema em {tema.nome} - {assunto.nome}",
+                    titulo=titulo_real, # Usa o título definido
+                    titulo_apresentacao=titulo_apresentacao, # NOVO: Salva o título Anti-Spoiler
                     assunto=assunto,
                     tema=tema,
-                    dataAplicacao=form.cleaned_data['data_aplicacao'],
+                    dataAplicacao=form.cleaned_data.get('data_aplicacao'), # Adicionado .get() para evitar KeyError caso o campo não exista
                 )
                 problema.objetivos.set(objetivos)
                 problema.fontes.set(fontes_selecionadas)
@@ -174,7 +188,6 @@ class GerarProblemaView(LoginRequiredMixin, View):
                 partes.append(f"Parte {parte_num}: Desenvolvimento do problema.")
         
         return partes
-
 class RegerarParteView(LoginRequiredMixin, View):
     def get(self, request, problema_id, parte_ordem=None):
         problema = get_object_or_404(Problema, id=problema_id)

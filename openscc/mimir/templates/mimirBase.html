@@ -21,6 +21,10 @@
     <!-- Custom CSS -->
     <link href="{% static 'assets/css/style.css' %}" rel="stylesheet">
     
+    <!-- SweetAlert2 CSS e JS -->
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+    
     {% block titlePage %}
     <title>Mimir - Sistema de Gestão do Conhecimento</title>
     {% endblock %}
@@ -63,6 +67,26 @@
         .app-container {
             display: flex;
             min-height: 100vh;
+            position: relative;
+        }
+
+        /* Sidebar Overlay para Mobile */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999; /* Fica logo abaixo da sidebar */
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+            opacity: 1;
         }
 
         /* Sidebar */
@@ -280,6 +304,7 @@
             flex: 1;
             margin-left: var(--sidebar-width);
             transition: all 0.3s ease;
+            min-width: 0; /* Previne que o conteúdo estoure a tela horizontalmente */
         }
 
         .sidebar.collapsed ~ .main-content {
@@ -297,7 +322,7 @@
             justify-content: space-between;
             position: sticky;
             top: 0;
-            z-index: 999;
+            z-index: 998; /* Ajustado para ficar abaixo do overlay se necessário */
             box-shadow: var(--shadow);
         }
 
@@ -376,7 +401,7 @@
         }
 
         .page-subtitle {
-            color: var(--secondary-color;
+            color: var(--secondary-color);
             font-size: 1.1rem;
             font-weight: 400;
         }
@@ -419,11 +444,13 @@
         .btn-primary {
             background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
             border: none;
+            color: white;
         }
 
         .btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(44, 90, 160, 0.3);
+            color: white;
         }
 
         /* Badges */
@@ -431,35 +458,6 @@
             font-weight: 500;
             padding: 0.375rem 0.75rem;
             border-radius: 20px;
-        }
-
-        /* Stats Cards */
-        .stat-card {
-            text-align: center;
-            padding: 1.5rem;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1rem;
-            font-size: 1.5rem;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--dark-color);
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            color: var(--secondary-color);
-            font-weight: 500;
         }
 
         /* Footer */
@@ -470,18 +468,21 @@
             margin-top: auto;
         }
 
-        /* Responsive */
+        /* Responsive Mobile Ajustado */
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
+                box-shadow: none;
             }
             
+            /* Quando aberto no mobile, traz para a tela e aplica sombra */
             .sidebar.mobile-open {
                 transform: translateX(0);
+                box-shadow: 4px 0 15px rgba(0,0,0,0.2);
             }
             
             .main-content {
-                margin-left: 0;
+                margin-left: 0 !important;
             }
             
             .content-wrapper {
@@ -496,49 +497,13 @@
                 display: none;
             }
         }
-
-        /* Utility Classes */
-        .text-gradient {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .bg-gradient-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-        }
-
-        .border-radius {
-            border-radius: var(--border-radius);
-        }
-
-        .shadow-custom {
-            box-shadow: var(--shadow);
-        }
-
-        .shadow-custom-lg {
-            box-shadow: var(--shadow-lg);
-        }
-
-        /* Loading States */
-        .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        @keyframes loading {
-            0% {
-                background-position: 200% 0;
-            }
-            100% {
-                background-position: -200% 0;
-            }
-        }
     </style>
 </head>
 <body>
+    
+    <!-- Overlay Escuro para Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -631,7 +596,7 @@
                         <i class="fas fa-bars"></i>
                     </button>
                     {% block headerPage %}
-                    <div class="d-none d-md-block">
+                    <div class="d-none d-md-block ms-3">
                         <span class="user-role-badge">
                             {% if user.isProfessor %}
                             <span class="badge bg-success">Professor</span>
@@ -660,13 +625,23 @@
                                     {% endif %}
                                 </span>
                             </div>
-                            <i class="fas fa-chevron-down"></i>
+                            <i class="fas fa-chevron-down ms-2 text-secondary"></i>
                         </button>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="{% url 'submission:logout' %}">
-                                <i class="fas fa-sign-out-alt me-2"></i>Sair
-                            </a>
+                        
+                        <!-- Menu Dropdown Moderno -->
+                        <div class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
+                            <div class="px-4 py-3 text-center border-bottom mb-2">
+                                <strong class="d-block text-dark">{{ user.get_full_name|default:user.username }}</strong>
+                                <small class="text-muted">{{ user.email|default:"Sem e-mail cadastrado" }}</small>
+                            </div>
+                            
+                            <!-- Formulário Seguro de Logout (POST) -->
+                            <form action="{% url 'submission:logout' %}" method="post" class="m-0 p-0">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item py-2 text-danger fw-bold">
+                                    <i class="fas fa-sign-out-alt me-2 w-20px text-center"></i> Sair do Sistema
+                                </button>
+                            </form>
                         </div>
                     </div>
                     {% else %}
@@ -682,7 +657,7 @@
                 {% if messages %}
                 <div class="messages mb-4">
                     {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
                         <div class="d-flex align-items-center">
                             <i class="fas 
                                 {% if message.tags == 'success' %}fa-check-circle
@@ -742,25 +717,47 @@
     <script src="{% static 'js/script.js' %}"></script>
 
     <script>
-        // Toggle Sidebar Mobile
-        document.getElementById('sidebarToggleMobile').addEventListener('click', function() {
-            document.querySelector('.sidebar').classList.toggle('mobile-open');
-        });
+        // DOM Elements
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        const btnToggleMobile = document.getElementById('sidebarToggleMobile');
+        const btnToggleDesktop = document.getElementById('sidebarToggleDesktop');
+
+        // Função para Abrir/Fechar no Mobile
+        function toggleMobileSidebar() {
+            sidebar.classList.toggle('mobile-open');
+            if (sidebar.classList.contains('mobile-open')) {
+                overlay.classList.add('show');
+            } else {
+                overlay.classList.remove('show');
+            }
+        }
+
+        // Eventos Mobile
+        if(btnToggleMobile) {
+            btnToggleMobile.addEventListener('click', toggleMobileSidebar);
+        }
+        
+        // Clicar fora da barra lateral (no fundo escuro) fecha ela
+        if(overlay) {
+            overlay.addEventListener('click', toggleMobileSidebar);
+        }
 
         // Toggle Sidebar Desktop (collapse/expand)
-        document.getElementById('sidebarToggleDesktop').addEventListener('click', function() {
-            document.querySelector('.sidebar').classList.toggle('collapsed');
-            
-            // Salvar preferência no localStorage
-            const isCollapsed = document.querySelector('.sidebar').classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-        });
+        if(btnToggleDesktop) {
+            btnToggleDesktop.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                // Salvar preferência no localStorage
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('sidebarCollapsed', isCollapsed);
+            });
+        }
 
-        // Restaurar estado da sidebar
+        // Restaurar estado da sidebar e links ativos
         document.addEventListener('DOMContentLoaded', function() {
             const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (sidebarCollapsed) {
-                document.querySelector('.sidebar').classList.add('collapsed');
+            if (sidebarCollapsed && window.innerWidth > 768) {
+                sidebar.classList.add('collapsed');
             }
 
             // Active Navigation
@@ -775,7 +772,6 @@
                 }
             });
         });
-
     </script>
 
     {% block ScriptCode %}

@@ -1,0 +1,173 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="h4 mb-1 text-dark fw-bold">
+                <i class="fas fa-chalkboard-teacher me-2 text-primary"></i> Painel da Sessão Tutorial
+            </h2>
+            <p class="text-muted mb-0">Gerenciando o grupo: <strong>{{ grupo.nome }}</strong></p>
+        </div>
+        <div>
+            <a href="{% url 'mimir:dashboardProfessor' %}" class="btn btn-outline-secondary btn-sm shadow-sm fw-bold">
+                <i class="fas fa-arrow-left me-1"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 border-start border-primary border-4 mb-4">
+                <div class="card-body bg-light">
+                    <h6 class="fw-bold text-primary text-uppercase tracking-wider mb-3">Informações do Grupo</h6>
+                    <p class="mb-1 small"><strong class="text-dark">Assunto:</strong> {{ grupo.assunto.nome }}</p>
+                    <p class="mb-1 small"><strong class="text-dark">Tutor:</strong> {{ grupo.tutor.get_full_name|default:grupo.tutor.username }}</p>
+                    <hr>
+                    <h6 class="fw-bold text-secondary text-uppercase tracking-wider mb-2 small">Alunos Participantes ({{ grupo.alunos.count }})</h6>
+                    <ul class="list-group list-group-flush small">
+                        {% for aluno in grupo.alunos.all %}
+                        <li class="list-group-item bg-transparent px-0 py-1 text-muted">
+                            <i class="fas fa-user-graduate me-2"></i> {{ aluno.get_full_name|default:aluno.username }}
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item bg-transparent px-0 py-1 text-muted fst-italic">Nenhum aluno vinculado.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark fs-6">
+                        <i class="fas fa-tasks me-2 text-secondary"></i> Controle de Liberação (PBL)
+                    </h5>
+                </div>
+                <div class="card-body p-4 bg-light">
+                    
+                    {% csrf_token %} <div class="accordion shadow-sm" id="accordionProblemas">
+                        {% for problema in problemas %}
+                        <div class="accordion-item border-0 mb-3 rounded overflow-hidden">
+                            <h2 class="accordion-header" id="heading{{ problema.id }}">
+                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-bold text-dark bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ problema.id }}">
+                                    <i class="fas fa-microscope text-primary me-2"></i> {{ problema.titulo }}
+                                </button>
+                            </h2>
+                            <div id="collapse{{ problema.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#accordionProblemas">
+                                <div class="accordion-body bg-white border-top">
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                        <span class="small text-muted">Este problema possui <strong>{{ problema.partes.count }} fatias</strong>.</span>
+                                        <div class="btn-group">
+                                            <a href="{% url 'mimir:problemaSessaoAluno' grupo.id problema.id %}" target="_blank" class="btn btn-outline-info btn-sm fw-bold">
+                                                <i class="fas fa-eye me-1"></i> Visão do Aluno
+                                            </a>
+                                            {% if problema.guia_tutor %}
+                                            <a href="{% url 'mimir:visualizarGuiaTutor' problema.id %}" target="_blank" class="btn btn-outline-success btn-sm fw-bold">
+                                                <i class="fas fa-book-reader me-1"></i> Guia do Tutor
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <ul class="list-group list-group-flush">
+                                        {% for parte in problema.partes.all|dictsort:"ordem" %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                                            <div>
+                                                <h6 class="mb-1 fw-bold text-dark">Parte {{ parte.ordem }}</h6>
+                                                <p class="mb-0 text-muted small text-truncate" style="max-width: 400px;">{{ parte.enunciado }}</p>
+                                            </div>
+                                            
+                                            <div class="form-check form-switch form-switch-lg mb-0">
+                                                <input class="form-check-input flex-shrink-0" type="checkbox" 
+                                                       role="switch" 
+                                                       id="switch_parte_{{ parte.id }}" 
+                                                       {% if parte.id in partes_liberadas %}checked{% endif %}
+                                                       onchange="toggleParte({{ grupo.id }}, {{ parte.id }}, this)">
+                                                <label class="form-check-label ms-2 small fw-bold" id="label_parte_{{ parte.id }}">
+                                                    {% if parte.id in partes_liberadas %}
+                                                        <span class="text-success"><i class="fas fa-unlock me-1"></i> Liberada</span>
+                                                    {% else %}
+                                                        <span class="text-secondary"><i class="fas fa-lock me-1"></i> Oculta</span>
+                                                    {% endif %}
+                                                </label>
+                                            </div>
+                                        </li>
+                                        {% empty %}
+                                        <div class="text-center py-3 text-muted small">Nenhuma parte estruturada neste problema.</div>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-5 text-secondary bg-white rounded border">
+                            <i class="fas fa-folder-open fa-3x mb-3 text-muted opacity-50"></i>
+                            <h5 class="text-dark">Nenhum problema encontrado</h5>
+                            <p class="small text-muted mb-0">Não há problemas cadastrados para o assunto deste grupo.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos para aumentar o tamanho do Switch do Bootstrap */
+.form-switch-lg .form-check-input {
+    width: 3rem;
+    height: 1.5rem;
+    cursor: pointer;
+}
+.form-switch-lg .form-check-label {
+    padding-top: 0.2rem;
+    cursor: pointer;
+}
+.tracking-wider { letter-spacing: 0.05em; }
+</style>
+
+<script>
+function toggleParte(grupoId, parteId, checkboxElement) {
+    const originalState = !checkboxElement.checked;
+    const label = document.getElementById(`label_parte_${parteId}`);
+    
+    // Feedback visual imediato "Carregando"
+    label.innerHTML = '<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Salvando...</span>';
+    checkboxElement.disabled = true;
+
+    fetch(`/mimir/grupo/${grupoId}/parte/${parteId}/liberar/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Erro na requisição');
+        return response.json();
+    })
+    .then(data => {
+        // Atualiza a Label com base na resposta do servidor
+        if (data.acao === 'liberada') {
+            label.innerHTML = '<span class="text-success"><i class="fas fa-unlock me-1"></i> Liberada</span>';
+        } else {
+            label.innerHTML = '<span class="text-secondary"><i class="fas fa-lock me-1"></i> Oculta</span>';
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        // Reverte o switch se der erro
+        checkboxElement.checked = originalState;
+        label.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Erro</span>';
+        alert('Ocorreu um erro ao tentar liberar a parte. Tente novamente.');
+    })
+    .finally(() => {
+        checkboxElement.disabled = false;
+    });
+}
+</script>
+{% endblock %}
