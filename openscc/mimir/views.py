@@ -3132,31 +3132,46 @@ def exportarProjetoPDF(request, projeto_id):
 
 @login_required
 def buscarUsuariosAjax(request):
-    """Retorna uma lista de usuários para adicionar à equipe (busca por nome ou email)."""
-    termo = request.GET.get('q', '').strip()
-    
-    # Exige pelo menos 3 caracteres para não sobrecarregar o banco
-    if len(termo) < 3:
-        return JsonResponse({'usuarios': []})
-        
-    # Busca usuários ignorando letras maiúsculas/minúsculas, e exclui o próprio usuário logado
-    usuarios = User.objects.filter(
-        (
+    try:
+        termo = request.GET.get('q', '').strip()
+        if len(termo) < 3:
+            return JsonResponse({'usuarios': []})
+            
+        # Busca por qualquer usuário (Professor ou Aluno) ignorando o próprio usuário logado
+        usuarios = User.objects.filter(
             Q(first_name__icontains=termo) | 
             Q(last_name__icontains=termo) | 
             Q(username__icontains=termo) |
             Q(email__icontains=termo)
-        ) &
-        Q(groups__name='Professor')
-    ).exclude(id=request.user.id)[:10] # Limita a 10 resultados
-
-    data = [{
-        'id': u.id, 
-        'nome': u.get_full_name() or u.username, 
-        'email': u.email or 'Sem e-mail cadastrado'
-    } for u in usuarios]
-    
-    return JsonResponse({'usuarios': data})
+        ).exclude(id=request.user.id)[:10]
+        
+        data = []
+        for u in usuarios:
+            # Identifica o papel baseado nos booleanos do seu custom user (isProfessor / isAluno)
+            papel = 'Pesquisador'
+            cor_badge = 'bg-secondary'
+            
+            if getattr(u, 'isProfessor', False):
+                papel = 'Professor'
+                cor_badge = 'bg-success'
+            elif getattr(u, 'isAluno', False):
+                papel = 'Aluno'
+                cor_badge = 'bg-info text-dark'
+                
+            data.append({
+                'id': u.id, 
+                'nome': u.get_full_name() or u.username, 
+                'email': u.email or 'Sem e-mail',
+                'papel': papel,
+                'cor_badge': cor_badge
+            })
+            
+        return JsonResponse({'usuarios': data})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'erro_interno': str(e)}, status=500)
 
 @login_required
 @require_POST
@@ -3188,57 +3203,126 @@ def gerenciarEquipeProjeto(request):
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
     
 @login_required
-@require_POST
 def adicionarComentarioRevisao(request):
-    """View AJAX para salvar um comentário de revisão num trecho de texto."""
-    try:
-        data = json.loads(request.body)
-        projeto = get_object_or_404(Projeto, id=data.get('projeto_id'))
-        campo = get_object_or_404(CampoTemplate, id=data.get('campo_id'))
-        
-        # 1. VALIDAÇÃO DE SEGURANÇA: Apenas Professores revisam
-        is_professor = request.user.groups.filter(name='Professor').exists() # Adapte se necessário
-        
-        if not is_professor and not request.user.is_superuser:
-            return JsonResponse({'success': False, 'message': 'Acesso negado. Apenas professores podem fazer revisões por pares.'}, status=403)
-
-        # 2. Salva o comentário
-        comentario = ComentarioRevisao.objects.create(
-            projeto=projeto,
-            campo=campo,
-            revisor=request.user,
-            marker_id=data.get('marker_id'),
-            texto_selecionado=data.get('texto_selecionado'),
-            texto_comentario=data.get('texto_comentario')
-        )
-        
-        return JsonResponse({
-            'success': True,
-            'id': comentario.id,
-            'revisor': request.user.get_full_name() or request.user.username,
-            'data': comentario.criado_em.strftime("%d/%m/%Y %H:%M")
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            projeto_id = data.get('projeto_id')
+            
+            from .models import Projeto, ComentarioRevisao
+            projeto = Projeto.objects.get(id=projeto_id)
+            
+            is_proponente = (request.user == projeto.proponente)
+            is_equipe = projeto.equipe.filter(id=request.user.id).exists()
+            
+            if is_proponente or is_equipe:
+                novo_comentario = ComentarioRevisao.objects.create(
+                    projeto=projeto,
+                    campo_id=data.get('campo_id'),
+                    revisor=request.user,
+                    marker_id=data.get('marker_id'),
+                    texto_selecionado=data.get('texto_selecionado'),
+                    texto_comentario=data.get('texto_comentario')
+                )
+                
+                # Identifica o papel para renderizar o card dinamicamente no front
+                papel = 'Pesquisador'
+                cor_badge = 'bg-secondary'
+                if getattr(request.user, 'isProfessor', False):
+                    papel = 'Professor'
+                    cor_badge = 'bg-success'
+                elif getattr(request.user, 'isAluno', False):
+                    papel = 'Aluno'
+                    cor_badge = 'bg-info text-dark'
+                
+                return JsonResponse({
+                    'success': True,
+                    'id': novo_comentario.id,
+                    'revisor': request.user.get_full_name() or request.user.username,
+                    'data': novo_comentario.criado_em.strftime("%d/%m %H:%M"),
+                    'papel': papel,
+                    'cor_badge': cor_badge
+                })
+            else:
+                return JsonResponse({'success': False, 'message': 'Acesso negado ao projeto.'})
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método inválido.'})
     
 @login_required
-@require_POST
 def resolverComentarioRevisao(request):
-    """Arquiva um comentário e permite que o JS limpe o highlight do texto."""
-    try:
-        data = json.loads(request.body)
-        comentario_id = data.get('comentario_id')
-        
-        comentario = get_object_or_404(ComentarioRevisao, id=comentario_id)
-        
-        # Trava de segurança: apenas o proponente ou o revisor podem resolver
-        if request.user != comentario.projeto.proponente and request.user != comentario.revisor:
-            return JsonResponse({'success': False, 'message': 'Apenas o proponente ou o revisor podem resolver este comentário.'}, status=403)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            comentario_id = data.get('comentario_id')
+            
+            from .models import ComentarioRevisao
+            comentario = ComentarioRevisao.objects.get(id=comentario_id)
+            
+            # CORREÇÃO: Pega o projeto diretamente do comentário (e não do campo)
+            projeto = comentario.projeto 
+            
+            # Quem pode arquivar? O Proponente, o Revisor que criou, OU qualquer membro da Equipe
+            is_proponente = (request.user == projeto.proponente)
+            is_revisor = (request.user == comentario.revisor)
+            is_equipe = projeto.equipe.filter(id=request.user.id).exists()
+            
+            if is_proponente or is_revisor or is_equipe:
+                comentario.resolvido = True 
+                comentario.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({
+                    'success': False, 
+                    'message': 'Você não tem permissão para arquivar este comentário.'
+                })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método inválido.'})
 
-        comentario.resolvido = True
-        comentario.save()
-        
-        return JsonResponse({'success': True})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+@login_required
+def editarReferenciaProjeto(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ref_id = data.get('ref_id')
+            citacao_curta = data.get('citacao_curta')
+            referencia_completa = data.get('referencia_completa')
+            
+            # Substitua 'ReferenciaProjeto' pelo nome exato do seu Modelo de Citações do Projeto
+            from .models import ReferenciaProjeto 
+            ref = ReferenciaProjeto.objects.get(id=ref_id)
+            projeto = ref.projeto
+            
+            # Permissão: Proponente ou Membro da Equipe
+            if request.user == projeto.proponente or projeto.equipe.filter(id=request.user.id).exists():
+                ref.citacao_curta = citacao_curta
+                ref.referencia_completa = referencia_completa
+                ref.save()
+                return JsonResponse({'success': True, 'citacao': citacao_curta, 'completa': referencia_completa})
+            return JsonResponse({'success': False, 'message': 'Acesso negado.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método inválido.'})
+
+@login_required
+def deletarReferenciaProjeto(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ref_id = data.get('ref_id')
+            
+            from .models import ReferenciaProjeto
+            ref = ReferenciaProjeto.objects.get(id=ref_id)
+            projeto = ref.projeto
+            
+            # Permissão: Proponente ou Membro da Equipe
+            if request.user == projeto.proponente or projeto.equipe.filter(id=request.user.id).exists():
+                ref.delete()
+                return JsonResponse({'success': True})
+            return JsonResponse({'success': False, 'message': 'Acesso negado.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método inválido.'})

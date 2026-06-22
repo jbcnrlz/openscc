@@ -3,7 +3,6 @@
 {% block mainContent %}
 <div class="container py-4 mb-5">
     
-    <!-- CABEÇALHO GLOBAL -->
     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
             <h1 class="h3 mb-1 text-dark fw-bold">Painel de Controle</h1>
@@ -17,7 +16,6 @@
     </div>
 
     {% if is_aluno or is_tutor or is_professor %}
-    <!-- NAVEGAÇÃO POR ABAS (Hierarquia: Professor > Tutor > Aluno) -->
     <ul class="nav nav-pills nav-fill mb-4 shadow-sm bg-white rounded border" id="dashboardTabs" role="tablist">
         
         {% if is_professor %}
@@ -46,16 +44,11 @@
         
     </ul>
 
-    <!-- CONTEÚDO DAS ABAS -->
     <div class="tab-content" id="dashboardTabsContent">
         
-        <!-- ========================================== -->
-        <!-- ABA DO PROFESSOR                           -->
-        <!-- ========================================== -->
         {% if is_professor %}
         <div class="tab-pane custom-pane fade {% if is_professor %}show active{% endif %}" id="professor-pane" role="tabpanel">
             
-            <!-- Cards Estatísticos -->
             <div class="row mb-4 g-3">
                 <div class="col-xl-3 col-md-6">
                     <div class="card border-start border-primary border-4 shadow-sm h-100 py-2 border-0">
@@ -91,7 +84,6 @@
                 </div>
             </div>
 
-            <!-- Módulos de Gestão -->
             <div class="row g-4">
                 <div class="col-md-6 col-lg-4">
                     <div class="card feature-card h-100 shadow-sm border-0">
@@ -171,7 +163,6 @@
                     </div>
                 </div>
 
-                <!-- NOVO CARD: PROJETOS E EDITAIS (PD&I) -->
                 <div class="col-md-6 col-lg-4">
                     <div class="card feature-card h-100 shadow-sm border-0">
                         <div class="card-body p-4">
@@ -179,9 +170,10 @@
                                 <div class="feature-icon bg-teal bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-rocket text-teal"></i></div>
                                 <h5 class="card-title mb-0">Projetos & Editais</h5>
                             </div>
-                            <p class="card-text text-muted small">Explore chamadas de fomento e redija propostas com IA.</p>
-                            <div class="mt-3">
-                                <a href="{% url 'mimir:listarEditais' %}" class="btn btn-teal text-white w-100 shadow-sm"><i class="fas fa-search-dollar me-1"></i> Acessar PD&I</a>
+                            <p class="card-text text-muted small">Explore chamadas de fomento e gerencie seus rascunhos.</p>
+                            <div class="mt-3 btn-group w-100 shadow-sm">
+                                <a href="{% url 'mimir:listarEditais' %}" class="btn btn-outline-teal w-50">Editais</a>
+                                <a href="{% url 'mimir:meusProjetos' %}" class="btn btn-teal text-white w-50">Projetos</a>
                             </div>
                         </div>
                     </div>
@@ -191,9 +183,6 @@
         </div>
         {% endif %}
 
-        <!-- ========================================== -->
-        <!-- ABA DO TUTOR                               -->
-        <!-- ========================================== -->
         {% if is_tutor %}
         <div class="tab-pane custom-pane fade {% if is_tutor and not is_professor %}show active{% endif %}" id="tutor-pane" role="tabpanel">
             <h5 class="text-info fw-bold mb-3"><i class="fas fa-chalkboard-teacher me-2"></i> Meus Grupos de Tutoria</h5>
@@ -226,11 +215,48 @@
         </div>
         {% endif %}
 
-        <!-- ========================================== -->
-        <!-- ABA DO ALUNO                               -->
-        <!-- ========================================== -->
         {% if is_aluno %}
         <div class="tab-pane custom-pane fade {% if is_aluno and not is_tutor and not is_professor %}show active{% endif %}" id="aluno-pane" role="tabpanel">
+            
+            <h5 class="text-success fw-bold mb-3"><i class="fas fa-bolt me-2"></i> Acesso Rápido</h5>
+            <div class="row g-4 mb-5">
+                
+                <div class="col-md-6">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-start border-success border-4">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-success bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-file-alt text-success"></i></div>
+                                <h5 class="card-title mb-0 fw-bold text-dark">Minhas Provas</h5>
+                            </div>
+                            <p class="card-text text-muted small">Acesse suas avaliações acadêmicas e realize as provas pendentes configuradas pelos docentes.</p>
+                            <div class="mt-3">
+                                <a href="{% url 'mimir:listarProvasDisponiveis' %}" class="btn btn-outline-success w-100 fw-bold shadow-sm">
+                                    <i class="fas fa-play me-1"></i> Acessar Avaliações
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-start border-info border-4">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-info bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-project-diagram text-info"></i></div>
+                                <h5 class="card-title mb-0 fw-bold text-dark">Projetos de Pesquisa</h5>
+                            </div>
+                            <p class="card-text text-muted small">Acesse as propostas de fomento (PD&I) nas quais você foi convidado como colaborador da equipe.</p>
+                            <div class="mt-3">
+                                <a href="{% url 'mimir:meusProjetos' %}" class="btn btn-outline-info text-info-emphasis w-100 fw-bold shadow-sm">
+                                    <i class="fas fa-folder-open me-1"></i> Acessar Meus Projetos
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
             <h5 class="text-success fw-bold mb-3"><i class="fas fa-users me-2"></i> Minhas Sessões Tutoriais (PBL)</h5>
             <div class="row g-4">
                 {% for grupo in grupos_aluno %}
@@ -276,7 +302,6 @@
     </div>
     {% endif %}
 
-    <!-- SEM ACESSO -->
     {% if not is_professor and not is_tutor and not is_aluno %}
     <div class="text-center py-5 bg-white shadow-sm rounded border mt-4">
         <i class="fas fa-user-lock fa-4x text-muted opacity-25 mb-3"></i>
@@ -296,18 +321,18 @@
     /* Utilitários Extras para botões e fundos */
     .bg-purple { background-color: var(--bs-purple) !important; }
     .bg-indigo { background-color: var(--bs-indigo) !important; }
-    .bg-teal { background-color: var(--bs-teal) !important; } /* Adicionado Teal */
+    .bg-teal { background-color: var(--bs-teal) !important; } 
     
     .text-purple { color: var(--bs-purple) !important; }
     .text-indigo { color: var(--bs-indigo) !important; }
-    .text-teal { color: var(--bs-teal) !important; } /* Adicionado Teal */
+    .text-teal { color: var(--bs-teal) !important; } 
     
     .btn-purple { background-color: var(--bs-purple); border-color: var(--bs-purple); color: white;}
     .btn-outline-purple { color: var(--bs-purple); border-color: var(--bs-purple); }
     .btn-outline-purple:hover { background-color: var(--bs-purple); color: white; }
     .btn-indigo { background-color: var(--bs-indigo); border-color: var(--bs-indigo); color: white;}
     .btn-orange { background-color: var(--bs-orange); border-color: var(--bs-orange); color: white;}
-    .btn-teal { background-color: var(--bs-teal); border-color: var(--bs-teal); color: white;} /* Adicionado Teal */
+    .btn-teal { background-color: var(--bs-teal); border-color: var(--bs-teal); color: white;} 
     
     /* Animações e Cards */
     .hover-elevate { transition: transform 0.2s ease, box-shadow 0.2s ease; }
@@ -325,7 +350,6 @@
     .nav-pills #professor-tab.active { color: #0d6efd; background-color: transparent; border-bottom-color: #0d6efd; }
 </style>
 
-<!-- SCRIPT À PROVA DE FALHAS PARA ALTERNÂNCIA DE ABAS -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const tabs = document.querySelectorAll('.custom-tab');
