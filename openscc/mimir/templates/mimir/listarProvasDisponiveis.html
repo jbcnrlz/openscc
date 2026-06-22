@@ -1,0 +1,122 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css" rel="stylesheet">
+
+<div class="container-fluid py-4 px-lg-5 mb-5 bg-light min-vh-100">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary border-opacity-25">
+        <div>
+            <h1 class="h3 mb-1 text-dark fw-bold">Minhas Provas</h1>
+            <p class="text-muted mb-0">Visualização de avaliações acadêmicas disponíveis e prazos de execução.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-card-checklist text-primary me-2"></i> Avaliações Ativas
+            </h5>
+            <span class="badge bg-primary rounded-pill">{{ aplicacoes_com_status|length }} item(ns)</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-secondary small text-uppercase fw-bold">
+                        <tr>
+                            <th class="ps-4">Título da Avaliação</th>
+                            <th>Assunto</th>
+                            <th>Data Limite</th>
+                            <th>Estrutura</th>
+                            <th class="text-end pe-4">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in aplicacoes_com_status %}
+                        <tr>
+                            <td class="ps-4">
+                                <span class="fw-bold text-dark d-block">{{ item.aplicacao.prova.titulo }}</span>
+                                <small class="text-muted">Aplicação: #APP-{{ item.aplicacao.id }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-secondary border px-2.5 py-1.5">
+                                    {{ item.aplicacao.prova.assunto|default:"Geral" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-dark small">
+                                    <i class="fas fa-calendar-alt text-muted me-1"></i> 
+                                    {{ item.aplicacao.data_limite|date:"d/m/Y H:i"|default:"Sem prazo estipulado" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-muted small">
+                                    <i class="fas fa-layer-group me-1"></i>
+                                    {{ item.aplicacao.prova.perguntas.all|length }} questões
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                {% if item.status == 'pendente' %}
+                                    <button class="btn btn-primary btn-sm px-3 shadow-sm rounded-pill" 
+                                            onclick="confirmarInicioProva('{% url 'mimir:iniciarProva' item.aplicacao.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'iniciar')">
+                                        <i class="fas fa-play me-1" style="font-size: 0.8rem;"></i> Iniciar
+                                    </button>
+                                {% elif item.status == 'em_andamento' %}
+                                    <button class="btn btn-warning btn-sm px-3 shadow-sm rounded-pill text-dark" 
+                                            onclick="confirmarInicioProva('{% url 'mimir:iniciarProva' item.aplicacao.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'continuar')">
+                                        <i class="fas fa-clock me-1" style="font-size: 0.8rem;"></i> Continuar
+                                    </button>
+                                {% else %}
+                                    <span class="badge bg-success px-3 py-2 rounded-pill">
+                                        <i class="fas fa-check-circle me-1"></i> Concluída
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <div class="mb-3"><i class="bi bi-clipboard-x fs-1 text-secondary opacity-50" style="font-size: 2.5rem;"></i></div>
+                                <span class="d-block fw-medium mb-1 fs-5">Nenhuma avaliação pendente encontrada</span>
+                                <small class="text-secondary">Seu professor ainda não liberou novas provas para você.</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+
+<script>
+    function confirmarInicioProva(urlDestino, tituloProva, acao) {
+        
+        let tituloModal = acao === 'iniciar' ? 'Iniciar Avaliação?' : 'Continuar Avaliação?';
+        let textoModal = acao === 'iniciar' 
+            ? `Você está prestes a abrir a prova "${tituloProva}". O cronômetro (caso exista) começará a contar. Certifique-se de estar em uma conexão estável antes de prosseguir.` 
+            : `Você será redirecionado para continuar a prova "${tituloProva}" de onde parou.`;
+            
+        let textoBotao = acao === 'iniciar' ? 'Sim, iniciar prova' : 'Sim, continuar';
+        let corBotao = acao === 'iniciar' ? '#2c5aa0' : '#ffc107'; 
+
+        Swal.fire({
+            title: tituloModal,
+            text: textoModal,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: corBotao,
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: `<span class="${acao === 'continuar' ? 'text-dark' : 'text-white'}">${textoBotao}</span>`,
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Redireciona de forma segura usando a URL construída nativamente pelo Django
+                window.location.href = urlDestino; 
+            }
+        });
+    }
+</script>
+{% endblock %}
