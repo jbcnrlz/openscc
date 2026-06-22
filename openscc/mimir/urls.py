@@ -1,5 +1,4 @@
 from django.urls import path
-from django.contrib.auth import views as auth_views
 
 from . import views
 from .viewsClasses.PerguntasTemplate import PerguntasView
@@ -13,6 +12,7 @@ app_name = 'mimir'
 urlpatterns = [    
      path("",views.dashboard_unificado,name='home'),
      path("",views.dashboard_unificado,name='dashboardProfessor'),
+     path("",views.dashboard_unificado,name='dashboardAluno'),
      path('upload/', views.uploadFile, name='uploadFile'),
      path("gerarPerguntas/",views.generateQuestions,name='gerarPerguntas'),    
      path("removerUploadSource/",views.deleteFile,name='excluirFonte'),
@@ -136,4 +136,8 @@ urlpatterns = [
      path('pdi/projeto/ajax/gerenciar-equipe/', views.gerenciarEquipeProjeto, name='gerenciarEquipeProjeto'),
      path('pdi/projeto/ajax/revisao/adicionar/', views.adicionarComentarioRevisao, name='adicionarComentarioRevisao'),
      path('pdi/projeto/ajax/revisao/resolver/', views.resolverComentarioRevisao, name='resolverComentarioRevisao'),
+     # Módulo PD&I: Gerenciamento do Repositório de Citações
+     path('pdi/projeto/ajax/referencia/adicionar/', views.adicionarReferenciaProjeto, name='adicionarReferenciaProjeto'),
+     path('pdi/projeto/ajax/referencia/editar/', views.editarReferenciaProjeto, name='editarReferenciaProjeto'),  # <-- NOVA ROTA
+     path('pdi/projeto/ajax/referencia/deletar/', views.deletarReferenciaProjeto, name='deletarReferenciaProjeto'),  # <-- NOVA ROTA
 ]
