@@ -297,7 +297,7 @@ PARA A CORREÇÃO DA RESPOSTA DO ALUNO ABAIXO:
 
 # Funções principais convertidas
 def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fontes_info, instrucoesGuia):
-    """Cria guia do tutor usando LangChain"""
+    """Cria guia do tutor usando LangChain com extração limpa de conteúdo"""
     chain = guia_tutor_template | get_llm()
     
     response = chain.invoke({
@@ -310,7 +310,35 @@ def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fonte
         "instrucoesGuia": instrucoesGuia
     })
     
-    return response.content
+    conteudo = response.content
+    
+    # Tratamento estruturado para extrair apenas o Markdown limpo
+    try:
+        # Cenário 1: O LangChain já retornou uma lista nativa de blocos do Python
+        if isinstance(conteudo, list) and len(conteudo) > 0:
+            if isinstance(conteudo[0], dict) and 'text' in conteudo[0]:
+                return conteudo[0]['text']
+                
+        # Cenário 2: O LangChain retornou o Array convertido forçadamente numa String
+        elif isinstance(conteudo, str) and conteudo.strip().startswith('['):
+            try:
+                dados = json.loads(conteudo)
+            except json.JSONDecodeError:
+                # O ast.literal_eval salva quando o log tem aspas simples ('type': 'text')
+                dados = ast.literal_eval(conteudo)
+                
+            if isinstance(dados, list) and len(dados) > 0 and isinstance(dados[0], dict) and 'text' in dados[0]:
+                return dados[0]['text']
+                
+    except Exception as e:
+        import logging
+        logging.error(f"Erro ao limpar retorno do LLM no Guia do Tutor: {e}")
+        
+    # Cenário Fallback: Se já for um texto normal ou se a limpeza falhar, devolve o original
+    if isinstance(conteudo, str):
+        return conteudo
+        
+    return str(conteudo)
 
 def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fontes, instrucoes, parte_original, instrucoes_layout="", user=None):
     """Regera parte usando LangChain"""
