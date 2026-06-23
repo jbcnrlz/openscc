@@ -1,10 +1,13 @@
 from django.contrib import admin
 from django.contrib import messages
-from .models import Edital, DocumentoEdital, CampoTemplate
+from .models import *
 
 # IMPORTANTE: Importe a função diretamente do arquivo onde você a criou 
 # (substitua 'commons.services' pelo local correto caso tenha colocado em outro arquivo)
 from commons.services import processar_edital_business_logic, get_llm
+
+admin.site.register(Assunto)
+admin.site.register(TiposDePergunta)
 
 # ==========================================
 # AÇÕES CUSTOMIZADAS DO ADMIN
