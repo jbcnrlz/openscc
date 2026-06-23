@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Correção de Prova - {{ prova_aluno.aluno.get_full_name|default:prova_aluno.aluno.username }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm 2cm;
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 11pt;
+            color: #333;
+            line-height: 1.5;
+        }
+        .header {
+            border-bottom: 2px solid #2c5aa0;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .header h1 {
+            color: #2c5aa0;
+            margin: 0 0 5px 0;
+            font-size: 20pt;
+        }
+        .header p {
+            margin: 0;
+            color: #555;
+            font-size: 12pt;
+        }
+        table.info-table {
+            width: 100%;
+            margin-bottom: 25px;
+            border-collapse: collapse;
+        }
+        table.info-table td {
+            padding: 5px 0;
+            vertical-align: top;
+        }
+        .nota-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            width: 150px;
+        }
+        .nota-valor {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #198754;
+            display: block;
+        }
+        
+        /* Estilos das Questões */
+        .questao-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            /* Evita que a questão quebre no meio ao mudar de página */
+            page-break-inside: avoid; 
+        }
+        .questao-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .questao-titulo {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #2c5aa0;
+            margin: 0;
+        }
+        .nota-badge {
+            float: right;
+            background-color: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+        .section-title {
+            font-size: 10pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+        
+        /* Caixas de Texto */
+        .box {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 10pt;
+        }
+        .box-enunciado {
+            background-color: #f8f9fa;
+            border-left: 3px solid #6c757d;
+        }
+        .box-aluno {
+            background-color: #e0f7fa;
+            border-left: 3px solid #0dcaf0;
+        }
+        .box-gabarito {
+            background-color: #e8f5e9;
+            border-left: 3px solid #198754;
+        }
+        .box-feedback {
+            background-color: #fff3cd;
+            border-left: 3px solid #ffc107;
+        }
+        .text-muted { color: #6c757d; font-size: 9pt; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Relatório de Correção</h1>
+        <p>{{ prova_aluno.aplicacao_prova.prova.titulo }}</p>
+    </div>
+
+    <table class="info-table">
+        <tr>
+            <td style="width: 70%;">
+                <strong>Aluno:</strong> {{ prova_aluno.aluno.get_full_name|default:prova_aluno.aluno.username }}<br>
+                <strong>Assunto:</strong> {{ prova_aluno.aplicacao_prova.prova.assunto.nome }}<br>
+                <strong>Data de Conclusão:</strong> {{ prova_aluno.data_conclusao|date:"d/m/Y H:i" }}<br>
+                <strong>Status:</strong> {{ prova_aluno.status|title }}
+            </td>
+            <td style="width: 30%;" align="right">
+                <div class="nota-box">
+                    <span style="font-size: 10pt; text-transform: uppercase;">Nota Final</span>
+                    <span class="nota-valor">{{ prova_aluno.nota_final|floatformat:1 }}</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <h3 style="color: #444; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Detalhamento das Questões</h3>
+
+    {% for item in perguntas_com_respostas %}
+    <div class="questao-card">
+        <div class="questao-header">
+            <span class="nota-badge">
+                Nota: {% if item.resposta and item.resposta.nota is not None %}{{ item.resposta.nota|floatformat:1 }}{% else %}0.0{% endif %} 
+                (Peso: {% if item.resposta and item.resposta.peso %}{{ item.resposta.peso }}{% else %}1{% endif %})
+            </span>
+            <h4 class="questao-titulo">Questão {{ forloop.counter }}</h4>
+        </div>
+
+        <div class="section-title" style="color: #6c757d;">Enunciado:</div>
+        <div class="box box-enunciado">
+            {{ item.pergunta.pergunta|linebreaksbr }}
+        </div>
+
+        <div class="section-title" style="color: #0dcaf0;">Resposta do Aluno:</div>
+        <div class="box box-aluno">
+            {% if item.resposta and item.resposta.resposta_texto %}
+                {{ item.resposta.resposta_texto|linebreaksbr }}
+            {% else %}
+                <span class="text-muted">Nenhuma resposta em texto fornecida ou apenas arquivo anexado.</span>
+            {% endif %}
+        </div>
+
+        <div class="section-title" style="color: #198754;">Gabarito Oficial:</div>
+        <div class="box box-gabarito">
+            {{ item.pergunta.gabarito|linebreaksbr }}
+        </div>
+
+        {% if item.resposta and item.resposta.feedback_professor %}
+        <div class="section-title" style="color: #fd7e14;">Feedback / Correção (Prof/IA):</div>
+        <div class="box box-feedback">
+            {{ item.resposta.feedback_professor|linebreaksbr }}
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <p class="text-muted">Não foram encontradas respostas registradas para esta avaliação.</p>
+    {% endfor %}
+
+</body>
+</html>

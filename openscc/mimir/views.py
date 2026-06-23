@@ -3326,3 +3326,54 @@ def deletarReferenciaProjeto(request):
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método inválido.'})
+
+@login_required
+def exportarCorrecaoPDF(request, prova_aluno_id):
+    # 1. Busca a prova com segurança (retorna 404 se não existir)
+    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id)
+    
+    # 2. Trava de Segurança: Só o dono da prova ou um professor podem exportar
+    is_dono = request.user == prova_aluno.aluno
+    is_professor = getattr(request.user, 'isProfessor', False)
+    
+    if not (is_dono or is_professor):
+        return HttpResponse("Acesso negado. Você não tem permissão para visualizar esta prova.", status=403)
+
+    # 3. Lógica para cruzar a Pergunta com a Resposta do Aluno
+    perguntas_com_respostas = []
+    
+    # Pega todas as perguntas da prova
+    todas_perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all()
+    
+    for pergunta in todas_perguntas:
+        # Tenta achar a resposta específica deste aluno para esta pergunta
+        resposta = RespostaAluno.objects.filter(
+            prova_aluno=prova_aluno,
+            pergunta=pergunta
+        ).first()
+        
+        # Monta o dicionário no exato formato que o template HTML espera
+        perguntas_com_respostas.append({
+            'pergunta': pergunta,
+            'resposta': resposta,
+        })
+    
+    # 4. Monta o contexto para o template
+    context = {
+        'prova_aluno': prova_aluno,
+        'perguntas_com_respostas': perguntas_com_respostas,
+    }
+    
+    # 5. Renderiza o HTML limpo
+    html_string = render_to_string('mimir/pdf_template_correcao.html', context)
+    
+    # 6. Converte para PDF
+    html = HTML(string=html_string, base_url=request.build_absolute_uri())
+    pdf_file = html.write_pdf()
+    
+    # 7. Força o download do arquivo no navegador
+    response = HttpResponse(pdf_file, content_type='application/pdf')
+    nome_arquivo = f"Correcao_Prova_{prova_aluno.aluno.username}.pdf"
+    response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
+    
+    return response

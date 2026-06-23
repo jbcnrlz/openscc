@@ -140,4 +140,5 @@ urlpatterns = [
      path('pdi/projeto/ajax/referencia/adicionar/', views.adicionarReferenciaProjeto, name='adicionarReferenciaProjeto'),
      path('pdi/projeto/ajax/referencia/editar/', views.editarReferenciaProjeto, name='editarReferenciaProjeto'),  # <-- NOVA ROTA
      path('pdi/projeto/ajax/referencia/deletar/', views.deletarReferenciaProjeto, name='deletarReferenciaProjeto'),  # <-- NOVA ROTA
+     path('aluno/prova/<int:prova_aluno_id>/exportar-pdf/', views.exportarCorrecaoPDF, name='exportarCorrecaoPDF'),
 ]

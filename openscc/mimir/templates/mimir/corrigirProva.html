@@ -4,15 +4,20 @@
 {% block mainContent %}
 <div class="container py-4">
     <!-- Cabeçalho da Correção -->
-    <div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4">
         <div class="card-header bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h4 class="mb-1">Corrigir Prova</h4>
                     <p class="mb-0">{{ prova_aluno.aplicacao_prova.prova.titulo }}</p>
                 </div>
-                <div class="text-end">
+                <div class="text-end d-flex align-items-center gap-2">
                     <span class="badge bg-light text-dark fs-6">{{ prova_aluno.status|title }}</span>
+                    {% if prova_aluno.status == 'concluida' or prova_aluno.status == 'corrigida' %}
+                    <a href="{% url 'mimir:exportarCorrecaoPDF' prova_aluno.id %}" target="_blank" class="btn btn-sm btn-light text-primary fw-bold shadow-sm" title="Gerar PDF da Correção">
+                        <i class="fas fa-file-pdf me-1"></i> Exportar PDF
+                    </a>
+                    {% endif %}                                        
                 </div>
             </div>
         </div>
