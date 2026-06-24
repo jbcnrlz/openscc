@@ -175,19 +175,6 @@
             {% endif %}
         {% endfor %}
 
-        {% if referencias %}
-        <div class="page-break"></div>
-        <h2 class="text-uppercase border-bottom border-dark pb-2 mb-4" style="font-size: 14pt;">Referências Bibliográficas</h2>
-        
-        <ul style="list-style-type: none; padding-left: 0;">
-            {% for ref in referencias %}
-            <li style="margin-bottom: 18px; text-align: justify; padding-left: 30px; text-indent: -30px;">
-                {{ ref.referencia_completa }}
-            </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-
     </div>
 
     <script>

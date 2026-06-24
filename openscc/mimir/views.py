@@ -3102,7 +3102,7 @@ def exportarProjetoPDF(request, projeto_id):
         })
 
     # 4. Busca as referências em ordem alfabética (Padrão ABNT)
-    referencias = projeto.referencias.all().order_by('referencia_completa')
+    referencias = None
 
     context = {
         'projeto': projeto,
