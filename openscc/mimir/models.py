@@ -229,7 +229,7 @@ class Prova(models.Model):
     descricao = models.TextField(blank=False, null=False)
     dataCriacao = models.DateTimeField(auto_now_add=True)
     dataAtualizacao = models.DateTimeField(auto_now=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE,unique=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     assunto = models.ForeignKey(Assunto, on_delete=models.CASCADE)
     perguntas = models.ManyToManyField(Pergunta)
 
@@ -905,13 +905,36 @@ class RevisaoPares(models.Model):
     concluida_em = models.DateTimeField(null=True, blank=True)
 
 class ReferenciaProjeto(models.Model):
+    # Tipos básicos mapeados do BibTeX
+    TIPO_PUBLICACAO_CHOICES = [
+        ('article', 'Artigo em Periódico (Journal)'),
+        ('inproceedings', 'Anais de Conferência (Conference)'),
+        ('book', 'Livro'),
+        ('misc', 'Outros / Site'),
+    ]
+
     projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='referencias')
-    citacao_curta = models.CharField(max_length=150, help_text="Ex: (SILVA et al., 2026)")
-    referencia_completa = models.TextField(help_text="Referência completa ABNT/APA")
+    
+    # A chave de citação usada no LaTeX (Ex: silva2026). Pode ser gerada automaticamente no `save()`
+    chave_bibtex = models.CharField(max_length=100, blank=True, help_text="Ex: silva2026")
+    
+    # Metadados Estruturados
+    tipo = models.CharField(max_length=20, choices=TIPO_PUBLICACAO_CHOICES, default='article')
+    autores = models.CharField(max_length=500, help_text="Formato: Sobrenome, Nome and Sobrenome, Nome")
+    titulo = models.CharField(max_length=300)
+    ano = models.CharField(max_length=4)
+    revista_evento = models.CharField(max_length=200, blank=True, null=True, verbose_name="Revista ou Nome do Evento")
+    volume = models.CharField(max_length=50, blank=True, null=True)
+    paginas = models.CharField(max_length=50, blank=True, null=True)
+    doi = models.CharField(max_length=100, blank=True, null=True)
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['citacao_curta']
+        ordering = ['autores', 'ano']
+
+    def __str__(self):
+        return f"{self.chave_bibtex} - {self.titulo}"
 
 class ComentarioRevisao(models.Model):
     projeto = models.ForeignKey(Projeto, on_delete=models.CASCADE, related_name='comentarios')

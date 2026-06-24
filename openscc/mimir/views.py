@@ -1,4 +1,4 @@
-import os, json, re
+import os, json, re, bibtexparser
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from .models import *
@@ -1130,7 +1130,7 @@ def meusFeedbacks(request):
 
 @login_required
 @acesso_mimir_requerido
-@grupo_requerido('Professor')
+@grupo_requerido('Especialista')
 def fornecerFeedback(request, feedback_id):
     if request.method == 'GET':
         feedback = get_object_or_404(
@@ -1146,54 +1146,36 @@ def fornecerFeedback(request, feedback_id):
     else:
         feedback = get_object_or_404(FeedbackEspecialista, id=feedback_id)
     
+    # Trava de segurança
     if not request.user == feedback.especialista:
         return HttpResponseForbidden("Você não tem permissão para fornecer feedback para esta solicitação.")
     
+    # Processamento do POST unificado
     if request.method == 'POST':
-        if feedback.tipo == 'pergunta':
-            pergunta_revisada = request.POST.get('pergunta_revisada', '').strip()
-            gabarito_revisado = request.POST.get('gabarito_revisado', '').strip()
-            
-            if not pergunta_revisada or not gabarito_revisado:
-                messages.error(request, 'Por favor, forneça tanto a pergunta revisada quanto o gabarito revisado.')
-            else:
-                comentarios = f"{pergunta_revisada}\n\n---GABARITO---\n\n{gabarito_revisado}"
-                feedback.comentarios = comentarios
-                feedback.status = 'respondido'
-                feedback.respondido_em = timezone.now()
-                feedback.save()
-                messages.success(request, 'Feedback enviado com sucesso!')
-                return redirect('mimir:meusFeedbacks')
+        # O template moderno envia tudo (Problema ou Pergunta) unificado no campo 'comentarios'
+        comentarios = request.POST.get('comentarios', '').strip()
+        
+        if not comentarios:
+            messages.error(request, 'Por favor, forneça suas edições ou comentários no editor.')
         else:
-            comentarios = request.POST.get('comentarios', '').strip()
-            if not comentarios:
-                messages.error(request, 'Por favor, forneça seus comentários.')
-            else:
-                feedback.comentarios = comentarios
-                feedback.status = 'respondido'
-                feedback.respondido_em = timezone.now()
-                feedback.save()
-                messages.success(request, 'Feedback enviado com sucesso!')
-                return redirect('mimir:meusFeedbacks')
+            feedback.comentarios = comentarios
+            feedback.status = 'respondido'
+            feedback.respondido_em = timezone.now()
+            feedback.save()
+            messages.success(request, 'Parecer técnico enviado com sucesso!')
+            return redirect('mimir:meusFeedbacks')
     
+    # Contexto para o GET
     context = { 'feedback': feedback }
     
-    # Se o tipo for problema, mandamos as partes para a view para o especialista ler tudo
+    # Se o tipo for problema, mandamos as partes para o JS montar o texto original
     if feedback.tipo == 'problema' and feedback.problema:
         context['partes'] = feedback.problema.partes.all().order_by('ordem')
-
-    if feedback.tipo == 'pergunta' and feedback.comentarios:
-        if '---GABARITO---' in feedback.comentarios:
-            partes = feedback.comentarios.split('---GABARITO---')
-            context['pergunta_revisada'] = partes[0].strip()
-            context['gabarito_revisado'] = partes[1].strip() if len(partes) > 1 else ''
-        else:
-            context['pergunta_revisada'] = feedback.comentarios
-            context['gabarito_revisado'] = feedback.pergunta.gabarito if feedback.pergunta else ''
-    elif feedback.tipo == 'pergunta':
-        context['pergunta_revisada'] = feedback.pergunta.pergunta if feedback.pergunta else ''
-        context['gabarito_revisado'] = feedback.pergunta.gabarito if feedback.pergunta else ''
     
+    # Nota: Removemos o antigo processamento de GET que quebrava strings e injetava 
+    # as variáveis 'pergunta_revisada' no contexto, pois o novo JavaScript 
+    # lê diretamente de 'feedback.pergunta.pergunta' no Front-End.
+
     return render(request, 'mimir/fornecerFeedback.html', context)
 
 @login_required
@@ -2843,6 +2825,7 @@ def dashboard_unificado(request):
         context['problemas_criados'] = Problema.objects.filter(assunto__user=user).count()
         context['questoes_geradas'] = Pergunta.objects.filter(assunto__user=user).count()
         context['provas_criadas'] = Prova.objects.filter(assunto__user=user).count()
+        context['ultimas_questoes'] = Pergunta.objects.all().order_by('-id')[:5]
         
     # Coleta de dados exclusiva para a Área do TUTOR
     if is_tutor:
@@ -3375,5 +3358,144 @@ def exportarCorrecaoPDF(request, prova_aluno_id):
     response = HttpResponse(pdf_file, content_type='application/pdf')
     nome_arquivo = f"Correcao_Prova_{prova_aluno.aluno.username}.pdf"
     response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
+    
+    return response
+
+@login_required
+def importarBibtexProjeto(request, projeto_id):
+    # 1. Procura o projeto e valida a existência
+    projeto = get_object_or_404(Projeto, id=projeto_id)
+    
+    # 2. Validação de segurança de acesso da equipa
+    if request.user != projeto.proponente and not projeto.equipe.filter(id=request.user.id).exists():
+        return HttpResponseForbidden("Não tem permissão para alterar este projeto.")
+
+    if request.method == 'POST' and request.FILES.get('arquivo_bib'):
+        ficheiro_bib = request.FILES['arquivo_bib']
+        
+        # Garante que o ficheiro tem a extensão correta
+        if not ficheiro_bib.name.endswith('.bib'):
+            messages.error(request, "Por favor, envie um ficheiro válido com a extensão .bib")
+            return redirect('mimir:editarProjeto', projeto_id=projeto.id)
+            
+        try:
+            # Descodifica o fluxo de bytes para string texto puro
+            conteudo_texto = ficheiro_bib.read().decode('utf-8')
+            
+            # Carrega o parser do BibTeX
+            base_dados_bib = bibtexparser.loads(conteudo_texto)
+            
+            referencias_criadas = 0
+            
+            # Dicionário de mapeamento de tipos BibTeX para as opções do Django
+            mapa_tipos = {
+                'article': 'article',
+                'book': 'book',
+                'inproceedings': 'inproceedings',
+                'conference': 'inproceedings',
+                'misc': 'misc',
+                'phdthesis': 'misc',
+                'mastersthesis': 'misc',
+            }
+            
+            for entry in base_dados_bib.entries:
+                chave = entry.get('ID', '').strip()
+                tipo_original = entry.get('ENTRYTYPE', 'misc').lower()
+                
+                # Captura os dados limpando espaços residuais
+                autores = entry.get('author', 'Autor Desconhecido').strip()
+                titulo = entry.get('title', 'Sem Título').strip()
+                ano = entry.get('year', '').strip()[:4]
+                
+                # Identifica o veículo de publicação de acordo com o tipo de entrada
+                revista_evento = entry.get('journal', entry.get('booktitle', entry.get('publisher', '')))
+                
+                volume = entry.get('volume', '')
+                paginas = entry.get('pages', '')
+                doi = entry.get('doi', '')
+                
+                # Evita duplicar referências com a mesma chave dentro do mesmo projeto
+                if not ReferenciaProjeto.objects.filter(projeto=projeto, chave_bibtex=chave).exists():
+                    ReferenciaProjeto.objects.create(
+                        projeto=projeto,
+                        chave_bibtex=chave,
+                        tipo=mapa_tipos.get(tipo_original, 'misc'),
+                        autores=autores,
+                        titulo=titulo,
+                        ano=ano,
+                        revista_evento=revista_evento,
+                        volume=volume,
+                        paginas=paginas,
+                        doi=doi
+                    )
+                    referencias_criadas += 1
+            
+            if referencias_criadas > 0:
+                messages.success(request, f'Sucesso! {referencias_criadas} referências foram importadas do ficheiro BibTeX.')
+            else:
+                messages.info(request, 'Nenhuma referência nova foi adicionada (chaves duplicadas detetadas).')
+                
+        except Exception as e:
+            messages.error(request, f"Erro ao processar o ficheiro estruturado: {str(e)}")
+            
+        return redirect('mimir:editarProjeto', projeto_id=projeto.id)
+        
+    messages.error(request, "Nenhum ficheiro foi carregado.")
+    return redirect('mimir:editarProjeto', projeto_id=projeto.id)
+
+@login_required
+def exportarBibtexProjeto(request, projeto_id):
+    # 1. Procura o projeto e valida a existência
+    projeto = get_object_or_404(Projeto, id=projeto_id)
+    
+    # 2. Validação de segurança para a equipa do projeto
+    if request.user != projeto.proponente and not projeto.equipe.filter(id=request.user.id).exists():
+        return HttpResponseForbidden("Não tem permissão para exportar os dados deste projeto.")
+
+    # 3. Procura as referências já estruturadas
+    referencias = projeto.referencias.all()
+    
+    bibtex_content = "% -----------------------------------------------------\n"
+    bibtex_content += f"% Repositório de Citações do Projeto: {projeto.titulo}\n"
+    bibtex_content += "% Gerado automaticamente pelo Mimir (Formato Estruturado)\n"
+    bibtex_content += "% -----------------------------------------------------\n\n"
+    
+    for ref in referencias:
+        # Utiliza a chave guardada ou gera um fallback seguro caso esteja vazia
+        chave = ref.chave_bibtex.strip() if ref.chave_bibtex else f"ref_{ref.id}"
+        tipo_entrada = ref.tipo if ref.tipo else "misc"
+        
+        # Inicia a entrada BibTeX estruturada (ex: @article{chave,)
+        bibtex_content += f"@{tipo_entrada}{{{chave},\n"
+        bibtex_content += f"  author = {{{ref.autores}}},\n"
+        bibtex_content += f"  title = {{{ref.titulo}}},\n"
+        bibtex_content += f"  year = {{{ref.ano}}},\n"
+        
+        # Mapeia dinamicamente o veículo de publicação conforme o tipo do BibTeX
+        if ref.revista_evento:
+            if tipo_entrada == 'article':
+                bibtex_content += f"  journal = {{{ref.revista_evento}}},\n"
+            elif tipo_entrada == 'inproceedings':
+                bibtex_content += f"  booktitle = {{{ref.revista_evento}}},\n"
+            else:
+                bibtex_content += f"  publisher = {{{ref.revista_evento}}},\n"
+                
+        # Adiciona os campos opcionais apenas se estiverem preenchidos no banco
+        if ref.volume:
+            bibtex_content += f"  volume = {{{ref.volume}}},\n"
+        if ref.paginas:
+            bibtex_content += f"  pages = {{{ref.paginas}}},\n"
+        if ref.doi:
+            bibtex_content += f"  doi = {{{ref.doi}}},\n"
+            
+        # Fecha o bloco da referência
+        bibtex_content += "}\n\n"
+
+    # 4. Configuração da resposta HTTP para download de ficheiro de dados
+    response = HttpResponse(bibtex_content, content_type='application/x-bibtex')
+    
+    # Normaliza o nome do ficheiro .bib removendo caracteres especiais
+    nome_ficheiro = re.sub(r'\W+', '_', projeto.titulo.lower()).strip('_')
+    response['Content-Disposition'] = f'attachment; filename="referencias_{nome_ficheiro}.bib"'
     
     return response
