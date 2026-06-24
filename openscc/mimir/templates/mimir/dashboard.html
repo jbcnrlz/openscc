@@ -85,8 +85,9 @@
             </div>
 
             <div class="row g-4">
+                
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-purple border-4">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="feature-icon bg-purple bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-clipboard-list text-purple"></i></div>
@@ -102,7 +103,7 @@
                 </div>
 
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-info border-4">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="feature-icon bg-info bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-tasks text-info"></i></div>
@@ -118,23 +119,61 @@
                 </div>
 
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
-                        <div class="card-body p-4">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-primary border-4">
+                        <div class="card-body p-4 d-flex flex-column">
                             <div class="d-flex align-items-center mb-3">
-                                <div class="feature-icon bg-primary bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-database text-primary"></i></div>
-                                <h5 class="card-title mb-0">Base de Dados</h5>
+                                <div class="feature-icon bg-primary bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-book text-primary fs-4"></i></div>
+                                <div>
+                                    <h5 class="card-title mb-0 fw-bold text-dark">Base de Fontes</h5>
+                                    <span class="badge bg-light text-primary border border-primary-subtle">{{ fontes_ativas }} documentos</span>
+                                </div>
                             </div>
-                            <p class="card-text text-muted small">Alimente a IA com Fontes, Temas, Vínculos e Perguntas.</p>
-                            <div class="mt-3 btn-group w-100 shadow-sm">
-                                <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-outline-primary">Fontes</a>
-                                <a href="{% url 'mimir:visualizarPerguntas'%}" class="btn btn-primary text-white">Questões</a>
+                            <p class="card-text text-muted small mb-4">
+                                Gerencie os documentos e textos base utilizados para alimentar o contexto e embasar a Inteligência Artificial.
+                            </p>
+                            <div class="mt-auto">
+                                <a href="{% url 'mimir:visualizarFontes'%}" class="btn btn-outline-primary w-100 shadow-sm fw-bold">
+                                    <i class="fas fa-file-alt me-1"></i> Acessar Fontes
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-warning border-4">
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="feature-icon bg-warning bg-opacity-10 p-3 rounded-circle me-3">
+                                    <i class="fas fa-question-circle text-warning fs-4"></i>
+                                </div>
+                                <div>
+                                    <h5 class="card-title mb-0 fw-bold text-dark">Banco de Questões</h5>
+                                    <span class="badge bg-light text-warning-emphasis border border-warning-subtle">{{ questoes_geradas }} cadastradas</span>
+                                </div>
+                            </div>
+                            <p class="card-text text-muted small mb-4 text-justify">
+                                Gerencie o acervo de questões. Crie avaliações manualmente ou utilize a IA para extrair perguntas complexas das suas fontes.
+                            </p>
+                            <div class="mt-auto">
+                                <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-warning text-dark fw-bold w-100 shadow-sm mb-2">
+                                    <i class="fas fa-database me-1"></i> Explorar Banco
+                                </a>
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-outline-warning text-dark w-50 fw-bold shadow-sm" title="Gerar com Inteligência Artificial">
+                                        <i class="fas fa-magic me-1"></i> Gerar IA
+                                    </a>
+                                    <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-outline-secondary w-50 fw-bold shadow-sm" title="Escrever questão manualmente">
+                                        <i class="fas fa-pen me-1"></i> Manual
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-indigo border-4">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="feature-icon bg-indigo bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-microchip text-indigo"></i></div>
@@ -149,7 +188,7 @@
                 </div>
                 
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-orange border-4">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="feature-icon bg-orange bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-comments text-orange"></i></div>
@@ -164,7 +203,7 @@
                 </div>
 
                 <div class="col-md-6 col-lg-4">
-                    <div class="card feature-card h-100 shadow-sm border-0">
+                    <div class="card feature-card h-100 shadow-sm border-0 border-top border-teal border-4">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="feature-icon bg-teal bg-opacity-10 p-3 rounded-circle me-3"><i class="fas fa-rocket text-teal"></i></div>

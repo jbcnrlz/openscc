@@ -5,6 +5,7 @@
 
 <div class="container-fluid py-4 px-lg-5 mb-5 bg-light min-vh-100">
     
+    <!-- CABEÇALHO DA TELA -->
     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary border-opacity-25">
         <div>
             <h1 class="h3 mb-1 text-dark fw-bold">{{ projeto.titulo }}</h1>
@@ -32,6 +33,7 @@
     </div>
 
     <div class="row g-4">
+        <!-- LADO ESQUERDO: REDAÇÃO DA PROPOSTA (TINYMCE) -->
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white border-bottom py-3">
@@ -86,9 +88,11 @@
             </div>
         </div>
 
+        <!-- LADO DIREITO: PAINEL LATERAL DE FERRAMENTAS -->
         <div class="col-lg-4">
             <div class="position-sticky" style="top: 20px;">
                 
+                <!-- COMENTÁRIOS DE REVISÃO -->
                 <div class="card shadow-sm border-0 border-top border-warning border-4 mb-4">
                     <div class="card-header bg-white border-bottom py-3">
                         <h6 class="mb-0 fw-bold text-warning-emphasis"><i class="fas fa-comments me-2"></i> Revisão por Pares</h6>
@@ -125,21 +129,43 @@
                     </div>
                 </div>
 
+                <!-- REPOSITÓRIO ESTRUTURADO DE CITAÇÕES -->
                 <div class="card shadow-sm border-0 border-top border-info border-4 mb-4">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 fw-bold text-info"><i class="fas fa-bookmark me-2"></i> Repositório de Citações</h6>
-                        <button class="btn btn-sm btn-outline-info" onclick="abrirModalNovaReferencia()"><i class="fas fa-plus"></i></button>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'mimir:exportarBibtexProjeto' projeto.id %}" class="btn btn-sm btn-outline-secondary" title="Exportar .bib para LaTeX">
+                                <i class="fas fa-file-download"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-purple" data-bs-toggle="modal" data-bs-target="#modalImportarBibtex" title="Importar arquivo .bib">
+                                <i class="fas fa-file-upload"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info text-white shadow-sm" onclick="abrirModalNovaReferencia()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body p-0" style="max-height: 220px; overflow-y: auto;">
+                    <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
                         <ul class="list-group list-group-flush small" id="listaReferenciasUI">
                             {% for ref in referencias %}
-                            <li class="list-group-item px-3 py-2 border-bottom d-flex justify-content-between align-items-start" id="ref_box_{{ ref.id }}">
-                                <div class="w-75">
-                                    <strong class="d-block text-dark ref-citacao-text">{{ ref.citacao_curta }}</strong>
-                                    <span class="text-muted text-truncate d-block ref-completa-text" style="max-width: 100%;" title="{{ ref.referencia_completa }}">{{ ref.referencia_completa }}</span>
+                            <li class="list-group-item px-3 py-3 border-bottom hover-elevate" id="ref_box_{{ ref.id }}">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <span class="badge bg-dark font-monospace shadow-sm ref-chave-text" style="font-size: 0.65rem;">
+                                        <i class="fas fa-key text-warning me-1"></i>{{ ref.chave_bibtex|default:"ref" }}
+                                    </span>
+                                    <span class="badge border border-secondary text-secondary ref-tipo-text" style="font-size: 0.65rem;">{{ ref.get_tipo_display|default:ref.tipo }}</span>
                                 </div>
-                                <div class="d-flex gap-2 mt-1">
-                                    <button class="btn btn-link text-primary p-0" onclick="prepararEdicaoReferencia('{{ ref.id }}', '{{ ref.citacao_curta|escapejs }}', '{{ ref.referencia_completa|escapejs }}')" title="Editar">
+                                <div class="mb-1">
+                                    <p class="mb-0 text-dark ref-completa-text" style="line-height: 1.4; text-align: justify; font-size: 0.8rem;">
+                                        <span class="fw-bold">{{ ref.autores|upper }}.</span> 
+                                        <strong>{{ ref.titulo }}.</strong> 
+                                        {% if ref.revista_evento %}<span class="fst-italic">{{ ref.revista_evento }}</span>, {% endif %}
+                                        {{ ref.ano }}.
+                                    </p>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2 mt-1">
+                                    <button class="btn btn-link text-primary p-0 btn-editar-ref" 
+                                            onclick="prepararEdicaoReferencia('{{ ref.id }}', '{{ ref.chave_bibtex|escapejs }}', '{{ ref.tipo|escapejs }}', '{{ ref.autores|escapejs }}', '{{ ref.titulo|escapejs }}', '{{ ref.ano|escapejs }}', '{{ ref.revista_evento|escapejs }}', '{{ ref.volume|escapejs }}', '{{ ref.paginas|escapejs }}', '{{ ref.doi|escapejs }}')" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-link text-danger p-0" onclick="deletarReferencia('{{ ref.id }}')" title="Excluir">
@@ -148,12 +174,16 @@
                                 </div>
                             </li>
                             {% empty %}
-                            <li class="list-group-item text-muted text-center p-3 fst-italic" id="emptyReferencias">Nenhuma referência cadastrada.</li>
+                            <li class="list-group-item text-muted text-center p-4 fst-italic" id="emptyReferencias">
+                                <i class="fas fa-books fa-2x text-secondary opacity-25 mb-2 d-block"></i>
+                                Nenhuma fonte bibliográfica importada.
+                            </li>
                             {% endfor %}
                         </ul>
                     </div>
                 </div>
 
+                <!-- RESUMO DO EDITAL -->
                 <div class="card shadow-sm border-0 border-top border-purple border-4 mb-4">
                     <div class="card-header bg-white border-bottom py-3">
                         <h6 class="mb-0 fw-bold text-purple"><i class="fas fa-book-reader me-2"></i> Guia Rápido do Edital</h6>
@@ -181,6 +211,157 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- SEÇÃO DE MODAIS DO SISTEMA                 -->
+<!-- ========================================== -->
+
+<!-- Modal: Inserir Fórmula Matemática -->
+<div class="modal fade" id="modalFormula" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="fas fa-square-root-alt text-purple me-2"></i> Editor de Equações (LaTeX)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-bold text-dark small mb-0">Código da Fórmula</label>
+                        <a href="https://editor.codecogs.com/" target="_blank" class="text-decoration-none small text-info"><i class="fas fa-external-link-alt me-1"></i>Gerador Visual</a>
+                    </div>
+                    <textarea id="inputLatex" class="form-control font-monospace bg-light" rows="3" placeholder="Ex: E = mc^2 &#10;Ou: \sum_{i=1}^{n} x_i" oninput="atualizarPreviewFormula()"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark small">Pré-visualização ao vivo</label>
+                    <div id="previewFormula" class="p-3 bg-white border rounded d-flex align-items-center justify-content-center text-dark" style="min-height: 80px; font-size: 1.2rem; overflow-x: auto;">
+                        <span class="text-muted small fst-italic">A fórmula aparecerá aqui...</span>
+                    </div>
+                </div>
+                <div class="alert alert-purple bg-purple bg-opacity-10 border-purple-subtle border small mb-0">
+                    <i class="fas fa-check-circle text-purple me-1"></i> A equação será compilada nativamente quando o PDF for gerado.
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-purple text-white fw-bold shadow-sm" onclick="inserirFormulaEditor()">
+                    <i class="fas fa-plus me-1"></i> Inserir no Texto
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Importar BibTeX -->
+<div class="modal fade" id="modalImportarBibtex" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-file-import text-purple me-2"></i> Importar Biblioteca (.bib)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'mimir:importarBibtexProjeto' projeto.id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">Carregue um arquivo exportado do Zotero, Mendeley ou Google Scholar para popular o repositório deste projeto.</p>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-dark small">Selecione o arquivo do seu computador</label>
+                        <input class="form-control" type="file" name="arquivo_bib" accept=".bib" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-purple text-white fw-bold shadow-sm">Iniciar Importação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Adicionar Referência Manual Estruturada -->
+<div class="modal fade" id="modalNovaReferencia" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark" id="tituloModalReferencia"><i class="fas fa-plus-circle text-info me-2"></i> Cadastrar Fonte Bibliográfica</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 mimir-form">
+                <input type="hidden" id="inputReferenciaId" value="">
+                
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-dark small">Chave de Citação *</label>
+                        <input type="text" id="inputChaveBibtex" class="form-control" placeholder="Ex: silva2026">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold text-dark small">Tipo de Publicação *</label>
+                        <select id="inputTipoRef" class="form-select">
+                            <option value="article">Artigo em Periódico (Journal)</option>
+                            <option value="inproceedings">Anais de Conferência (Conference)</option>
+                            <option value="book">Livro</option>
+                            <option value="misc">Outros / Site / Tese</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark small">Autores *</label>
+                        <input type="text" id="inputAutores" class="form-control" placeholder="Formato: Silva, J. B. and Sousa, Maria">
+                    </div>
+                    
+                    <div class="col-md-10">
+                        <label class="form-label fw-bold text-dark small">Título da Obra *</label>
+                        <input type="text" id="inputTituloRef" class="form-control" placeholder="Título completo do artigo ou livro">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-dark small">Ano *</label>
+                        <input type="text" id="inputAno" class="form-control" placeholder="Ex: 2026">
+                    </div>
+                    
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark small">Revista ou Nome do Evento</label>
+                        <input type="text" id="inputRevista" class="form-control" placeholder="Ex: Revista Brasileira de Informática na Educação">
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-dark small">Volume/Edição</label>
+                        <input type="text" id="inputVolume" class="form-control" placeholder="Ex: 12(3)">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-dark small">Páginas</label>
+                        <input type="text" id="inputPaginas" class="form-control" placeholder="Ex: 120-135">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-dark small">DOI ou Link</label>
+                        <input type="text" id="inputDoi" class="form-control" placeholder="Ex: 10.1234/rbie.v20">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info text-white fw-bold shadow-sm" onclick="salvarReferencia()">Salvar no Repositório</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Citar Texto no TinyMCE -->
+<div class="modal fade" id="modalCitarTexto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-bookmark text-info me-2"></i> Inserir Citação no Texto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush" id="listaCitarModal"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Adicionar Revisão -->
 <div class="modal fade" id="modalNovoComentario" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">
@@ -191,12 +372,10 @@
             <div class="modal-body">
                 <input type="hidden" id="inputComentarioCampoId">
                 <input type="hidden" id="inputComentarioMarkerId">
-                
                 <div class="mb-3">
                     <label class="form-label fw-bold small text-secondary">Trecho Selecionado</label>
                     <blockquote class="border-start border-3 border-warning bg-light p-2 mb-1 text-muted small fst-italic" id="displayTrechoSelecionado"></blockquote>
                 </div>
-                
                 <div class="mb-3">
                     <label class="form-label fw-bold">Sua Orientação / Comentário</label>
                     <textarea id="inputTextoComentario" class="form-control" rows="4" placeholder="Escreva a sua sugestão de melhoria ou correção para este trecho..."></textarea>
@@ -207,6 +386,31 @@
     </div>
 </div>
 
+<!-- Modal: Bibliografia Gerada -->
+<div class="modal fade" id="modalBiblioGerada" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-bottom-0">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-list-ol text-success me-2"></i> Referências Utilizadas no Texto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success bg-success bg-opacity-10 border-0 small mb-4">O sistema compilou apenas as referências que possuem citações ativas inseridas no corpo do documento.</div>
+                <div id="biblioGeradaContent" class="p-4 bg-white border rounded shadow-sm" style="font-family: 'Times New Roman', serif; font-size: 1.1rem; line-height: 1.6;"></div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-primary shadow-sm" onclick="copiarBibliografia()"><i class="fas fa-copy me-1"></i> Copiar Bibliografia</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: IA Copiloto Spinner -->
+<div class="modal fade" id="modalIA" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow"><div class="modal-body text-center p-5"><div class="spinner-border text-purple mb-3" style="width: 3rem; height: 3rem;" role="status"></div><h5 class="fw-bold text-dark">Processando com IA...</h5><p class="text-muted small mb-0">Cruzando dados globais do projeto para garantir coerência metodológica e ortográfica.</p></div></div></div>
+</div>
+
+<!-- Modal: Gerenciar Equipe -->
 <div class="modal fade" id="modalEquipe" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content border-0 shadow">
@@ -223,7 +427,6 @@
                     </div>
                     <div id="resultadosBuscaUsuarios" class="list-group position-absolute w-100 shadow mt-1 d-none" style="z-index: 1050; max-height: 200px; overflow-y: auto;"></div>
                 </div>
-                
                 <h6 class="fw-bold border-bottom pb-2 mb-3">Membros Atuais</h6>
                 <ul class="list-group list-group-flush" id="listaMembrosEquipe">
                     <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
@@ -233,22 +436,11 @@
                         </div>
                         <span class="badge bg-warning text-dark"><i class="fas fa-crown me-1"></i> Proponente</span>
                     </li>
-                    
                     {% for membro in projeto.equipe.all %}
                     <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2" id="membro_{{ membro.id }}">
-                        <div>
-                            <span class="fw-bold text-dark d-block">{{ membro.get_full_name|default:membro.username }}</span>
-                            <small class="text-muted">{{ membro.email }}</small>
-                        </div>
+                        <div><span class="fw-bold text-dark d-block">{{ membro.get_full_name|default:membro.username }}</span><small class="text-muted">{{ membro.email }}</small></div>
                         <div class="d-flex align-items-center gap-2">
-                            {% if membro.isProfessor %}
-                            <span class="badge bg-success" style="font-size: 0.75rem;">Professor</span>
-                            {% elif membro.isAluno %}
-                            <span class="badge bg-info text-dark" style="font-size: 0.75rem;">Aluno</span>
-                            {% else %}
-                            <span class="badge bg-secondary" style="font-size: 0.75rem;">Pesquisador</span>
-                            {% endif %}
-                            
+                            {% if membro.isProfessor %}<span class="badge bg-success" style="font-size: 0.75rem;">Professor</span>{% elif membro.isAluno %}<span class="badge bg-info text-dark" style="font-size: 0.75rem;">Aluno</span>{% else %}<span class="badge bg-secondary" style="font-size: 0.75rem;">Pesquisador</span>{% endif %}
                             <button class="btn btn-sm btn-outline-danger" onclick="gerenciarMembro({{ membro.id }}, 'remover')">Remover</button>
                         </div>
                     </li>
@@ -261,76 +453,9 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalNovaReferencia" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-dark" id="tituloModalReferencia"><i class="fas fa-plus-circle text-info me-2"></i> Cadastrar Fonte Bibliográfica</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="inputReferenciaId" value="">
-                
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Citação Curta (Tags de texto)</label>
-                    <input type="text" id="inputCitacaoCurta" class="form-control" placeholder="Ex: (SILVA, 2026)">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Referência Completa (Normas ABNT)</label>
-                    <textarea id="inputReferenciaCompleta" class="form-control" rows="4" placeholder="Ex: SILVA, J. B. Implementação de Sistemas..."></textarea>
-                </div>
-                <button type="button" class="btn btn-info text-white w-100 fw-bold" id="btnSalvarReferencia" onclick="salvarReferencia()">Salvar no Repositório</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalCitarTexto" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-bookmark text-info me-2"></i> Inserir Citação no Texto</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="list-group list-group-flush" id="listaCitarModal"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalBiblioGerada" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light border-bottom-0">
-                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-list-ol text-success me-2"></i> Referências Utilizadas no Texto</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-success bg-success bg-opacity-10 border-0 small mb-4">
-                    O sistema compilou apenas as referências que possuem citações ativas inseridas no corpo do documento.
-                </div>
-                <div id="biblioGeradaContent" class="p-4 bg-white border rounded shadow-sm" style="font-family: 'Times New Roman', serif; font-size: 1.1rem; line-height: 1.6;"></div>
-            </div>
-            <div class="modal-footer bg-light border-0">
-                <button type="button" class="btn btn-primary shadow-sm" onclick="copiarBibliografia()"><i class="fas fa-copy me-1"></i> Copiar Bibliografia</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalIA" data-bs-backdrop="static" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-body text-center p-5">
-                <div class="spinner-border text-purple mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                <h5 class="fw-bold text-dark">Processando com IA...</h5>
-                <p class="text-muted small mb-0">Cruzando dados globais do projeto para garantir coerência metodológica e ortográfica.</p>
-            </div>
-        </div>
-    </div>
-</div>
-
+<!-- ========================================== -->
+<!-- CSS E SCRIPTS                              -->
+<!-- ========================================== -->
 <style>
     :root { --bs-purple: #6f42c1; }
     .text-purple { color: var(--bs-purple) !important; }
@@ -340,64 +465,118 @@
     .tox-tinymce { border: none !important; }
     .tox .mimir-citacao { background-color: #e9ecef; color: #0dcaf0; font-weight: bold; padding: 2px 6px; border-radius: 4px; cursor: pointer; user-select: none; }
     .revisao-highlight { background-color: #ffeeba; border-bottom: 2px solid #ffc107; display: inline; cursor: pointer;}
+    .hover-elevate { transition: background-color 0.2s; }
+    .hover-elevate:hover { background-color: #f8f9fa !important; }
+    
+    .mimir-form input[type="text"], .mimir-form select {
+        display: block; width: 100%; padding: 0.5rem 0.75rem; font-size: 0.95rem; line-height: 1.5; color: #212529; background-color: #fff; border: 1px solid #ced4da; border-radius: 0.375rem; transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    }
+    .mimir-form input:focus, .mimir-form select:focus { border-color: #0dcaf0; outline: 0; box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js"></script>
 
+<!-- MOTOR MATHJAX PARA FÓRMULAS MATEMÁTICAS -->
 <script>
-// Variáveis Globais de Sincronização
+    window.MathJax = {
+        tex: { 
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]']],
+            processEscapes: true 
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        }
+    };
+</script>
+<script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>
+// ==========================================
+// FORMATAÇÃO ABNT E ESTRUTURA DE DADOS
+// ==========================================
+function formatarCitacaoABNT(autores_str, ano) {
+    if (!autores_str) return `(AUTOR, ${ano || 's.d.'})`;
+    let listaAutores = autores_str.split(/\s+and\s+|;/).map(a => a.trim()).filter(a => a !== '');
+    
+    function extrairSobrenome(nomeCompleto) {
+        if (nomeCompleto.includes(',')) {
+            return nomeCompleto.split(',')[0].trim().toUpperCase();
+        } else {
+            let partes = nomeCompleto.split(' ');
+            return partes[partes.length - 1].trim().toUpperCase();
+        }
+    }
+    
+    if (listaAutores.length === 1) { return `(${extrairSobrenome(listaAutores[0])}, ${ano})`; } 
+    else if (listaAutores.length === 2) { return `(${extrairSobrenome(listaAutores[0])}; ${extrairSobrenome(listaAutores[1])}, ${ano})`; } 
+    else { return `(${extrairSobrenome(listaAutores[0])} et al., ${ano})`; }
+}
+
 let referenciasProjeto = [
     {% for ref in referencias %}
-    { id: "{{ ref.id }}", citacao: "{{ ref.citacao_curta|escapejs }}", completa: "{{ ref.referencia_completa|escapejs }}" },
+    { 
+        id: "{{ ref.id }}", 
+        citacao: formatarCitacaoABNT("{{ ref.autores|escapejs }}", "{{ ref.ano|escapejs }}"), 
+        completa: "{{ ref.autores|escapejs|upper }}. {{ ref.titulo|escapejs }}. {% if ref.revista_evento %}{{ ref.revista_evento|escapejs }}, {% endif %}{{ ref.ano|escapejs }}." 
+    },
     {% endfor %}
 ];
+
+// Variáveis Globais
 let editorAtualParaCitacao = null; 
+let editorAtualParaFormula = null;
 let modalCitar = null; 
 let modalComentario = null;
+let modalFormula = null;
 let trechoSelecionadoGlobal = '';
 let editorComentarioGlobal = null;
 
-const swalMimir = Swal.mixin({
-    confirmButtonColor: '#6f42c1',
-    cancelButtonColor: '#6c757d'
-});
+const swalMimir = Swal.mixin({ confirmButtonColor: '#6f42c1', cancelButtonColor: '#6c757d' });
 
 document.addEventListener('DOMContentLoaded', function() {
     modalCitar = new bootstrap.Modal(document.getElementById('modalCitarTexto'));
     modalComentario = new bootstrap.Modal(document.getElementById('modalNovoComentario'));
+    modalFormula = new bootstrap.Modal(document.getElementById('modalFormula'));
     let timeouts_salvamento = {};
 
-    // 1. INICIALIZAÇÃO TINYMCE
+    // ==========================================
+    // 1. INICIALIZAÇÃO TINYMCE (COM MATHJAX)
+    // ==========================================
     tinymce.init({
         selector: '.tinymce-editor',
         plugins: 'table image link lists advlist fullscreen',
-        toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright justify | bullist numlist outdent indent | table image link citar_btn revisar_btn | fullscreen',
-        menubar: false,
-        branding: false,
-        statusbar: false,
-        paste_data_images: true, 
-        content_style: `
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; line-height: 1.5; } 
-            .mimir-citacao { background-color: #cff4fc; color: #055160; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 0.25rem; border: 1px solid #b6effb; display: inline-block; } 
-            .revisao-highlight { background-color: #ffeeba; border-bottom: 2px solid #ffc107; display: inline; }
-        `,
+        toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright justify | bullist numlist outdent indent | table image link citar_btn revisar_btn formula_btn | fullscreen',
+        menubar: false, branding: false, statusbar: false, paste_data_images: true, 
+        content_style: `body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; line-height: 1.5; text-align: justify; } .mimir-citacao { background-color: #cff4fc; color: #055160; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 0.25rem; border: 1px solid #b6effb; display: inline-block; cursor: pointer; } .revisao-highlight { background-color: #ffeeba; border-bottom: 2px solid #ffc107; display: inline; cursor: pointer;} .math-tex { cursor: pointer; }`,
+        
         setup: function (editor) {
-            editor.ui.registry.addButton('citar_btn', { icon: 'bookmark', tooltip: 'Inserir Citação', onAction: function (_) { abrirModalCitar(editor); } });
+            editor.ui.registry.addButton('citar_btn', { icon: 'bookmark', tooltip: 'Inserir Citação Múltipla/ABNT', onAction: function (_) { abrirModalCitar(editor); } });
             editor.ui.registry.addButton('revisar_btn', { icon: 'comment-add', tooltip: 'Comentar Trecho Selecionado', onAction: function (_) { prepararComentario(editor); } });
+            editor.ui.registry.addButton('formula_btn', { icon: 'superscript', tooltip: 'Inserir Equação Matemática', onAction: function (_) { editorAtualParaFormula = editor; document.getElementById('inputLatex').value = ''; document.getElementById('previewFormula').innerHTML = '<span class="text-muted small fst-italic">A fórmula aparecerá aqui...</span>'; modalFormula.show(); } });
+
+            // Injeta o MathJax no iframe do TinyMCE
+            editor.on('init', function () {
+                const doc = editor.getDoc();
+                const configScript = doc.createElement('script');
+                configScript.text = `window.MathJax = { tex: { inlineMath: [['\\\\(', '\\\\)'], ['$', '$']] }, startup: { ready: () => { MathJax.startup.defaultReady(); MathJax.typesetPromise(); } } };`;
+                doc.head.appendChild(configScript);
+                const mathjaxScript = doc.createElement('script');
+                mathjaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+                mathjaxScript.async = true;
+                doc.head.appendChild(mathjaxScript);
+            });
 
             editor.on('Change KeyUp', function (e) {
                 const campoId = editor.targetElm.dataset.campoId;
                 clearTimeout(timeouts_salvamento[campoId]);
                 const statusEl = document.getElementById('status_' + campoId);
-                statusEl.classList.remove('d-none', 'text-success'); 
-                statusEl.classList.add('text-muted');
+                statusEl.classList.remove('d-none', 'text-success'); statusEl.classList.add('text-muted');
                 statusEl.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> Salvando rascunho...';
 
                 timeouts_salvamento[campoId] = setTimeout(() => {
                     fetch("{% url 'mimir:salvarCampoProjeto' %}", {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                         body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, valor: editor.getContent() })
                     }).then(r => r.json()).then(data => {
                         if(data.success) {
@@ -406,325 +585,249 @@ document.addEventListener('DOMContentLoaded', function() {
                             setTimeout(() => statusEl.classList.add('d-none'), 3000);
                         }
                     });
+                    
+                    // Renderiza a matemática nova
+                    const win = editor.getWin();
+                    if (win && win.MathJax) { win.MathJax.typesetPromise().catch(err => console.log(err)); }
                 }, 1200); 
+            });
+            
+            // Abre o modal ao clicar em uma citação existente
+            editor.on('click', function(e) {
+                if (e.target.nodeName === 'SPAN' && e.target.classList.contains('mimir-citacao')) {
+                    editor.selection.select(e.target);
+                    abrirModalCitar(editor);
+                }
             });
         }
     });
 
-    // 2. IA
+    // ==========================================
+    // 2. IA E EQUIPE
+    // ==========================================
     const modalIA = new bootstrap.Modal(document.getElementById('modalIA'));
     document.querySelectorAll('.btn-copiloto').forEach(btn => {
         btn.addEventListener('click', function() {
-            const campoId = this.dataset.campoId;
-            const editor = tinymce.get('campo_' + campoId);
-            const conteudo_atual_texto = editor.getContent({ format: 'text' });
-            
+            const campoId = this.dataset.campoId; const editor = tinymce.get('campo_' + campoId); const conteudo = editor.getContent({ format: 'text' });
             modalIA.show();
-            fetch("{% url 'mimir:copilotoCampo' %}", {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, conteudo_atual: conteudo_atual_texto })
+            fetch("{% url 'mimir:copilotoCampo' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, conteudo_atual: conteudo })
             }).then(r => r.json()).then(data => {
                 modalIA.hide();
                 if(data.success) {
-                    if(conteudo_atual_texto.trim() !== '') {
-                        swalMimir.fire({ title: 'Substituir texto?', text: 'Deseja substituir a sua versão atual pela sugestão gerada pela IA?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sim, substituir', cancelButtonText: 'Cancelar'
-                        }).then((result) => { if (result.isConfirmed) { editor.setContent(data.sugestao); editor.fire('Change'); } });
-                    } else { editor.setContent(data.sugestao); editor.fire('Change'); }
+                    if(conteudo.trim() !== '') { swalMimir.fire({ title: 'Substituir texto?', text: 'Deseja substituir a versão atual pela sugestão da IA?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sim', cancelButtonText: 'Não' }).then((result) => { if (result.isConfirmed) { editor.setContent(data.sugestao); editor.fire('Change'); } }); } 
+                    else { editor.setContent(data.sugestao); editor.fire('Change'); }
                 } else { swalMimir.fire('Erro na IA', data.message, 'error'); }
-            }).catch(() => { modalIA.hide(); swalMimir.fire('Erro', 'Erro de comunicação com o servidor da IA.', 'error'); });
+            }).catch(() => { modalIA.hide(); swalMimir.fire('Erro', 'Falha na IA.', 'error'); });
         });
     });
 
-    // 3. BUSCA DE EQUIPE
-    const inputBusca = document.getElementById('inputBuscarUsuario');
-    const boxResultados = document.getElementById('resultadosBuscaUsuarios');
-    let timeoutBuscaUser = null;
-
+    const inputBusca = document.getElementById('inputBuscarUsuario'); const boxResultados = document.getElementById('resultadosBuscaUsuarios'); let timeoutBuscaUser = null;
     if(inputBusca) {
         inputBusca.addEventListener('input', function() {
-            clearTimeout(timeoutBuscaUser);
-            const termo = this.value;
-            if (termo.length < 3) { boxResultados.classList.add('d-none'); return; }
-
+            clearTimeout(timeoutBuscaUser); const termo = this.value; if (termo.length < 3) { boxResultados.classList.add('d-none'); return; }
             timeoutBuscaUser = setTimeout(() => {
-                fetch(`{% url 'mimir:buscarUsuariosAjax' %}?q=${encodeURIComponent(termo)}`)
-                .then(async response => {
-                    if (!response.ok) { const err = await response.json(); throw new Error(err.erro_interno || 'Erro interno'); }
-                    return response.json();
-                })
+                fetch(`{% url 'mimir:buscarUsuariosAjax' %}?q=${encodeURIComponent(termo)}`).then(async response => { if (!response.ok) { const err = await response.json(); throw new Error(err.erro_interno || 'Erro interno'); } return response.json(); })
                 .then(data => {
                     boxResultados.innerHTML = '';
-                    if(data.usuarios.length === 0) { 
-                        boxResultados.innerHTML = '<div class="list-group-item text-muted text-center py-2">Nenhum colaborador encontrado.</div>'; 
-                    } else {
-                        data.usuarios.forEach(u => {
-                            boxResultados.innerHTML += `
-                                <button type="button" class="list-group-item list-group-item-action py-2" onclick="gerenciarMembro(${u.id}, 'adicionar', '${u.nome}', '${u.email}')">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong class="d-block text-dark mb-1">
-                                                ${u.nome} <span class="badge ${u.cor_badge} ms-2" style="font-size: 0.65rem;">${u.papel}</span>
-                                            </strong>
-                                            <small class="text-muted">${u.email}</small>
-                                        </div>
-                                        <i class="fas fa-plus-circle text-success"></i>
-                                    </div>
-                                </button>`;
-                        });
-                    }
+                    if(data.usuarios.length === 0) { boxResultados.innerHTML = '<div class="list-group-item text-muted text-center py-2">Nenhum colaborador encontrado.</div>'; } 
+                    else { data.usuarios.forEach(u => { boxResultados.innerHTML += `<button type="button" class="list-group-item list-group-item-action py-2" onclick="gerenciarMembro(${u.id}, 'adicionar', '${u.nome}', '${u.email}')"><div class="d-flex justify-content-between align-items-center"><div><strong class="d-block text-dark mb-1">${u.nome} <span class="badge ${u.cor_badge} ms-2" style="font-size: 0.65rem;">${u.papel}</span></strong><small class="text-muted">${u.email}</small></div><i class="fas fa-plus-circle text-success"></i></div></button>`; }); }
                     boxResultados.classList.remove('d-none');
-                })
-                .catch(error => {
-                    boxResultados.innerHTML = `<div class="list-group-item text-danger text-center py-2 small fw-bold">Erro: ${error.message}</div>`;
-                    boxResultados.classList.remove('d-none');
-                });
+                }).catch(error => { boxResultados.innerHTML = `<div class="list-group-item text-danger text-center py-2 small fw-bold">Erro: ${error.message}</div>`; boxResultados.classList.remove('d-none'); });
             }, 400); 
         });
-
-        document.addEventListener('click', function(e) { 
-            if (!inputBusca.contains(e.target) && !boxResultados.contains(e.target)) { boxResultados.classList.add('d-none'); } 
-        });
+        document.addEventListener('click', function(e) { if (!inputBusca.contains(e.target) && !boxResultados.contains(e.target)) { boxResultados.classList.add('d-none'); } });
     }
 });
 
 // ==========================================
-// FUNÇÕES AUXILIARES: COMENTÁRIOS E EQUIPE
+// MATEMÁTICA E FÓRMULAS
 // ==========================================
+function atualizarPreviewFormula() {
+    const latex = document.getElementById('inputLatex').value.trim();
+    const previewDiv = document.getElementById('previewFormula');
+    
+    if (!latex) { previewDiv.innerHTML = '<span class="text-muted small fst-italic">A fórmula aparecerá aqui...</span>'; return; }
+    previewDiv.innerHTML = `\\[ ${latex} \\]`; // Envelopa a fórmula para display
+    
+    if (window.MathJax) { MathJax.typesetPromise([previewDiv]).catch(err => console.log('Erro MathJax: ', err)); }
+}
 
-function prepararComentario(editor) {
-    const textoSelecionado = editor.selection.getContent({format: 'text'});
-    if (!textoSelecionado || textoSelecionado.trim() === '') {
-        swalMimir.fire('Seleção Necessária', 'Selecione primeiro com o mouse o trecho de texto que deseja revisar.', 'info');
-        return;
+function inserirFormulaEditor() {
+    const latex = document.getElementById('inputLatex').value.trim();
+    if (!latex) { return swalMimir.fire('Atenção', 'Digite o código da fórmula.', 'warning'); }
+
+    if (editorAtualParaFormula) {
+        const tagInline = `&nbsp;<span class="math-tex">\\( ${latex} \\)</span>&nbsp;`;
+        editorAtualParaFormula.insertContent(tagInline);
+        
+        const win = editorAtualParaFormula.getWin();
+        if (win && win.MathJax) { win.MathJax.typesetPromise(); }
     }
-    const campoId = editor.targetElm.dataset.campoId;
-    const markerId = 'marker_' + Date.now();
-    trechoSelecionadoGlobal = textoSelecionado;
-    editorComentarioGlobal = editor;
-    document.getElementById('inputComentarioCampoId').value = campoId;
-    document.getElementById('inputComentarioMarkerId').value = markerId;
-    document.getElementById('displayTrechoSelecionado').innerText = '"' + textoSelecionado + '"';
-    document.getElementById('inputTextoComentario').value = '';
-    modalComentario.show();
-}
-
-function salvarComentarioRevisao() {
-    const campoId = document.getElementById('inputComentarioCampoId').value;
-    const markerId = document.getElementById('inputComentarioMarkerId').value;
-    const textoComentario = document.getElementById('inputTextoComentario').value;
-    
-    if (!textoComentario.trim()) { return swalMimir.fire('Atenção', 'Insira a descrição da revisão.', 'warning'); }
-
-    fetch("{% url 'mimir:adicionarComentarioRevisao' %}", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-        body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, marker_id: markerId, texto_selecionado: trechoSelecionadoGlobal, texto_comentario: textoComentario })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if(data.success) {
-            // Realça o texto no editor e já manda salvar o documento para não perder o span
-            const htmlOriginal = editorComentarioGlobal.selection.getContent();
-            const spanHtml = `<span id="${markerId}" class="revisao-highlight" title="${textoComentario.replace(/"/g, '&quot;')}">${htmlOriginal}</span>`;
-            editorComentarioGlobal.selection.setContent(spanHtml);
-            
-            fetch("{% url 'mimir:salvarCampoProjeto' %}", {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, valor: editorComentarioGlobal.getContent() })
-            });
-
-            // Insere o card lateral dinamicamente
-            const emptyLabel = document.getElementById('emptyComentarios');
-            if(emptyLabel) emptyLabel.remove();
-            
-            const ul = document.getElementById('listaComentariosUI');
-            ul.innerHTML = `
-                <div class="list-group-item px-3 py-2 border-bottom" id="comentario_box_${markerId}">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                        <div>
-                            <strong class="text-dark">${data.revisor}</strong>
-                            <small class="text-muted ms-1">${data.data}</small>
-                            <span class="badge ${data.cor_badge} ms-1" style="font-size: 0.65rem;">${data.papel}</span>
-                        </div>
-                        <button class="btn btn-sm btn-outline-success border-0 py-0 px-1" onclick="resolverComentario(${data.id}, '${markerId}')">
-                            <i class="fas fa-check"></i>
-                        </button>
-                    </div>
-                    <blockquote class="border-start border-3 border-warning bg-light p-1 mb-1 text-muted small fst-italic text-truncate" title="${trechoSelecionadoGlobal}">
-                        "${trechoSelecionadoGlobal}"
-                    </blockquote>
-                    <p class="mb-1 text-dark" style="text-align: justify;">${textoComentario}</p>
-                </div>` + ul.innerHTML;
-            
-            modalComentario.hide();
-        } else { swalMimir.fire('Erro', data.message, 'error'); }
-    }).catch(() => { swalMimir.fire('Erro', 'Erro de comunicação ao salvar o comentário.', 'error'); });
-}
-
-function resolverComentario(comentarioId, markerId) {
-    swalMimir.fire({ title: 'Arquivar Revisão?', text: "A marcação será removida do texto oficial.", icon: 'question', showCancelButton: true, confirmButtonText: 'Sim, arquivar', cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            fetch("{% url 'mimir:resolverComentarioRevisao' %}", {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ comentario_id: comentarioId })
-            }).then(r => r.json()).then(data => {
-                if(data.success) {
-                    const box = document.getElementById('comentario_box_' + markerId); if(box) box.remove();
-                    const ul = document.getElementById('listaComentariosUI');
-                    if(ul.children.length === 0) { ul.innerHTML = '<div class="list-group-item text-muted text-center p-3 fst-italic" id="emptyComentarios">Nenhum comentário pendente.</div>'; }
-                    document.querySelectorAll('.tinymce-editor').forEach(textarea => {
-                        let editor = tinymce.get(textarea.id);
-                        if(editor) {
-                            let doc = new DOMParser().parseFromString(editor.getContent(), 'text/html');
-                            let span = doc.getElementById(markerId);
-                            if(span) {
-                                let nodeTexto = doc.createTextNode(span.textContent);
-                                span.parentNode.replaceChild(nodeTexto, span);
-                                editor.setContent(doc.body.innerHTML);
-                                editor.fire('Change'); 
-                            }
-                        }
-                    });
-                } else { swalMimir.fire('Erro', data.message, 'error'); }
-            });
-        }
-    });
-}
-
-function gerenciarMembro(usuarioId, acao, nome = '', email = '') {
-    if (acao === 'remover') {
-        swalMimir.fire({ title: 'Remover Colaborador?', text: "Ele perderá o acesso ao rascunho deste projeto.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Sim, remover', cancelButtonText: 'Cancelar'
-        }).then((result) => { if (result.isConfirmed) executarGerenciarMembro(usuarioId, acao); });
-    } else { executarGerenciarMembro(usuarioId, acao); }
-}
-
-function executarGerenciarMembro(usuarioId, acao) {
-    fetch("{% url 'mimir:gerenciarEquipeProjeto' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ projeto_id: {{ projeto.id }}, usuario_id: usuarioId, acao: acao }) 
-    }).then(r => r.json()).then(data => {
-        if (data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Atenção', data.message, 'error'); }
-    });
+    modalFormula.hide();
 }
 
 // ==========================================
-// FUNÇÕES AUXILIARES: REPOSITÓRIO DE CITAÇÕES
+// CITAÇÃO INTELIGENTE MÚLTIPLA
 // ==========================================
-
-function abrirModalNovaReferencia() {
-    document.getElementById('inputReferenciaId').value = '';
-    document.getElementById('inputCitacaoCurta').value = '';
-    document.getElementById('inputReferenciaCompleta').value = '';
-    document.getElementById('tituloModalReferencia').innerHTML = '<i class="fas fa-plus-circle text-info me-2"></i> Cadastrar Fonte Bibliográfica';
-    new bootstrap.Modal(document.getElementById('modalNovaReferencia')).show();
-}
-
-function prepararEdicaoReferencia(id, citacao, completa) {
-    document.getElementById('inputReferenciaId').value = id;
-    document.getElementById('inputCitacaoCurta').value = citacao;
-    document.getElementById('inputReferenciaCompleta').value = completa;
-    document.getElementById('tituloModalReferencia').innerHTML = '<i class="fas fa-edit text-info me-2"></i> Editar Fonte Bibliográfica';
-    
-    let modalEl = document.getElementById('modalNovaReferencia');
-    let modalInst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-    modalInst.show();
-}
-
-function salvarReferencia() {
-    const refId = document.getElementById('inputReferenciaId').value;
-    const curtaVal = document.getElementById('inputCitacaoCurta').value;
-    const curta = curtaVal.trim ? curtaVal.trim() : curtaVal;
-    const completa = document.getElementById('inputReferenciaCompleta').value;
-    
-    if(!curta || !completa) { return swalMimir.fire('Campos Vazios', 'Preencha todos os campos obrigatórios da referência.', 'warning'); }
-    
-    const urlDestino = refId ? "{% url 'mimir:editarReferenciaProjeto' %}" : "{% url 'mimir:adicionarReferenciaProjeto' %}";
-    const dadosEnvio = refId ? { ref_id: refId, citacao_curta: curta, referencia_completa: completa } : { projeto_id: {{ projeto.id }}, citacao_curta: curta, referencia_completa: completa };
-
-    fetch(urlDestino, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(dadosEnvio) 
-    }).then(r => r.json()).then(data => {
-        if(data.success) {
-            let modalInst = bootstrap.Modal.getInstance(document.getElementById('modalNovaReferencia'));
-            if(modalInst) modalInst.hide();
-
-            if (refId) {
-                let index = referenciasProjeto.findIndex(r => r.id.toString() === refId.toString());
-                if(index !== -1) { referenciasProjeto[index].citacao = data.citacao; referenciasProjeto[index].completa = data.completa; }
-                const card = document.getElementById('ref_box_' + refId);
-                if(card) {
-                    card.querySelector('.ref-citacao-text').innerText = data.citacao;
-                    card.querySelector('.ref-completa-text').innerText = data.completa;
-                    card.querySelector('.ref-completa-text').setAttribute('title', data.completa);
-                    card.querySelector('button[title="Editar"]').setAttribute('onclick', `prepararEdicaoReferencia('${refId}', '${data.citacao.replace(/'/g, "\\'")}', '${data.completa.replace(/'/g, "\\'")}')`);
-                }
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Citação atualizada!', showConfirmButton: false, timer: 2000 });
-            } else {
-                referenciasProjeto.push({ id: data.id, citacao: data.citacao, completa: data.completa });
-                const emptyLabel = document.getElementById('emptyReferencias'); if(emptyLabel) emptyLabel.remove();
-                const ul = document.getElementById('listaReferenciasUI');
-                ul.innerHTML += `
-                    <li class="list-group-item px-3 py-2 border-bottom d-flex justify-content-between align-items-start" id="ref_box_${data.id}">
-                        <div class="w-75">
-                            <strong class="d-block text-dark ref-citacao-text">${data.citacao}</strong>
-                            <span class="text-muted text-truncate d-block ref-completa-text" style="max-width: 100%;" title="${data.completa}">${data.completa}</span>
-                        </div>
-                        <div class="d-flex gap-2 mt-1">
-                            <button class="btn btn-link text-primary p-0" onclick="prepararEdicaoReferencia('${data.id}', '${data.citacao.replace(/'/g, "\\'")}', '${data.completa.replace(/'/g, "\\'")}')" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-link text-danger p-0" onclick="deletarReferencia('${data.id}')" title="Excluir">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </li>`;
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Citação adicionada!', showConfirmButton: false, timer: 2000 });
-            }
-        } else { swalMimir.fire('Erro', data.message, 'error'); }
-    });
-}
-
-function deletarReferencia(refId) {
-    swalMimir.fire({ title: 'Remover Citação?', text: "Essa fonte sairá do repositório do projeto. Citações já inseridas no texto continuarão visíveis, mas perderão o vínculo.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Sim, remover', cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            fetch("{% url 'mimir:deletarReferenciaProjeto' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ ref_id: refId })
-            }).then(r => r.json()).then(data => {
-                if(data.success) {
-                    referenciasProjeto = referenciasProjeto.filter(r => r.id.toString() !== refId.toString());
-                    const itemLista = document.getElementById('ref_box_' + refId); if(itemLista) itemLista.remove();
-                    const ul = document.getElementById('listaReferenciasUI');
-                    if(ul.children.length === 0) { ul.innerHTML = '<li class="list-group-item text-muted text-center p-3 fst-italic" id="emptyReferencias">Nenhuma referência cadastrada.</li>'; }
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Removida com sucesso!', showConfirmButton: false, timer: 2000 });
-                } else { swalMimir.fire('Erro', data.message, 'error'); }
-            });
-        }
-    });
-}
-
 function abrirModalCitar(editor) {
     editorAtualParaCitacao = editor;
-    const listGroup = document.getElementById('listaCitarModal'); listGroup.innerHTML = '';
+    const listGroup = document.getElementById('listaCitarModal'); 
+    listGroup.innerHTML = '';
+    
     if(referenciasProjeto.length === 0) { listGroup.innerHTML = '<div class="p-4 text-center text-muted">Não há fontes salvas. Adicione-as no painel lateral.</div>'; } 
-    else { referenciasProjeto.forEach(ref => { listGroup.innerHTML += `<button type="button" class="list-group-item list-group-item-action py-3" onclick="inserirCitacaoEditor('${ref.id}', '${ref.citacao.replace(/'/g, "\\'")}')"><strong class="text-info">${ref.citacao}</strong><br><small class="text-muted">${ref.completa}</small></button>`; }); }
+    else {
+        let currentNode = editor.selection.getNode(); let isEditing = false; let selectedIds = [];
+        if (currentNode && currentNode.classList.contains('mimir-citacao')) {
+            isEditing = true; let attrData = currentNode.getAttribute('data-ref-id');
+            if (attrData) { selectedIds = attrData.split(','); }
+        }
+
+        referenciasProjeto.forEach(ref => { 
+            let isChecked = selectedIds.includes(ref.id.toString()) ? 'checked' : '';
+            listGroup.innerHTML += `
+            <label class="list-group-item list-group-item-action py-3 d-flex align-items-center gap-3 hover-elevate" style="cursor: pointer;">
+                <input class="form-check-input ref-checkbox fs-4 m-0" type="checkbox" value="${ref.id}" ${isChecked}>
+                <div><strong class="text-info">${ref.citacao}</strong><br><small class="text-muted">${ref.completa}</small></div>
+            </label>`; 
+        }); 
+        
+        listGroup.innerHTML += `<div class="p-3 bg-light border-top text-end position-sticky bottom-0" style="z-index: 10;"><button type="button" class="btn btn-info text-white fw-bold shadow-sm" onclick="inserirCitacoesSelecionadas(${isEditing})"><i class="fas fa-check-double me-1"></i> ${isEditing ? 'Atualizar Citação' : 'Inserir Citação ABNT'}</button></div>`;
+    }
     modalCitar.show();
 }
 
-function inserirCitacaoEditor(refId, citacaoTexto) {
-    if(editorAtualParaCitacao) { editorAtualParaCitacao.insertContent(`&nbsp;<span class="mimir-citacao" data-ref-id="${refId}" contenteditable="false">${citacaoTexto}</span>&nbsp;`); modalCitar.hide(); }
+function inserirCitacoesSelecionadas(isEditing) {
+    let checkboxes = document.querySelectorAll('.ref-checkbox:checked');
+    if (checkboxes.length === 0) { return swalMimir.fire('Atenção', 'Selecione ao menos uma referência.', 'warning'); }
+
+    let selecionados = Array.from(checkboxes).map(cb => cb.value);
+    let textosAgrupados = [];
+
+    selecionados.forEach(id => {
+        let ref = referenciasProjeto.find(r => r.id.toString() === id.toString());
+        if(ref) { textosAgrupados.push(ref.citacao.replace(/^\(|\)$/g, '')); }
+    });
+
+    let citacaoFinalABNT = '(' + textosAgrupados.join('; ') + ')';
+    let refsJoin = selecionados.join(',');
+
+    if (isEditing && editorAtualParaCitacao) {
+        let currentNode = editorAtualParaCitacao.selection.getNode();
+        if (currentNode && currentNode.classList.contains('mimir-citacao')) {
+            currentNode.setAttribute('data-ref-id', refsJoin);
+            currentNode.innerText = citacaoFinalABNT;
+        }
+    } else if (editorAtualParaCitacao) {
+        editorAtualParaCitacao.insertContent(`&nbsp;<span class="mimir-citacao" data-ref-id="${refsJoin}" contenteditable="false">${citacaoFinalABNT}</span>&nbsp;`); 
+    }
+    modalCitar.hide();
 }
 
 function gerarBibliografia() {
     let idsCitados = new Set();
     document.querySelectorAll('.tinymce-editor').forEach(textarea => {
         let editor = tinymce.get(textarea.id);
-        if(editor) { let doc = new DOMParser().parseFromString(editor.getContent(), 'text/html'); doc.querySelectorAll('.mimir-citacao').forEach(el => { idsCitados.add(el.getAttribute('data-ref-id')); }); }
+        if(editor) { 
+            let doc = new DOMParser().parseFromString(editor.getContent(), 'text/html'); 
+            doc.querySelectorAll('.mimir-citacao').forEach(el => { 
+                let ids = el.getAttribute('data-ref-id').split(',');
+                ids.forEach(id => idsCitados.add(id.trim())); 
+            }); 
+        }
     });
-    if(idsCitados.size === 0) { return swalMimir.fire('Nenhuma Citação', 'Não encontramos citações no corpo da proposta.', 'info'); }
+    
+    if(idsCitados.size === 0) { return swalMimir.fire('Nenhuma Citação', 'Não encontramos citações inseridas no corpo da proposta.', 'info'); }
+    
     let refUtilizadas = referenciasProjeto.filter(r => idsCitados.has(r.id.toString())).sort((a, b) => a.completa.localeCompare(b.completa));
     let htmlBiblio = "<ul style='list-style-type: none; padding-left: 0;'>";
-    refUtilizadas.forEach(ref => { htmlBiblio += `<li style="margin-bottom: 15px; text-align: justify;">${ref.completa}</li>`; }); htmlBiblio += "</ul>";
-    document.getElementById('biblioGeradaContent').innerHTML = htmlBiblio; new bootstrap.Modal(document.getElementById('modalBiblioGerada')).show();
+    refUtilizadas.forEach(ref => { htmlBiblio += `<li style="margin-bottom: 15px; text-align: justify;">${ref.completa}</li>`; }); 
+    htmlBiblio += "</ul>";
+    
+    document.getElementById('biblioGeradaContent').innerHTML = htmlBiblio; 
+    new bootstrap.Modal(document.getElementById('modalBiblioGerada')).show();
 }
 
 function copiarBibliografia() { navigator.clipboard.writeText(document.getElementById('biblioGeradaContent').innerText).then(() => { Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Bibliografia copiada!', showConfirmButton: false, timer: 2500 }); }); }
+
+// ==========================================
+// REPOSITÓRIO CRUD E REVISÕES
+// ==========================================
+function abrirModalNovaReferencia() {
+    document.getElementById('inputReferenciaId').value = '';
+    ['inputChaveBibtex', 'inputAutores', 'inputTituloRef', 'inputAno', 'inputRevista', 'inputVolume', 'inputPaginas', 'inputDoi'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tituloModalReferencia').innerHTML = '<i class="fas fa-plus-circle text-info me-2"></i> Cadastrar Fonte Bibliográfica';
+    new bootstrap.Modal(document.getElementById('modalNovaReferencia')).show();
+}
+
+function prepararEdicaoReferencia(id, chave, tipo, autores, titulo, ano, revista, volume, paginas, doi) {
+    document.getElementById('inputReferenciaId').value = id;
+    document.getElementById('inputChaveBibtex').value = chave;
+    document.getElementById('inputTipoRef').value = tipo;
+    document.getElementById('inputAutores').value = autores;
+    document.getElementById('inputTituloRef').value = titulo;
+    document.getElementById('inputAno').value = ano;
+    document.getElementById('inputRevista').value = revista;
+    document.getElementById('inputVolume').value = volume;
+    document.getElementById('inputPaginas').value = paginas;
+    document.getElementById('inputDoi').value = doi;
+    
+    document.getElementById('tituloModalReferencia').innerHTML = '<i class="fas fa-edit text-info me-2"></i> Editar Fonte Bibliográfica';
+    let modalInst = bootstrap.Modal.getInstance(document.getElementById('modalNovaReferencia')) || new bootstrap.Modal(document.getElementById('modalNovaReferencia'));
+    modalInst.show();
+}
+
+function salvarReferencia() {
+    const refId = document.getElementById('inputReferenciaId').value;
+    const autores = document.getElementById('inputAutores').value;
+    const titulo = document.getElementById('inputTituloRef').value;
+    const ano = document.getElementById('inputAno').value;
+    
+    if(!autores || !titulo || !ano) { return swalMimir.fire('Atenção', 'Os campos Autores, Título e Ano são obrigatórios.', 'warning'); }
+    
+    const urlDestino = refId ? "{% url 'mimir:editarReferenciaProjeto' %}" : "{% url 'mimir:adicionarReferenciaProjeto' %}";
+    const dadosEnvio = { projeto_id: {{ projeto.id }}, ref_id: refId, chave_bibtex: document.getElementById('inputChaveBibtex').value, tipo: document.getElementById('inputTipoRef').value, autores: autores, titulo: titulo, ano: ano, revista_evento: document.getElementById('inputRevista').value, volume: document.getElementById('inputVolume').value, paginas: document.getElementById('inputPaginas').value, doi: document.getElementById('inputDoi').value };
+
+    fetch(urlDestino, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(dadosEnvio) 
+    }).then(r => r.json()).then(data => {
+        if(data.success) { Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Salvo com sucesso!', showConfirmButton: false, timer: 1500 }); setTimeout(() => location.reload(), 800); } else { swalMimir.fire('Erro', data.message, 'error'); }
+    });
+}
+
+function deletarReferencia(refId) {
+    swalMimir.fire({ title: 'Remover Citação?', text: "Essa fonte sairá do repositório.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Remover', cancelButtonText: 'Cancelar' }).then((result) => {
+        if (result.isConfirmed) { fetch("{% url 'mimir:deletarReferenciaProjeto' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ ref_id: refId }) }).then(r => r.json()).then(data => { if(data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Erro', data.message, 'error'); } }); }
+    });
+}
+
+function prepararComentario(editor) {
+    const textoSelecionado = editor.selection.getContent({format: 'text'});
+    if (!textoSelecionado || textoSelecionado.trim() === '') { swalMimir.fire('Seleção Necessária', 'Selecione primeiro o trecho que deseja revisar.', 'info'); return; }
+    const campoId = editor.targetElm.dataset.campoId; const markerId = 'marker_' + Date.now();
+    trechoSelecionadoGlobal = textoSelecionado; editorComentarioGlobal = editor;
+    document.getElementById('inputComentarioCampoId').value = campoId; document.getElementById('inputComentarioMarkerId').value = markerId;
+    document.getElementById('displayTrechoSelecionado').innerText = '"' + textoSelecionado + '"'; document.getElementById('inputTextoComentario').value = '';
+    modalComentario.show();
+}
+
+function salvarComentarioRevisao() {
+    const campoId = document.getElementById('inputComentarioCampoId').value; const markerId = document.getElementById('inputComentarioMarkerId').value; const textoComentario = document.getElementById('inputTextoComentario').value;
+    if (!textoComentario.trim()) { return swalMimir.fire('Atenção', 'Insira a descrição da revisão.', 'warning'); }
+    fetch("{% url 'mimir:adicionarComentarioRevisao' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ projeto_id: {{ projeto.id }}, campo_id: campoId, marker_id: markerId, texto_selecionado: trechoSelecionadoGlobal, texto_comentario: textoComentario })
+    }).then(r => r.json()).then(data => { if(data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Erro', data.message, 'error'); } });
+}
+
+function resolverComentario(comentarioId, markerId) {
+    swalMimir.fire({ title: 'Arquivar Revisão?', text: "A marcação será removida do texto.", icon: 'question', showCancelButton: true, confirmButtonText: 'Sim, arquivar', cancelButtonText: 'Cancelar' }).then((result) => {
+        if (result.isConfirmed) { fetch("{% url 'mimir:resolverComentarioRevisao' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ comentario_id: comentarioId }) }).then(r => r.json()).then(data => { if(data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Erro', data.message, 'error'); } }); }
+    });
+}
+
+function gerenciarMembro(usuarioId, acao, nome = '', email = '') {
+    if (acao === 'remover') { swalMimir.fire({ title: 'Remover Colaborador?', text: "Perderá acesso ao projeto.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Remover', cancelButtonText: 'Cancelar' }).then((result) => { if (result.isConfirmed) executarGerenciarMembro(usuarioId, acao); }); } else { executarGerenciarMembro(usuarioId, acao); }
+}
+
+function executarGerenciarMembro(usuarioId, acao) {
+    fetch("{% url 'mimir:gerenciarEquipeProjeto' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ projeto_id: {{ projeto.id }}, usuario_id: usuarioId, acao: acao }) }).then(r => r.json()).then(data => { if (data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Atenção', data.message, 'error'); } });
+}
 </script>
 {% endblock %}

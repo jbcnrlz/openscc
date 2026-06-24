@@ -141,4 +141,6 @@ urlpatterns = [
      path('pdi/projeto/ajax/referencia/editar/', views.editarReferenciaProjeto, name='editarReferenciaProjeto'),  # <-- NOVA ROTA
      path('pdi/projeto/ajax/referencia/deletar/', views.deletarReferenciaProjeto, name='deletarReferenciaProjeto'),  # <-- NOVA ROTA
      path('aluno/prova/<int:prova_aluno_id>/exportar-pdf/', views.exportarCorrecaoPDF, name='exportarCorrecaoPDF'),
+     path('pdi/projeto/<int:projeto_id>/referencias/importar/bibtex/', views.importarBibtexProjeto, name='importarBibtexProjeto'),
+     path('pdi/projeto/<int:projeto_id>/referencias/exportar/bibtex/', views.exportarBibtexProjeto, name='exportarBibtexProjeto'),
 ]
