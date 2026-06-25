@@ -23,7 +23,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from django.utils.html import strip_tags
 from commons.services import get_llm
-
+from django.utils.crypto import get_random_string
 
 def acessoNegado(request):
     """View para página de acesso negado"""
@@ -3506,3 +3506,31 @@ def exportarBibtexProjeto(request, projeto_id):
     response['Content-Disposition'] = f'attachment; filename="referencias_{nome_ficheiro}.bib"'
     
     return response
+
+@login_required
+def uploadImagemTinymce(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
+        
+        # 1. Validação estrita de extensão de imagem
+        ext = os.path.splitext(file.name)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            return JsonResponse({'error': 'Formato de imagem não permitido.'}, status=400)
+        
+        try:
+            # 2. Ofuscação do nome do arquivo para evitar conflitos no storage
+            nome_seguro = f"img_{get_random_string(8)}{ext}"
+            caminho_diretorio = os.path.join('mimir', 'projeto_imagens')
+            caminho_completo = os.path.join(caminho_diretorio, nome_seguro)
+            
+            # 3. Salva no Storage padrão (MEDIA_ROOT)
+            nome_salvo = default_storage.save(caminho_completo, file)
+            url_publica = default_storage.url(nome_salvo)
+            
+            # Retorno exigido pelo TinyMCE para injetar o elemento <img> automaticamente
+            return JsonResponse({'location': url_publica})
+            
+        except Exception as e:
+            return JsonResponse({'error': f'Falha no processamento: {str(e)}'}, status=500)
+            
+    return JsonResponse({'error': 'Método inválido ou arquivo ausente.'}, status=405)

@@ -540,22 +540,73 @@ document.addEventListener('DOMContentLoaded', function() {
     modalFormula = new bootstrap.Modal(document.getElementById('modalFormula'));
     let timeouts_salvamento = {};
 
+
     // ==========================================
-    // 1. INICIALIZAÇÃO TINYMCE (COM MATHJAX)
+    // 1. INICIALIZAÇÃO TINYMCE (COM MATHJAX E UPLOAD DE IMAGENS)
     // ==========================================
     tinymce.init({
         selector: '.tinymce-editor',
+        // Inclusão explícita do plugin 'image'
         plugins: 'table image link lists advlist fullscreen',
-        toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright justify | bullist numlist outdent indent | table image link citar_btn revisar_btn formula_btn | fullscreen',
-        menubar: false, branding: false, statusbar: false, paste_data_images: true, 
-        content_style: `body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; line-height: 1.5; text-align: justify; } .mimir-citacao { background-color: #cff4fc; color: #055160; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 0.25rem; border: 1px solid #b6effb; display: inline-block; cursor: pointer; } .revisao-highlight { background-color: #ffeeba; border-bottom: 2px solid #ffc107; display: inline; cursor: pointer;} .math-tex { cursor: pointer; }`,
+        // Adicionado o botão 'image' na barra de ferramentas
+        toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | table image link citar_btn formula_btn | fullscreen',
+        menubar: false, 
+        branding: false, 
+        statusbar: false, 
+        paste_data_images: true, // Permite colar imagens diretamente da área de transferência (Ctrl+V)
+        automatic_uploads: true,  // Faz o upload disparar assim que a imagem for solta no editor
         
+        content_style: `body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; line-height: 1.5; text-align: justify; } .mimir-citacao { background-color: #cff4fc; color: #055160; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 0.25rem; border: 1px solid #b6effb; display: inline-block; cursor: pointer; } .revisao-highlight { background-color: #ffeeba; border-bottom: 2px solid #ffc107; display: inline; cursor: pointer;} .math-tex { cursor: pointer; } img { max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0; }`,
+        
+        // HANDLER DE UPLOAD VIA PROMISE (PADRÃO TINYMCE 6+)
+        images_upload_handler: (blobInfo, progress) => new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.withCredentials = false;
+            xhr.open('POST', "{% url 'mimir:uploadImagemTinymce' %}");
+            
+            // Injeta o token de segurança exigido pelo middleware do Django
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}");
+
+            xhr.upload.onprogress = (e) => {
+                progress(e.loaded / e.total * 100);
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 403) {
+                    reject({ message: 'Erro de permissão do Servidor (HTTP ' + xhr.status + ')', remove: true });
+                    return;
+                }
+                if (xhr.status < 200 || xhr.status >= 300) {
+                    reject('Erro de comunicação no upload (HTTP ' + xhr.status + ')');
+                    return;
+                }
+
+                const json = JSON.parse(xhr.responseText);
+
+                if (!json || typeof json.location !== 'string') {
+                    reject('Resposta inválida do servidor: ' + xhr.responseText);
+                    return;
+                }
+
+                // Sucesso: Retorna a URL para o TinyMCE renderizar a tag <img>
+                resolve(json.location);
+            };
+
+            xhr.onerror = () => {
+                reject('Falha no transporte do arquivo devido a um erro de rede.');
+            };
+
+            const formData = new FormData();
+            formData.append('file', blobInfo.blob(), blobInfo.filename());
+
+            xhr.send(formData);
+        }),
+
         setup: function (editor) {
             editor.ui.registry.addButton('citar_btn', { icon: 'bookmark', tooltip: 'Inserir Citação Múltipla/ABNT', onAction: function (_) { abrirModalCitar(editor); } });
             editor.ui.registry.addButton('revisar_btn', { icon: 'comment-add', tooltip: 'Comentar Trecho Selecionado', onAction: function (_) { prepararComentario(editor); } });
             editor.ui.registry.addButton('formula_btn', { icon: 'superscript', tooltip: 'Inserir Equação Matemática', onAction: function (_) { editorAtualParaFormula = editor; document.getElementById('inputLatex').value = ''; document.getElementById('previewFormula').innerHTML = '<span class="text-muted small fst-italic">A fórmula aparecerá aqui...</span>'; modalFormula.show(); } });
 
-            // Injeta o MathJax no iframe do TinyMCE
             editor.on('init', function () {
                 const doc = editor.getDoc();
                 const configScript = doc.createElement('script');
@@ -585,14 +636,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             setTimeout(() => statusEl.classList.add('d-none'), 3000);
                         }
                     });
-                    
-                    // Renderiza a matemática nova
                     const win = editor.getWin();
                     if (win && win.MathJax) { win.MathJax.typesetPromise().catch(err => console.log(err)); }
                 }, 1200); 
             });
             
-            // Abre o modal ao clicar em uma citação existente
             editor.on('click', function(e) {
                 if (e.target.nodeName === 'SPAN' && e.target.classList.contains('mimir-citacao')) {
                     editor.selection.select(e.target);
@@ -600,9 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-    });
-
-    // ==========================================
+    });    // ==========================================
     // 2. IA E EQUIPE
     // ==========================================
     const modalIA = new bootstrap.Modal(document.getElementById('modalIA'));
