@@ -3271,20 +3271,27 @@ def editarReferenciaProjeto(request):
         try:
             data = json.loads(request.body)
             ref_id = data.get('ref_id')
-            citacao_curta = data.get('citacao_curta')
-            referencia_completa = data.get('referencia_completa')
             
-            # Substitua 'ReferenciaProjeto' pelo nome exato do seu Modelo de Citações do Projeto
             from .models import ReferenciaProjeto 
             ref = ReferenciaProjeto.objects.get(id=ref_id)
             projeto = ref.projeto
             
-            # Permissão: Proponente ou Membro da Equipe
+            # Verificação de permissão
             if request.user == projeto.proponente or projeto.equipe.filter(id=request.user.id).exists():
-                ref.citacao_curta = citacao_curta
-                ref.referencia_completa = referencia_completa
+                # Atualizando todos os campos que vêm do JavaScript
+                ref.chave_bibtex = data.get('chave_bibtex', ref.chave_bibtex)
+                ref.tipo = data.get('tipo', ref.tipo)
+                ref.autores = data.get('autores', ref.autores)
+                ref.titulo = data.get('titulo', ref.titulo)
+                ref.ano = data.get('ano', ref.ano)
+                ref.revista_evento = data.get('revista_evento', ref.revista_evento)
+                ref.volume = data.get('volume', ref.volume)
+                ref.paginas = data.get('paginas', ref.paginas)
+                ref.doi = data.get('doi', ref.doi)
+                
                 ref.save()
-                return JsonResponse({'success': True, 'citacao': citacao_curta, 'completa': referencia_completa})
+                return JsonResponse({'success': True})
+            
             return JsonResponse({'success': False, 'message': 'Acesso negado.'})
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)})
