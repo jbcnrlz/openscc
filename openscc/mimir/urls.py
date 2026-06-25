@@ -143,4 +143,5 @@ urlpatterns = [
      path('aluno/prova/<int:prova_aluno_id>/exportar-pdf/', views.exportarCorrecaoPDF, name='exportarCorrecaoPDF'),
      path('pdi/projeto/<int:projeto_id>/referencias/importar/bibtex/', views.importarBibtexProjeto, name='importarBibtexProjeto'),
      path('pdi/projeto/<int:projeto_id>/referencias/exportar/bibtex/', views.exportarBibtexProjeto, name='exportarBibtexProjeto'),
+     path('pdi/projeto/upload-imagem-editor/', views.uploadImagemTinymce, name='uploadImagemTinymce'),
 ]
