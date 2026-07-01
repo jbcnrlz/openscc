@@ -951,3 +951,13 @@ class ComentarioRevisao(models.Model):
 
     class Meta:
         ordering = ['-criado_em']
+
+class ParecerHistorico(models.Model):
+    titulo = models.CharField(max_length=255, help_text="Ex: Parecer FAPESP - Auxílio Regular 2024 (Reprovado)")
+    orgao_fomento = models.CharField(max_length=100, blank=True, null=True, help_text="Ex: FAPESP, FINEP, CNPq")
+    texto_parecer = models.TextField(help_text="Texto completo do feedback recebido dos avaliadores.")
+    cadastrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.titulo
