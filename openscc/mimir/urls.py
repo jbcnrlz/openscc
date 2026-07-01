@@ -144,4 +144,6 @@ urlpatterns = [
      path('pdi/projeto/<int:projeto_id>/referencias/importar/bibtex/', views.importarBibtexProjeto, name='importarBibtexProjeto'),
      path('pdi/projeto/<int:projeto_id>/referencias/exportar/bibtex/', views.exportarBibtexProjeto, name='exportarBibtexProjeto'),
      path('pdi/projeto/upload-imagem-editor/', views.uploadImagemTinymce, name='uploadImagemTinymce'),
+     path('pdi/projeto/parecer/cadastrar/', views.cadastrarParecerHistorico, name='cadastrarParecerHistorico'),
+     path('pdi/projeto/<int:projeto_id>/analise-preditiva/', views.analisePreditivaProjeto, name='analisePreditivaProjeto'),
 ]
