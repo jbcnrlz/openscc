@@ -1,17 +1,28 @@
-import base64, io, json, re, pdfplumber, time
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
+import base64, io, json, re, pdfplumber, time, ast
+from typing import List, Optional
+
+from django.conf import settings
+from PIL import Image
+from pydantic import BaseModel, Field
+
+# LangChain Core & Models
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.messages import HumanMessage
-from pydantic import BaseModel, Field
-from PIL import Image
-from langchain_core.output_parsers import StrOutputParser
-from django.conf import settings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_ollama import ChatOllama
-from typing import List, Optional
-from mimir.models import LLMLog
-from mimir.models import Edital
-# Configuração do modelo LangChain
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# LangChain Tools (Map-Reduce e RAG)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_classic.chains.summarize import load_summarize_chain
+from langchain_community.vectorstores import FAISS
+
+from mimir.models import LLMLog, Edital
+
+# ==========================================
+# CONFIGURAÇÃO DE MODELOS E EMBEDDINGS
+# ==========================================
 def get_llm():
     """Retorna uma instância configurada do LLM"""
     if settings.GEMINI_API_KEY is None or settings.GEMINI_API_KEY == "":
@@ -30,21 +41,29 @@ def get_llm():
         max_retries=2,
     )
 
+def get_embeddings():
+    """Fábrica de Embeddings agnóstica para RAG"""
+    if settings.GEMINI_API_KEY is None or settings.GEMINI_API_KEY == "":
+        print("Usando modelo de embeddings local (HuggingFace)")
+        return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        
+    # Com os pacotes atualizados, o modelo 004 será reconhecido sem erros
+    return GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=settings.GEMINI_API_KEY)
+
+
+# ==========================================
+# FUNÇÕES DE APOIO E PARSERS
+# ==========================================
 def extrair_texto_puro(content):
-    """
-    Extrai o texto puro da resposta do LangChain, lidando com casos onde 
-    o conteúdo é retornado como uma lista de blocos (comportamento comum do Gemini).
-    """
+    """Extrai o texto puro da resposta do LangChain"""
     if isinstance(content, str):
         return content.strip()
     
     if isinstance(content, list):
         text_parts = []
         for block in content:
-            # Se for um dicionário, pega a chave 'text'
             if isinstance(block, dict) and 'text' in block:
                 text_parts.append(block['text'])
-            # Se for string perdida na lista
             elif isinstance(block, str):
                 text_parts.append(block)
         return "\n".join(text_parts).strip()
@@ -52,10 +71,7 @@ def extrair_texto_puro(content):
     return str(content).strip()
 
 def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
-    """
-    Executa uma chain do LangChain e registra o log.
-    Retorna o objeto resposta original.
-    """
+    """Executa uma chain do LangChain e registra o log."""
     start_time = time.time()
     error = None
     response = None
@@ -66,18 +82,16 @@ def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
     
     try:
         response = chain.invoke(inputs)
-        # Tenta extrair tokens de uso (se disponível)
         if hasattr(response, 'usage_metadata'):
             tokens_input = response.usage_metadata.get('input_tokens')
             tokens_output = response.usage_metadata.get('output_tokens')
     except Exception as e:
         status = 'error'
         error = str(e)
-        raise e  # Relança para que a aplicação trate o erro
+        raise e  
     finally:
         duration = int((time.time() - start_time) * 1000)
         
-        # Conteúdo da resposta (string)
         response_content = None
         if response:
             if hasattr(response, 'content'):
@@ -87,10 +101,9 @@ def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
             else:
                 response_content = str(response)
         
-        # Cria o registro no banco
         LLMLog.objects.create(
             user=user,
-            prompt=str(inputs),  # Pode ser muito grande, considere truncar se necessário
+            prompt=str(inputs)[:5000],  # Truncado por segurança no banco de dados
             response=response_content,
             model_used=model_used,
             tokens_input=tokens_input,
@@ -103,31 +116,69 @@ def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
     
     return response
 
-# Esquema para questões individuais
+
+# ==========================================
+# ESQUEMAS (PYDANTIC)
+# ==========================================
 class QuestaoSchema(BaseModel):
     tipo: str = Field(description="Tipo da questão (ex: múltipla escolha, discursiva)")
     enunciado: str = Field(description="Texto completo do enunciado da questão")
     alternativas: Optional[List[str]] = Field(default=None, description="Lista de alternativas para questões de múltipla escolha")
     resposta: str = Field(description="Gabarito ou padrão de resposta esperado")
 
-# Esquema para lista de perguntas
 class PerguntasSchema(BaseModel):
     perguntas: List[QuestaoSchema] = Field(description="Lista de questões geradas")
 
-# Esquema para correção
 class CorrecaoSchema(BaseModel):
     nota: float = Field(description="Nota de 0 a 10", ge=0, le=10)
     justificativa: str = Field(description="Análise detalhada da resposta")
 
-# Esquema para guia do tutor
 class GuiaTutorSchema(BaseModel):
     guia_tutor: str = Field(description="Texto completo do guia do tutor")
 
-# Criar prompt templates
+class AnaliseAprovacaoSchema(BaseModel):
+    probabilidade_aprovacao: int = Field(description="Probabilidade estimada de aprovação de 0 a 100")
+    pontos_fortes: List[str] = Field(description="Lista de 3 a 5 pontos fortes do projeto atual")
+    pontos_fracos: List[str] = Field(description="Lista de 3 a 5 pontos fracos ou riscos baseados no histórico de reprovações")
+    mitigacoes: List[str] = Field(description="Recomendações práticas e diretas de como reescrever ou alterar o projeto para mitigar os pontos fracos")
+
+
+# ==========================================
+# TEMPLATES DE PROMPT (PBL E CORREÇÃO)
+# ==========================================
+def criar_template_analise_projeto():
+    """Cria template para análise preditiva de projetos baseada em histórico"""
+    parser = JsonOutputParser(pydantic_object=AnaliseAprovacaoSchema)
+    
+    template = """TODO TEXTO QUE VOCÊ GERAR DEVE SER EM JSON, SIGA AS INSTRUÇÕES ABAIXO.
+
+Você é um avaliador sênior de projetos acadêmicos e de inovação tecnológica (com expertise em agências de fomento e comitês institucionais).
+Sua tarefa é analisar o RASCUNHO DO PROJETO ATUAL e prever sua probabilidade de aprovação com base no HISTÓRICO DE AVALIAÇÕES PASSADAS de projetos similares.
+
+# HISTÓRICO DE PARECERES E FEEDBACKS RELEVANTES:
+{contexto_historico}
+
+# RASCUNHO DO PROJETO ATUAL A SER AVALIADO:
+{projeto_atual}
+
+# DIRETRIZES DE AVALIAÇÃO:
+1. Compare as falhas criticadas no histórico com o que está escrito no projeto atual. Se o projeto atual comete os mesmos erros, diminua a probabilidade de aprovação.
+2. Compare os elogios do histórico. Se o projeto atual possui as mesmas qualidades, aumente a probabilidade.
+3. Seja extremamente crítico e realista.
+4. As "mitigações" devem ser sugestões acionáveis (ex: "Detalhar o tamanho da amostra na seção de metodologia", "Incluir referências mais recentes sobre o impacto financeiro").
+
+# INSTRUÇÕES DE FORMATO:
+- FORMATE TODA A SAÍDA EM JSON
+- NÃO UTILIZE NENHUMA TAG HTML OU MARKDOWN FORA DO BLOCO JSON
+- RETORNE EXATAMENTE AS CHAVES: probabilidade_aprovacao (número inteiro), pontos_fortes (array de strings), pontos_fracos (array de strings), mitigacoes (array de strings)
+
+{format_instructions}
+"""
+    return ChatPromptTemplate.from_template(template), parser
+
 guia_tutor_template = ChatPromptTemplate.from_messages([
     ("system", "Você é um especialista em criação de materiais educacionais."),
     ("human", """Com base no problema abaixo, gere um GUIA DO TUTOR detalhado seguindo EXATAMENTE a estrutura fornecida:
-
 # TÍTULO DO PROBLEMA: {titulo}
 TEMA: {tema}
 ASSUNTO: {assunto}
@@ -140,7 +191,6 @@ OBJETIVOS DE APRENDIZAGEM: {objetivos}
 {fontes_info}
 
 --- ESTRUTURA DO GUIA DO TUTOR ---
-
 {instrucoesGuia}
 """)
 ])
@@ -174,17 +224,6 @@ Sua tarefa é gerar uma NOVA VERSÃO para a PARTE {parte_ordem} que:
 5. Mantenha o mesmo nível de detalhe e complexidade
 6. Seja uma melhoria clara em relação à versão original
 7. Siga as instruções de layout fornecidas
-8. Identificação e Queixa: Dados sociodemográficos e motivo da consulta.
-9. Relato Espontâneo: Citações diretas da paciente expressando sentimentos, dúvidas e ansiedades (essencial para a dimensão biopsicossocial).
-10. Anamnese e Exame Físico: Descrição técnica detalhada, incluindo sinais vitais e dados antropométricos.
-11. Exames Complementares: Resultados com Valores de Referência (VR).
-12. Evolução: Progressão no tempo (ex: retorno semanas depois) e desfecho (ex: descrição da placenta e parto).
-
-Diretrizes importantes:
-- Foque em atender especificamente às instruções do usuário
-- Mantenha o fluxo narrativo natural
-- Não quebre a continuidade com as partes seguintes
-- Se as instruções pedirem mudanças específicas, implemente-as claramente
 
 Forneça APENAS o texto da nova parte {parte_ordem}, sem marcações, números ou comentários.
 """)
@@ -215,7 +254,6 @@ IMPORTANTE, SIGA ESSAS INSTRUÇÕES SEM FALHA - Esta parte deve:
 - Siga as instruções de layout fornecidas na estruturação do caso
 
 OBSERVAÇÕES FINAIS:
-- O problema deve ter um título relevante e isso deve aparecer na parte 1, mas não precisa ser repetido nas partes seguintes.
 - Mantenha o fluxo narrativo natural, como se fosse uma história real.
 - Não adicione * ou qualquer outro tipo de caracter de marcação.
 - Sempre que forem os personagens da história falando, coloque o conteúdo entre aspas
@@ -223,14 +261,11 @@ OBSERVAÇÕES FINAIS:
 """)
 ])
 
-# Template para geração de questões
 def criar_template_questoes():
-    """Cria template com instruções de JSON explícitas"""
     parser = JsonOutputParser(pydantic_object=PerguntasSchema)
-    
     template = """TODO TEXTO QUE VOCÊ GERAR DEVE SER EM JSON, SIGA AS INSTRUÇÕES ABAIXO.
 
-BASEADO NO CONTEÚDO ABAIXO DE UM DOCUMENTO PDF:
+BASEADO NO SEGUINTE EXTRATO DE DOCUMENTO:
 {conteudo_pdf}
 
 GERE {total_perguntas} QUESTÕES DE PROVA SOBRE O ASSUNTO:
@@ -244,24 +279,12 @@ GERE {total_perguntas} QUESTÕES DE PROVA SOBRE O ASSUNTO:
 - FORMATE TODA A SAÍDA EM JSON COM A CHAVE "perguntas" E O VALOR SENDO UM ARRAY DE OBJETOS COM "tipo", "enunciado", "alternativa" E "resposta"
 - NÃO UTILIZE NENHUMA TAG HTML
 - AO GERAR AS ALTERNATIVAS, UTILIZE LETRAS PARA IDENTIFICAR CADA ALTERNATIVA
-- AS LETRAS NÃO DEVEM SER CHAVES DO JSON, APENAS O TEXTO DA ALTERNATIVA
-- AS ALTERNATIVAS SEMPRE DEVEM CONTER O SEGUINTE FORMATO: "A) texto da alternativa\n B) texto da alternativa\n C) texto da alternativa\n D) texto da alternativa\n E) texto da alternativa"
-- A CHAVE "alternativas", EM CASO DE QUESTÃO QUE AS TENHAM, NO JSON SEMPRE DEVE SER UM ARRAY E NUNCA UM OBJETO
-- O PADRÃO DE RESPOSTA E O GABARITO DE ALTERNATIVAS DEVEM FICAR NA CHAVE "resposta"
-- CONTEMPLE TODOS OS MATERIAIS PARA A GERAÇÃO DAS QUESTÕES, OU SEJA, PELO MENOS UMA QUESTÃO DE CADA TEMA SOLICITADO
-- VOCÊ DEVE GERAR EXATAMENTE O NÚMERO DE QUESTÕES SOLICITADO PARA CADA TIPO, NEM MAIS, NEM MENOS
-- NO CAMPO TIPO DO JSON COLOQUE O TIPO DE QUESTÃO SOLICITADO CONFORME ENVIADO PELO PROMPT
-- O TIPO DEVE SER IGUAL AO TIPO SOLICITADO
+- AS ALTERNATIVAS SEMPRE DEVEM CONTER O SEGUINTE FORMATO: "A) texto\n B) texto\n C) texto\n D) texto\n E) texto"
+- A CHAVE "alternativas" NO JSON SEMPRE DEVE SER UM ARRAY E NUNCA UM OBJETO
+- VOCÊ DEVE GERAR EXATAMENTE O NÚMERO DE QUESTÕES SOLICITADO
 {format_instructions}
 
-REGRAS:
-Para questões dissertativas: use "alternativas": null
-Para múltipla escolha: "alternativas" deve ter 5 itens no formato "A) texto"
-Use apenas aspas duplas
-Não adicione texto fora do JSON
-Não use markdown além do bloco json
-
-IMPORTANTE - DE FORMA ALGUMA ADICIONE TEXTO FORA DO JSON
+IMPORTANTE - DE FORMA ALGUMA ADICIONE TEXTO FORA DO JSON.
 """
     return ChatPromptTemplate.from_template(template), parser
 
@@ -278,106 +301,228 @@ PARA A CORREÇÃO DA RESPOSTA DO ALUNO ABAIXO:
 
 #INSTRUÇÕES FINAIS        
 - AVALIE A RESPOSTA DO ALUNO COM BASE NO GABARITO FORNECIDO. 
-- SEJA CRITERIONOSO E JUSTO.
 - FORNEÇA UMA NOTA DE 0 A 10, CONSIDERANDO A COMPLETUDE E CORREÇÃO DA RESPOSTA.
 - Justificativa deve analisar a qualidade técnica da resposta
-- Compare com o gabarito oficial
 - Identifique acertos, erros e omissões
-- Seja construtivo e educativo
 - Retorne APENAS um JSON no formato:
 {{
   "nota": 0-10,
   "justificativa": "análise detalhada"
 }}
-- NÃO UTILIZE NENHUMA TAG HTML
 - TRATE O ALUNO NA SEGUNDA PESSOA DO SINGULAR (VOCÊ)
 """)
 ])
 
 
-# Funções principais convertidas
-def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fontes_info, instrucoesGuia):
-    """Cria guia do tutor usando LangChain com extração limpa de conteúdo"""
-    chain = guia_tutor_template | get_llm()
-    
-    response = chain.invoke({
-        "titulo": titulo,
-        "tema": tema,
-        "assunto": assunto,
-        "objetivos": ", ".join(objetivos),
-        "texto_problema": texto_problema,
-        "fontes_info": fontes_info,
-        "instrucoesGuia": instrucoesGuia
-    })
-    
-    conteudo = response.content
-    
-    # Tratamento estruturado para extrair apenas o Markdown limpo
+# ==========================================
+# LÓGICA DE NEGÓCIO PRINCIPAL
+# ==========================================
+def processar_edital_business_logic(edital_id, user=None):
+    """
+    Nova Arquitetura Agnóstica (Map-Reduce).
+    Processa editais gigantes fragmentando-os em blocos para evitar estouro de contexto
+    independentemente do modelo configurado.
+    """
     try:
-        # Cenário 1: O LangChain já retornou uma lista nativa de blocos do Python
+        llm = get_llm()
+        edital = Edital.objects.get(id=edital_id)
+        
+        # 1. Extração do texto
+        texto_completo = "\n".join(extrair_texto_pdf(edital.arquivo_edital.path))
+        
+        # 2. Fragmentação Segura (4000 caracteres garante encaixe em modelos locais e APIs)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+        docs = text_splitter.create_documents([texto_completo])
+        
+        # 3. Definição da Cadeia Map-Reduce para RESUMO
+        map_resumo_prompt = PromptTemplate(
+            template="Extraia as informações mais importantes sobre prazos, valores e objeto do seguinte trecho de edital:\nTRECHO:\n{text}\nRESUMO:", 
+            input_variables=["text"]
+        )
+        reduce_resumo_prompt = PromptTemplate(
+            template="Com base nos seguintes resumos parciais, crie um Resumo Executivo final coeso, destacando: Objeto do edital, Valores máximos, Prazos e Itens financiáveis.\nRESUMOS PARCIAIS:\n{text}\nRESUMO EXECUTIVO FINAL:", 
+            input_variables=["text"]
+        )
+        chain_resumo = load_summarize_chain(llm, chain_type="map_reduce", map_prompt=map_resumo_prompt, combine_prompt=reduce_resumo_prompt)
+        
+        # 4. Definição da Cadeia Map-Reduce para INSIGHTS
+        map_insights_prompt = PromptTemplate(
+            template="Levante os critérios de elegibilidade, restrições e dicas de aprovação presentes no trecho:\nTRECHO:\n{text}\nINSIGHTS:", 
+            input_variables=["text"]
+        )
+        reduce_insights_prompt = PromptTemplate(
+            template="Com base nos levantamentos parciais, crie uma lista final e estratégica contendo: critérios de elegibilidade críticos, restrições de submissão e dicas táticas de aprovação.\nLEVANTAMENTOS PARCIAIS:\n{text}\nLISTA DE INSIGHTS:", 
+            input_variables=["text"]
+        )
+        chain_insights = load_summarize_chain(llm, chain_type="map_reduce", map_prompt=map_insights_prompt, combine_prompt=reduce_insights_prompt)
+
+        # ==========================================
+        # EXECUÇÃO 1: RESUMO DO EDITAL
+        # ==========================================
+        start_time = time.time()
+        res_resumo = chain_resumo.invoke({"input_documents": docs})
+        duracao_resumo = int((time.time() - start_time) * 1000)
+        texto_resumo_gerado = res_resumo.get("output_text", "")
+        
+        LLMLog.objects.create(
+            user=user,
+            prompt="Processamento Map-Reduce: Resumo do Edital",
+            response=texto_resumo_gerado,
+            model_used=getattr(llm, 'model', 'unknown'),
+            duration_ms=duracao_resumo,
+            status='success',
+            endpoint='processar_edital_business_logic - resumo'
+        )
+
+        # ==========================================
+        # EXECUÇÃO 2: INSIGHTS DO EDITAL
+        # ==========================================
+        start_time = time.time()
+        res_insights = chain_insights.invoke({"input_documents": docs})
+        duracao_insights = int((time.time() - start_time) * 1000)
+        texto_insights_gerado = res_insights.get("output_text", "")
+        
+        LLMLog.objects.create(
+            user=user,
+            prompt="Processamento Map-Reduce: Insights do Edital",
+            response=texto_insights_gerado,
+            model_used=getattr(llm, 'model', 'unknown'),
+            duration_ms=duracao_insights,
+            status='success',
+            endpoint='processar_edital_business_logic - insights'
+        )
+
+        # Atualização no BD
+        edital.resumo_llm = texto_resumo_gerado
+        edital.insights_llm = texto_insights_gerado
+        edital.save()
+        return True
+        
+    except Exception as e:
+        print(f"Falha global ao processar o edital {edital_id}: {str(e)}")
+        LLMLog.objects.create(
+            user=user, prompt=f"Falha ao processar edital ID {edital_id}",
+            status='error', error_message=str(e), endpoint='processar_edital_business_logic'
+        )
+        return False
+
+def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
+    """
+    Nova Arquitetura Agnóstica (RAG In-Memory).
+    Extrai informações usando Banco Vetorial FAISS para evitar estouro de contexto
+    na criação de questões de prova em documentos extensos.
+    """
+    totalPerguntas = sum(qtPerguntas.values())
+    textoPerguntas = "\n".join([f"{k};" for k in qtPerguntas])
+    
+    try:
+        # 1. Extrair e juntar texto bruto
+        completoTudo = ''
+        for fp in file_path:
+            conteudo_extraido = extrair_texto_pdf(fp[0])
+            completoTudo += "\n".join(conteudo_extraido) + "\n\n"
+            
+        # 2. Fragmentar em blocos de conhecimento semântico
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+        docs = text_splitter.create_documents([completoTudo])
+        
+        # 3. Criação do Banco Vetorial e do Buscador (Retriever)
+        embeddings = get_embeddings()
+        vectorstore = FAISS.from_documents(docs, embeddings)
+        
+        # Traz os 6 chunks mais relevantes relacionados ao tema das perguntas
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
+        
+        # 4. Formatação da corrente LCEL
+        prompt_template, parser = criar_template_questoes()
+        llm = get_llm()
+        
+        def format_docs(docs_retrieved):
+            return "\n\n".join([d.page_content for d in docs_retrieved])
+
+        rag_chain = (
+            {
+                "conteudo_pdf": lambda x: format_docs(retriever.invoke(x["query"])),
+                "total_perguntas": lambda x: x["total_perguntas"],
+                "tipo_perguntas": lambda x: x["tipo_perguntas"],
+                "info_extras": lambda x: x["info_extras"],
+                "format_instructions": lambda x: x["format_instructions"]
+            }
+            | prompt_template
+            | llm
+            | parser
+        )
+        
+        # Monta a query para o Retriever puxar apenas a área do PDF relevante para as questões
+        query_busca = f"Conteúdo sobre: {', '.join(qtPerguntas.keys())}"
+        
+        inputs = {
+            "query": query_busca,
+            "total_perguntas": totalPerguntas,
+            "tipo_perguntas": textoPerguntas,
+            "info_extras": infoExtras,
+            "format_instructions": parser.get_format_instructions()
+        }
+        
+        response = invoke_chain(rag_chain, inputs, endpoint='getQuestionsFromSource', user=user)
+        print(response)
+        return json.dumps(response, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        return json.dumps({
+            "perguntas": [],
+            "erro": f"Erro ao gerar questões via RAG: {str(e)}"
+        }, ensure_ascii=False)
+
+
+# ==========================================
+# OUTRAS FUNÇÕES DE ROTEAMENTO (Mantidas inalteradas)
+# ==========================================
+def criarPromptGuiaTutor(titulo, tema, assunto, objetivos, texto_problema, fontes_info, instrucoesGuia):
+    chain = guia_tutor_template | get_llm()
+    response = chain.invoke({
+        "titulo": titulo, "tema": tema, "assunto": assunto,
+        "objetivos": ", ".join(objetivos), "texto_problema": texto_problema,
+        "fontes_info": fontes_info, "instrucoesGuia": instrucoesGuia
+    })
+    conteudo = response.content
+    try:
         if isinstance(conteudo, list) and len(conteudo) > 0:
             if isinstance(conteudo[0], dict) and 'text' in conteudo[0]:
                 return conteudo[0]['text']
-                
-        # Cenário 2: O LangChain retornou o Array convertido forçadamente numa String
         elif isinstance(conteudo, str) and conteudo.strip().startswith('['):
             try:
                 dados = json.loads(conteudo)
             except json.JSONDecodeError:
-                # O ast.literal_eval salva quando o log tem aspas simples ('type': 'text')
                 dados = ast.literal_eval(conteudo)
-                
             if isinstance(dados, list) and len(dados) > 0 and isinstance(dados[0], dict) and 'text' in dados[0]:
                 return dados[0]['text']
-                
     except Exception as e:
         import logging
         logging.error(f"Erro ao limpar retorno do LLM no Guia do Tutor: {e}")
-        
-    # Cenário Fallback: Se já for um texto normal ou se a limpeza falhar, devolve o original
-    if isinstance(conteudo, str):
-        return conteudo
-        
-    return str(conteudo)
+    return conteudo if isinstance(conteudo, str) else str(conteudo)
 
 def regerarParte(tema, assunto, objetivos, parte_ordem, contexto_anterior, fontes, instrucoes, parte_original, instrucoes_layout="", user=None):
-    """Regera parte usando LangChain"""
     chain = regerar_parte_template | get_llm()
-    
     inputs = {
-        "tema": tema,
-        "assunto": assunto,
-        "objetivos": ", ".join(objetivos),
-        "parte_ordem": parte_ordem,
-        "parte_ordem_anterior": parte_ordem - 1,
-        "contexto_anterior": contexto_anterior,
-        "fontes": fontes,
-        "instrucoes": instrucoes,
-        "parte_original": parte_original,
+        "tema": tema, "assunto": assunto, "objetivos": ", ".join(objetivos),
+        "parte_ordem": parte_ordem, "parte_ordem_anterior": parte_ordem - 1,
+        "contexto_anterior": contexto_anterior, "fontes": fontes,
+        "instrucoes": instrucoes, "parte_original": parte_original,
         "instrucoes_layout": instrucoes_layout
     }
-
-    response = invoke_chain(chain, inputs, endpoint='regerarParte',user=user)
-    
+    response = invoke_chain(chain, inputs, endpoint='regerarParte', user=user)
     return extrair_texto_puro(response.content) if hasattr(response, 'content') else str(response)
 
 def criarPromptParaParte(tema, assunto, objetivos, parte_atual, total_partes, contexto_anterior, fontes, instrucoes_layout="", user=None):
-    """Cria parte do problema usando LangChain"""
     chain = criar_parte_template | get_llm()
-
     inputs = {
-        "tema": tema,
-        "assunto": assunto,
-        "objetivos": ", ".join(objetivos),
-        "parte_atual": parte_atual,
-        "total_partes": total_partes if total_partes else "N",
-        "contexto_anterior": contexto_anterior,
-        "fontes": fontes,
+        "tema": tema, "assunto": assunto, "objetivos": ", ".join(objetivos),
+        "parte_atual": parte_atual, "total_partes": total_partes if total_partes else "N",
+        "contexto_anterior": contexto_anterior, "fontes": fontes,
         "instrucoes_layout": instrucoes_layout
     }
-
     response = invoke_chain(chain, inputs, endpoint='criarPromptParaParte', user=user)
-    
     return extrair_texto_puro(response.content) if hasattr(response, 'content') else str(response)
 
 def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
@@ -387,14 +532,9 @@ def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
     error = None
     response_content = None
     status = 'success'
-    
     try:
         response = llm.invoke(prompt)
-        if hasattr(response, 'content'):
-            # Usando a nova função aqui
-            response_content = extrair_texto_puro(response.content)
-        else:
-            response_content = extrair_texto_puro(response)
+        response_content = extrair_texto_puro(response.content) if hasattr(response, 'content') else extrair_texto_puro(response)
     except Exception as e:
         status = 'error'
         error = str(e)
@@ -402,90 +542,23 @@ def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
     finally:
         duration = int((time.time() - start_time) * 1000)
         LLMLog.objects.create(
-            user=user,
-            prompt=prompt,
-            response=response_content,
-            model_used=model_name,
-            duration_ms=duration,
-            status=status,
-            error_message=error,
-            endpoint=endpoint
+            user=user, prompt=prompt[:5000], response=response_content,
+            model_used=model_name, duration_ms=duration, status=status,
+            error_message=error, endpoint=endpoint
         )
-    
     return response_content
 
-def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
-    """Gera questões a partir do conteúdo do PDF usando LangChain com JSON parsing"""
-    totalPerguntas = sum(qtPerguntas.values())
-    textoPerguntas = "\n".join([f"{k};" for k in qtPerguntas])
-    
-    try:
-        # Extrair texto do PDF
-        completoTudo = ''
-        for fp in file_path:
-            conteudo_extraido = extrair_texto_pdf(fp[0])
-            texto_completo = "\n".join(conteudo_extraido)
-            completoTudo += f"FONTE - {fp[1]}\n" + texto_completo + "\n\n"
-        
-        # Limitar tamanho para evitar timeout
-        conteudo_limitado = completoTudo
-        
-        # Criar chain com parser JSON        
-        prompt_template, parser = criar_template_questoes()
-        print(prompt_template)
-
-        chain = prompt_template | get_llm() | parser
-        
-        # Invocar chain
-        inputs = {
-            "conteudo_pdf": conteudo_limitado,
-            "total_perguntas": totalPerguntas,
-            "tipo_perguntas": textoPerguntas,
-            "info_extras": infoExtras,
-            "format_instructions": parser.get_format_instructions()
-        }
-        print(inputs)
-        response = invoke_chain(chain, inputs, endpoint='getQuestionsFromSource', 
-                                user=user)
-        
-        return json.dumps(response, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
-        # Fallback para versão manual se o parsing automático falhar
-        return json.dumps({
-            "perguntas": [],
-            "erro": f"Erro ao gerar questões: {str(e)}"
-        }, ensure_ascii=False)
-
 def fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno, user=None):
-    """Corrige resposta usando LangChain"""
     try:
-        # Criar chain com parser JSON
         parser = JsonOutputParser()
         chain = correcao_template | get_llm() | parser
-        
-        # Invocar chain
-        inputs = {
-            "enunciado": enunciado,
-            "gabarito": gabarito,
-            "resposta_aluno": resposta_aluno
-        }
+        inputs = { "enunciado": enunciado, "gabarito": gabarito, "resposta_aluno": resposta_aluno }
         response = invoke_chain(chain, inputs, endpoint='fazerCorrecaoComModelo', user=user)
-        
         return json.dumps(response, ensure_ascii=False)
-        
     except Exception as e:
-        return json.dumps({
-            "nota": 0,
-            "justificativa": f"Erro na correção: {str(e)}"
-        })
+        return json.dumps({ "nota": 0, "justificativa": f"Erro na correção: {str(e)}" })
 
 def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_pergunta=None, user=None):
-    """
-    Corrige respostas multimodais usando Gemini (multimodal).
-    Registra log da chamada.
-    Retorna string JSON com nota e justificativa.
-    """
     start_time = time.time()
     error = None
     response_content = None
@@ -494,202 +567,88 @@ def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_perg
     tokens_input = None
     tokens_output = None
     output = None
-
     try:
-        # Usar Gemini para multimodal
-        llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            google_api_key=settings.GEMINI_API_KEY,
-            temperature=0.3,
-        )
-        
-        # Preparar conteúdo multimodal
+        llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=settings.GEMINI_API_KEY, temperature=0.3)
         conteudos = []
-        
-        # Adicionar texto base
-        prompt_texto = f"""
-        ENUNCIADO DA PERGUNTA:
-        {enunciado}
-        
-        GABARITO/PADRÃO DE RESPOSTA:
-        {gabarito}
-        
-        RESPOSTA DO ALUNO (pode conter texto e/ou elementos visuais):
-        """
+        prompt_texto = f"ENUNCIADO DA PERGUNTA:\n{enunciado}\n\nGABARITO/PADRÃO DE RESPOSTA:\n{gabarito}\n\nRESPOSTA DO ALUNO:\n"
         conteudos.append(HumanMessage(content=prompt_texto))
         
-        # Adicionar imagens da pergunta (se houver)
         if imagens_pergunta:
             for imagem_info in imagens_pergunta:
                 try:
                     imagem = Image.open(imagem_info['caminho_absoluto'])
-                    
-                    # Converter imagem para base64
                     buffered = io.BytesIO()
                     imagem.save(buffered, format="PNG")
                     img_str = base64.b64encode(buffered.getvalue()).decode()
-                    
-                    # Criar mensagem com texto e imagem
-                    message_content = [
+                    conteudos.append(HumanMessage(content=[
                         {"type": "text", "text": f"IMAGEM DO ENUNCIADO: {imagem_info['nome']}"},
                         {"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}
-                    ]
-                    conteudos.append(HumanMessage(content=message_content))
+                    ]))
                 except Exception as e:
-                    # Log do erro mas continua
                     print(f"Erro ao carregar imagem do enunciado: {e}")
         
-        # Adicionar resposta do aluno (pode ser imagem ou texto)
         try:
-            # Se resposta_aluno for string, verificar se é caminho de arquivo
             if isinstance(resposta_aluno, str):
-                # Tenta abrir como imagem
                 try:
                     imagem_resposta = Image.open(resposta_aluno)
-                    # Converter imagem para base64
                     buffered = io.BytesIO()
                     imagem_resposta.save(buffered, format="PNG")
                     img_str = base64.b64encode(buffered.getvalue()).decode()
-                    
-                    message_content = [
-                        {"type": "text", "text": "RESPOSTA DO ALUNO (IMAGEM):"},
-                        {"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}
-                    ]
-                    conteudos.append(HumanMessage(content=message_content))
+                    conteudos.append(HumanMessage(content=[{"type": "text", "text": "RESPOSTA DO ALUNO (IMAGEM):"},{"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}]))
                 except:
-                    # Se não for imagem, trata como texto
                     conteudos.append(HumanMessage(content=f"RESPOSTA DO ALUNO (TEXTO):\n{resposta_aluno}"))
             else:
-                # Assume que é objeto Image
                 buffered = io.BytesIO()
                 resposta_aluno.save(buffered, format="PNG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
-                
-                message_content = [
-                    {"type": "text", "text": "RESPOSTA DO ALUNO (IMAGEM):"},
-                    {"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}
-                ]
-                conteudos.append(HumanMessage(content=message_content))
+                conteudos.append(HumanMessage(content=[{"type": "text", "text": "RESPOSTA DO ALUNO (IMAGEM):"},{"type": "image_url", "image_url": f"data:image/png;base64,{img_str}"}]))
         except Exception as e:
-            print(f"Erro ao processar resposta do aluno: {e}")
-            # Em caso de erro, adiciona texto simples
             conteudos.append(HumanMessage(content=f"RESPOSTA DO ALUNO (não processada): {str(resposta_aluno)}"))
         
-        # Adicionar instruções finais
-        instrucoes_finais = """
+        conteudos.append(HumanMessage(content="""
         #INSTRUÇÕES FINAIS        
         - AVALIE A RESPOSTA DO ALUNO COM BASE NO GABARITO FORNECIDO. 
         - SEJA CRITERIONOSO E JUSTO.
         - FORNEÇA UMA NOTA DE 0 A 10, CONSIDERANDO A COMPLETUDE E CORREÇÃO DA RESPOSTA.
-        - Justificativa deve analisar a qualidade técnica da resposta
-        - Compare com o gabarito oficial
-        - Identifique acertos, erros e omissões
-        - Seja construtivo e educativo
-        - Retorne APENAS um JSON no formato:
-        {
-          "nota": 0-10,
-          "justificativa": "análise detalhada"
-        }
-        - NÃO UTILIZE NENHUMA TAG HTML
+        - Retorne APENAS um JSON no formato: {"nota": 0-10, "justificativa": "análise detalhada"}
         - TRATE O ALUNO NA SEGUNDA PESSOA DO SINGULAR (VOCÊ)
-        """
-        conteudos.append(HumanMessage(content=instrucoes_finais))
+        """))
         
-        # Gerar correção
         response = llm.invoke(conteudos)
         response_content = response.content
-        
-        # Tentar extrair tokens de uso (se disponível)
         if hasattr(response, 'usage_metadata'):
             tokens_input = response.usage_metadata.get('input_tokens')
             tokens_output = response.usage_metadata.get('output_tokens')
         
-        # Extrair JSON da resposta
         json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
         if json_match:
             output = json_match.group()
-            # Validar se é JSON válido
             try:
                 json.loads(output)
             except json.JSONDecodeError:
-                # Se não for válido, criar estrutura padrão
-                output = json.dumps({
-                    "nota": 0,
-                    "justificativa": f"A resposta da IA não pôde ser interpretada. Conteúdo: {response_content[:200]}..."
-                })
+                output = json.dumps({"nota": 0, "justificativa": f"A resposta da IA não pôde ser interpretada. Conteúdo: {response_content[:200]}..."})
         else:
-            # Se não encontrar JSON, criar um manualmente
-            output = json.dumps({
-                "nota": 0,
-                "justificativa": f"Resposta não pôde ser processada. Conteúdo: {response_content[:200]}..."
-            })
-        
+            output = json.dumps({"nota": 0, "justificativa": f"Resposta não pôde ser processada. Conteúdo: {response_content[:200]}..."})
         return output
-        
     except Exception as e:
         status = 'error'
         error = str(e)
-        output = json.dumps({
-            "nota": 0,
-            "justificativa": f"Erro na correção multimodal: {str(e)}"
-        })
-        return output
+        return json.dumps({"nota": 0, "justificativa": f"Erro na correção multimodal: {str(e)}"})
     finally:
         duration = int((time.time() - start_time) * 1000)
-        # Registrar log
         try:
             from mimir.models import LLMLog
             LLMLog.objects.create(
-                user=user,
-                prompt=f"Multimodal - enunciado: {enunciado[:200]}...",  # resumo
-                response=response_content,
-                model_used=model_name,
-                tokens_input=tokens_input,
-                tokens_output=tokens_output,
-                duration_ms=duration,
-                status=status,
-                error_message=error,
-                endpoint='corrigirRespostaMultimodal'
+                user=user, prompt=f"Multimodal - enunciado: {enunciado[:200]}...", response=response_content,
+                model_used=model_name, tokens_input=tokens_input, tokens_output=tokens_output,
+                duration_ms=duration, status=status, error_message=error, endpoint='corrigirRespostaMultimodal'
             )
         except Exception as log_error:
-            # Não deixar o log atrapalhar a resposta
             print(f"Erro ao salvar log: {log_error}")
 
-# Funções auxiliares (mantidas como estão)
-def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
-    """Processa PDF em lotes para evitar timeout"""
-    textos_por_lote = []
-    
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            total_paginas = len(pdf.pages)
-            lotes = [pdf.pages[i:i+max_pages_per_batch] 
-                    for i in range(0, total_paginas, max_pages_per_batch)]
-            
-            for indice_lote, lote_paginas in enumerate(lotes):
-                texto_lote = f"FONTE: {fileName} - LOTE {indice_lote + 1}\n"
-                
-                for i, pagina in enumerate(lote_paginas, 1):
-                    try:
-                        texto_pagina = pagina.extract_text()
-                        if texto_pagina and texto_pagina.strip():
-                            texto_lote += f"--- PÁGINA {(indice_lote * max_pages_per_batch) + i} ---\n"
-                            texto_lote += texto_pagina.strip() + "\n\n"
-                    except Exception as e:
-                        texto_lote += f"Erro na página {(indice_lote * max_pages_per_batch) + i}: {str(e)}\n"
-                
-                textos_por_lote.append(texto_lote)
-                
-    except Exception as e:
-        textos_por_lote.append(f"Erro ao processar {file_path}: {str(e)}")
-    
-    return textos_por_lote
-
 def extrair_texto_pdf(caminho_arquivo):
-    """Extrai texto de PDF com tratamento robusto de erros"""
     try:
         texto = []
-        
         with pdfplumber.open(caminho_arquivo) as pdf:
             for i, pagina in enumerate(pdf.pages, 1):
                 try:
@@ -697,203 +656,138 @@ def extrair_texto_pdf(caminho_arquivo):
                     if texto_pagina and texto_pagina.strip():
                         texto.append(f"--- PÁGINA {i} ---")
                         texto.append(texto_pagina.strip())
-                        texto.append("")  # Linha em branco
+                        texto.append("") 
                 except Exception as e:
                     texto.append(f"Erro na página {i}: {str(e)}")
-        
         return texto if texto else ["Nenhum texto extraído do PDF"]
-        
     except ImportError:
         return ["Biblioteca pdfplumber não instalada. Execute: pip install pdfplumber"]
     except Exception as e:
         return [f"Erro na extração do PDF: {str(e)}"]
 
 def processarRespostaIA(resposta_ia):
-    """Processa o JSON retornado pela IA"""
     try:
-        # Limpar e parsear o JSON        
         resposta_limpa = re.sub(r'^```json\n|\n```$', '', resposta_ia.strip())
-        print(resposta_limpa)
         return json.loads(resposta_limpa)
     except Exception as e:
         print(f"Erro ao processar resposta da IA: {str(e)}")
         return []
 
-def construirTextoPerguntaCompleto(enunciado, tipo_pergunta, pergunta_id, post_data):
-    """
-    Constrói o texto completo da pergunta incluindo alternativas se for múltipla escolha
-    """
-    tipo_pergunta = tipo_pergunta.lower() if tipo_pergunta else ''
-    
-    if 'múltipla' in tipo_pergunta.lower() or 'multipla' in tipo_pergunta.lower():
-        alternativas = []
-        prefixo = f'pergunta_{pergunta_id}'
-        
-        i = 1
-        while True:
-            alternativa_key = f'{prefixo}_alternativa_{i}'
-            alternativa = post_data.get(alternativa_key, '').strip()
-            
-            if not alternativa:
-                break
-                
-            alternativas.append(alternativa)
-            i += 1
-        
-        if alternativas:
-            texto_pergunta = enunciado + "\n\n"
-            for j, alternativa in enumerate(alternativas, 1):
-                texto_pergunta += f"{alternativa}\n"
-            
-            return texto_pergunta.strip()
-    
-    return enunciado
-
-# Função auxiliar para processar JSON
 def extrair_json_da_resposta(texto):
-    """Extrai JSON de uma resposta que pode conter texto adicional"""
     try:
-        # Tentar parsear diretamente
         return json.loads(texto)
     except json.JSONDecodeError:
-        # Procurar por JSON no texto
         match = re.search(r'\{[\s\S]*\}', texto)
         if match:
             try:
                 return json.loads(match.group())
             except json.JSONDecodeError:
-                # Tentar limpar o JSON
                 json_str = match.group()
-                # Remover caracteres problemáticos
                 json_str = re.sub(r',\s*}', '}', json_str)
                 json_str = re.sub(r',\s*]', ']', json_str)
                 try:
                     return json.loads(json_str)
                 except:
                     pass
-        
-        # Se não encontrar JSON válido, criar estrutura padrão
         return {"perguntas": [], "erro": "Não foi possível processar o JSON"}
 
-def processar_edital_business_logic(edital_id, user=None):
+def construirTextoPerguntaCompleto(enunciado, tipo_pergunta, pergunta_id, post_data):
+    tipo_pergunta = tipo_pergunta.lower() if tipo_pergunta else ''
+    if 'múltipla' in tipo_pergunta.lower() or 'multipla' in tipo_pergunta.lower():
+        alternativas = []
+        prefixo = f'pergunta_{pergunta_id}'
+        i = 1
+        while True:
+            alternativa_key = f'{prefixo}_alternativa_{i}'
+            alternativa = post_data.get(alternativa_key, '').strip()
+            if not alternativa: break
+            alternativas.append(alternativa)
+            i += 1
+        if alternativas:
+            texto_pergunta = enunciado + "\n\n"
+            for j, alternativa in enumerate(alternativas, 1):
+                texto_pergunta += f"{alternativa}\n"
+            return texto_pergunta.strip()
+    return enunciado
+
+def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
+    textos_por_lote = []
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            total_paginas = len(pdf.pages)
+            lotes = [pdf.pages[i:i+max_pages_per_batch] for i in range(0, total_paginas, max_pages_per_batch)]
+            for indice_lote, lote_paginas in enumerate(lotes):
+                texto_lote = f"FONTE: {fileName} - LOTE {indice_lote + 1}\n"
+                for i, pagina in enumerate(lote_paginas, 1):
+                    try:
+                        texto_pagina = pagina.extract_text()
+                        if texto_pagina and texto_pagina.strip():
+                            texto_lote += f"--- PÁGINA {(indice_lote * max_pages_per_batch) + i} ---\n{texto_pagina.strip()}\n\n"
+                    except Exception as e:
+                        texto_lote += f"Erro na página {(indice_lote * max_pages_per_batch) + i}: {str(e)}\n"
+                textos_por_lote.append(texto_lote)
+    except Exception as e:
+        textos_por_lote.append(f"Erro ao processar {file_path}: {str(e)}")
+    return textos_por_lote
+
+def avaliarProbabilidadeProjeto(texto_projeto_atual, lista_feedbacks_passados, user=None):
     """
-    Extrai o texto, aciona o LangChain e registra no LLMLog calculando tokens e milissegundos.
+    Cruza o projeto atual com feedbacks antigos usando RAG em memória 
+    para prever a aprovação e gerar insights de mitigação.
     """
     try:
-        llm_instance = get_llm()
-        edital = Edital.objects.get(id=edital_id)
-        texto_completo = "\n".join(extrair_texto_pdf(edital.arquivo_edital.path))
-        contexto_ia = texto_completo[:12000] # Limite de segurança de contexto
-        
-        # 1. Definição dos Prompts
-        prompt_resumo = ChatPromptTemplate.from_messages([
-            ("system", "Você é um especialista em análise de editais públicos e propostas de fomento à pesquisa."),
-            ("user", "Analise o seguinte edital e faça um resumo direto focado em: Objeto do edital, Valores máximos, Prazos e Itens financiáveis.\n\nTexto:\n{texto}")
-        ])
-        
-        prompt_insights = ChatPromptTemplate.from_messages([
-            ("system", "Você é um avaliador sênior de projetos institucionais."),
-            ("user", "Com base no seguinte edital, levante os principais critérios de elegibilidade, restrições críticas e dicas estratégicas de aprovação.\n\nTexto:\n{texto}")
-        ])
-        
-        # 2. Cadeias LCEL (Sem o OutputParser final para mantermos o AIMessage e extrairmos tokens)
-        cadeia_resumo = prompt_resumo | llm_instance
-        cadeia_insights = prompt_insights | llm_instance
-        
-        # ==========================================
-        # EXECUÇÃO 1: RESUMO DO EDITAL
-        # ==========================================
-        start_time_resumo = time.time()
-        try:
-            prompt_resumo_formatado = prompt_resumo.format(texto=contexto_ia)
-            resposta_bruta_resumo = cadeia_resumo.invoke({"texto": contexto_ia})
+        # 1. Se não houver histórico, criamos um contexto genérico para o LLM não falhar
+        if not lista_feedbacks_passados or len(lista_feedbacks_passados) == 0:
+            texto_historico_consolidado = "Não há histórico de feedbacks passados no sistema. Avalie o projeto apenas com base em boas práticas universais de redação científica e estruturação de projetos."
+            retriever = None
+        else:
+            # Consolida o histórico e fragmenta para o RAG
+            texto_historico_consolidado = "\n\n--- NOVO PARECER/FEEDBACK ---\n\n".join(lista_feedbacks_passados)
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+            docs_historico = text_splitter.create_documents([texto_historico_consolidado])
             
-            duracao_resumo_ms = int((time.time() - start_time_resumo) * 1000)
+            # Cria o Banco Vetorial FAISS com o histórico
+            embeddings = get_embeddings()
+            vectorstore = FAISS.from_documents(docs_historico, embeddings)
+            
+            # O Retriever vai buscar as avaliações passadas mais parecidas com o tema do projeto atual
+            retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
-            conteudo_resumo = resposta_bruta_resumo.content
-            if isinstance(conteudo_resumo, list):
-                # Percorre a lista e concatena tudo que for do tipo 'text'
-                texto_resumo_gerado = "".join(bloco.get('text', '') for bloco in conteudo_resumo if isinstance(bloco, dict))
-            else:
-                # Se o modelo retornou uma string direta
-                texto_resumo_gerado = str(conteudo_resumo)
-            
-            # Extração segura de metadados (tokens e modelo)
-            metadata = resposta_bruta_resumo.response_metadata or {}
-            token_usage = metadata.get('token_usage', {})
-            
-            LLMLog.objects.create(
-                user=user,
-                prompt=prompt_resumo_formatado,
-                response=texto_resumo_gerado,
-                model_used=metadata.get('model_name', 'Mimir Default LLM'),
-                tokens_input=token_usage.get('prompt_tokens', 0),
-                tokens_output=token_usage.get('completion_tokens', 0),
-                duration_ms=duracao_resumo_ms,
-                status='success',
-                endpoint='processar_edital_business_logic - resumo'
-            )
-        except Exception as e:
-            LLMLog.objects.create(
-                user=user,
-                prompt=prompt_resumo.format(texto=contexto_ia),
-                duration_ms=int((time.time() - start_time_resumo) * 1000),
-                status='error',
-                error_message=str(e),
-                endpoint='processar_edital_business_logic - resumo'
-            )
-            raise e # Repassa o erro para interromper o fluxo
+        # 2. Prepara a Corrente LCEL
+        prompt_template, parser = criar_template_analise_projeto()
+        llm = get_llm()
 
-        # ==========================================
-        # EXECUÇÃO 2: INSIGHTS DO EDITAL
-        # ==========================================
-        start_time_insights = time.time()
-        try:
-            prompt_insights_formatado = prompt_insights.format(texto=contexto_ia)
-            resposta_bruta_insights = cadeia_insights.invoke({"texto": contexto_ia})
-            
-            duracao_insights_ms = int((time.time() - start_time_insights) * 1000)
-            conteudo_insights = resposta_bruta_insights.content
-            if isinstance(conteudo_insights, list):
-                texto_insights_gerado = "".join(bloco.get('text', '') for bloco in conteudo_insights if isinstance(bloco, dict))
-            else:
-                texto_insights_gerado = str(conteudo_insights)
-            
-            # Extração segura de metadados
-            metadata = resposta_bruta_insights.response_metadata or {}
-            token_usage = metadata.get('token_usage', {})
-            
-            LLMLog.objects.create(
-                user=user,
-                prompt=prompt_insights_formatado,
-                response=texto_insights_gerado,
-                model_used=metadata.get('model_name', 'Mimir Default LLM'),
-                tokens_input=token_usage.get('prompt_tokens', 0),
-                tokens_output=token_usage.get('completion_tokens', 0),
-                duration_ms=duracao_insights_ms,
-                status='success',
-                endpoint='processar_edital_business_logic - insights'
-            )
-        except Exception as e:
-            LLMLog.objects.create(
-                user=user,
-                prompt=prompt_insights.format(texto=contexto_ia),
-                duration_ms=int((time.time() - start_time_insights) * 1000),
-                status='error',
-                error_message=str(e),
-                endpoint='processar_edital_business_logic - insights'
-            )
-            raise e
+        # Função auxiliar para extrair texto do retriever
+        def get_contexto(projeto_text):
+            if retriever:
+                docs = retriever.invoke(projeto_text)
+                return "\n\n".join([d.page_content for d in docs])
+            return texto_historico_consolidado
 
-        # ==========================================
-        # ATUALIZAÇÃO DO BANCO DE DADOS
-        # ==========================================
-        edital.resumo_llm = texto_resumo_gerado
-        edital.insights_llm = texto_insights_gerado
-        edital.save()
-        
-        return True
-        
+        rag_chain = (
+            {
+                "contexto_historico": lambda x: get_contexto(x["projeto_atual"]),
+                "projeto_atual": lambda x: x["projeto_atual"],
+                "format_instructions": lambda x: x["format_instructions"]
+            }
+            | prompt_template
+            | llm
+            | parser
+        )
+
+        inputs = {
+            "projeto_atual": texto_projeto_atual,
+            "format_instructions": parser.get_format_instructions()
+        }
+
+        # 3. Execução e Log
+        response = invoke_chain(rag_chain, inputs, endpoint='avaliarProbabilidadeProjeto', user=user)
+        return json.dumps(response, ensure_ascii=False, indent=2)
+
     except Exception as e:
-        print(f"Falha global ao processar o edital {edital_id}: {str(e)}")
-        return False
+        return json.dumps({
+            "probabilidade_aprovacao": 0,
+            "pontos_fortes": [],
+            "pontos_fracos": [],
+            "mitigacoes": [f"Erro ao processar análise preditiva: {str(e)}"]
+        }, ensure_ascii=False)

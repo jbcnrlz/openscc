@@ -4,7 +4,7 @@ from django.conf import settings
 from .models import *
 from .forms import *
 from django.contrib import messages
-from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo, corrigirRespostaMultimodal
+from commons.services import getQuestionsFromSource, processarRespostaIA, construirTextoPerguntaCompleto, fazerCorrecaoComModelo, corrigirRespostaMultimodal, avaliarProbabilidadeProjeto
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
@@ -3534,3 +3534,44 @@ def uploadImagemTinymce(request):
             return JsonResponse({'error': f'Falha no processamento: {str(e)}'}, status=500)
             
     return JsonResponse({'error': 'Método inválido ou arquivo ausente.'}, status=405)
+
+@login_required
+def cadastrarParecerHistorico(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ParecerHistorico.objects.create(
+                titulo=data.get('titulo'),
+                orgao_fomento=data.get('orgao_fomento'),
+                texto_parecer=data.get('texto_parecer'),
+                cadastrado_por=request.user
+            )
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método inválido.'})
+
+@login_required
+def analisePreditivaProjeto(request, projeto_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            texto_rascunho_atual = data.get('texto_projeto') # Vem do TinyMCE no frontend
+            
+            # Puxa todos os pareceres cadastrados no sistema (Você pode filtrar por órgão de fomento depois se quiser)
+            pareceres = ParecerHistorico.objects.all().values_list('texto_parecer', flat=True)
+            lista_pareceres = list(pareceres)
+            
+            if not lista_pareceres:
+                return JsonResponse({'success': False, 'message': 'Nenhum parecer histórico cadastrado no banco para servir de base.'})
+
+            # Chama a função do LangChain que criamos no passo anterior
+            # (Certifique-se de importar avaliarProbabilidadeProjeto do seu arquivo de IA)            
+            resultado_json = avaliarProbabilidadeProjeto(texto_rascunho_atual, lista_pareceres, request.user)
+            
+            # O resultado_json já é uma string formatada em JSON pelo LangChain
+            return JsonResponse({'success': True, 'analise': json.loads(resultado_json)})
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False})

@@ -183,6 +183,25 @@
                     </div>
                 </div>
 
+                <!-- INTELIGÊNCIA ESTRATÉGICA E FEEDBACK -->
+                <div class="card shadow-sm border-0 border-top border-success border-4 mb-4">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-success"><i class="fas fa-chart-line me-2"></i> Estratégia e Aprovação</h6>
+                    </div>
+                    <div class="card-body p-3 text-center">
+                        <p class="small text-muted mb-3" style="text-align: justify;">O sistema cruza o rascunho atual com o histórico de pareceres cadastrados para prever a probabilidade de aprovação.</p>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-success btn-sm fw-bold shadow-sm" onclick="abrirModalParecer()">
+                                <i class="fas fa-plus-circle me-1"></i> Alimentar IA com Parecer
+                            </button>
+                            <button class="btn btn-success btn-sm fw-bold shadow-sm" onclick="iniciarAnalisePreditiva()">
+                                <i class="fas fa-robot me-1"></i> Rodar Análise Preditiva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- RESUMO DO EDITAL -->
                 <div class="card shadow-sm border-0 border-top border-purple border-4 mb-4">
                     <div class="card-header bg-white border-bottom py-3">
@@ -214,6 +233,92 @@
 <!-- ========================================== -->
 <!-- SEÇÃO DE MODAIS DO SISTEMA                 -->
 <!-- ========================================== -->
+<!-- Modal: Cadastrar Novo Parecer Historico -->
+<div class="modal fade" id="modalCadastrarParecer" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-database text-success me-2"></i> Cadastrar Parecer Histórico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-success bg-success bg-opacity-10 border-success-subtle small">
+                    <i class="fas fa-info-circle me-1"></i> Os dados inseridos aqui alimentarão o banco vetorial do projeto e servirão de base para prever falhas em propostas futuras.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Título / Identificação</label>
+                    <input type="text" id="inputTituloParecer" class="form-control" placeholder="Ex: Avaliação FINEP 2023 - Reprovado">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Órgão de Fomento</label>
+                    <input type="text" id="inputOrgaoParecer" class="form-control" placeholder="Ex: FAPESP, CNPq...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Texto Completo do Parecer / Feedback</label>
+                    <textarea id="inputTextoParecer" class="form-control" rows="8" placeholder="Cole aqui as críticas, pontuações e recomendações dadas pelos avaliadores..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success text-white fw-bold shadow-sm" onclick="salvarParecerBanco()">Salvar no Banco</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Resultado da Análise Preditiva -->
+<div class="modal fade" id="modalResultadoAnalise" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-chart-pie text-success me-2"></i> Relatório de Viabilidade e Mitigação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <!-- Loader -->
+                <div id="loaderAnalise" class="text-center py-5">
+                    <div class="spinner-border text-success mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                    <h5 class="fw-bold">Avaliando Proposta...</h5>
+                    <p class="text-muted small">Cruzando informações com o banco vetorial de pareceres. Isso pode levar alguns segundos.</p>
+                </div>
+
+                <!-- Conteúdo -->
+                <div id="conteudoAnalise" class="d-none">
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100 text-center p-4">
+                                <h6 class="text-muted fw-bold text-uppercase mb-3">Probabilidade de Aprovação</h6>
+                                <h1 class="display-1 fw-bold text-success mb-0" id="uiProbabilidade">0%</h1>
+                                <div class="progress mt-3" style="height: 10px;">
+                                    <div class="progress-bar bg-success" id="uiBarraProbabilidade" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card border-0 shadow-sm h-100 p-4">
+                                <h6 class="text-primary fw-bold mb-3"><i class="fas fa-check-circle me-2"></i>Pontos Fortes Identificados</h6>
+                                <ul class="list-group list-group-flush small" id="uiPontosFortes"></ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm border-top border-danger border-4 h-100 p-4">
+                                <h6 class="text-danger fw-bold mb-3"><i class="fas fa-exclamation-triangle me-2"></i>Pontos Críticos / Riscos</h6>
+                                <ul class="list-group list-group-flush small" id="uiPontosFracos"></ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm border-top border-info border-4 h-100 p-4 bg-info bg-opacity-10">
+                                <h6 class="text-info-emphasis fw-bold mb-3"><i class="fas fa-lightbulb me-2"></i>Plano de Mitigação Recomendado</h6>
+                                <ul class="list-group list-group-flush small bg-transparent" id="uiMitigacoes"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- Modal: Inserir Fórmula Matemática -->
 <div class="modal fade" id="modalFormula" tabindex="-1">
@@ -874,6 +979,95 @@ function gerenciarMembro(usuarioId, acao, nome = '', email = '') {
 
 function executarGerenciarMembro(usuarioId, acao) {
     fetch("{% url 'mimir:gerenciarEquipeProjeto' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ projeto_id: {{ projeto.id }}, usuario_id: usuarioId, acao: acao }) }).then(r => r.json()).then(data => { if (data.success) { setTimeout(() => location.reload(), 300); } else { swalMimir.fire('Atenção', data.message, 'error'); } });
+}
+// --- LÓGICA DE CADASTRO DE PARECERES ---
+let modalParecerInst = null;
+let modalAnaliseInst = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    modalParecerInst = new bootstrap.Modal(document.getElementById('modalCadastrarParecer'));
+    modalAnaliseInst = new bootstrap.Modal(document.getElementById('modalResultadoAnalise'));
+});
+
+function abrirModalParecer() {
+    document.getElementById('inputTituloParecer').value = '';
+    document.getElementById('inputOrgaoParecer').value = '';
+    document.getElementById('inputTextoParecer').value = '';
+    modalParecerInst.show();
+}
+
+function salvarParecerBanco() {
+    const titulo = document.getElementById('inputTituloParecer').value;
+    const orgao = document.getElementById('inputOrgaoParecer').value;
+    const texto = document.getElementById('inputTextoParecer').value;
+
+    if (!titulo || !texto) return swalMimir.fire('Atenção', 'Título e Texto são obrigatórios.', 'warning');
+
+    fetch("{% url 'mimir:cadastrarParecerHistorico' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ titulo: titulo, orgao_fomento: orgao, texto_parecer: texto })
+    }).then(r => r.json()).then(data => {
+        if(data.success) {
+            modalParecerInst.hide();
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Parecer catalogado!', showConfirmButton: false, timer: 2000 });
+        } else {
+            swalMimir.fire('Erro', data.message, 'error');
+        }
+    });
+}
+
+// --- LÓGICA DE ANÁLISE PREDITIVA ---
+function iniciarAnalisePreditiva() {
+    // 1. Extrair TODO o texto do projeto juntando os conteúdos dos TinyMCEs
+    let textoProjetoCompleto = "";
+    document.querySelectorAll('.tinymce-editor').forEach(textarea => {
+        let editor = tinymce.get(textarea.id);
+        if(editor) {
+            textoProjetoCompleto += editor.getContent({format: 'text'}) + "\n\n";
+        }
+    });
+
+    if(textoProjetoCompleto.trim() === '') {
+        return swalMimir.fire('Projeto Vazio', 'Escreva algo no projeto antes de rodar a análise.', 'warning');
+    }
+
+    // 2. Prepara a UI
+    document.getElementById('loaderAnalise').classList.remove('d-none');
+    document.getElementById('conteudoAnalise').classList.add('d-none');
+    modalAnaliseInst.show();
+
+    // 3. Envia para o Backend
+    fetch(`{% url 'mimir:analisePreditivaProjeto' projeto.id %}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ texto_projeto: textoProjetoCompleto })
+    }).then(r => r.json()).then(data => {
+        document.getElementById('loaderAnalise').classList.add('d-none');
+        
+        if(data.success) {
+            const analise = data.analise;
+            
+            // Popula Probabilidade
+            document.getElementById('uiProbabilidade').innerText = analise.probabilidade_aprovacao + '%';
+            document.getElementById('uiBarraProbabilidade').style.width = analise.probabilidade_aprovacao + '%';
+            
+            // Popula Listas
+            const montarLista = (array, icon, cor) => array.map(item => `<li class="list-group-item bg-transparent px-0 border-bottom"><i class="${icon} text-${cor} me-2"></i>${item}</li>`).join('');
+            
+            document.getElementById('uiPontosFortes').innerHTML = montarLista(analise.pontos_fortes, 'fas fa-plus', 'primary');
+            document.getElementById('uiPontosFracos').innerHTML = montarLista(analise.pontos_fracos, 'fas fa-times', 'danger');
+            document.getElementById('uiMitigacoes').innerHTML = montarLista(analise.mitigacoes, 'fas fa-arrow-right', 'info');
+            
+            document.getElementById('conteudoAnalise').classList.remove('d-none');
+        } else {
+            modalAnaliseInst.hide();
+            swalMimir.fire('Ops!', data.message, 'error');
+        }
+    }).catch(err => {
+        modalAnaliseInst.hide();
+        swalMimir.fire('Erro', 'Falha ao processar análise na IA.', 'error');
+    });
 }
 </script>
 {% endblock %}
