@@ -234,14 +234,14 @@
                             </div>
                         </div>
 
-                        <!-- Modal de Comparação (DIFF VIEWER) -->
+                        <!-- Modal de Comparação (DIFF VIEWER GRANULAR) -->
                         {% if feedback.comentarios and feedback.status == 'respondido' %}
-                        <div class="modal fade" id="compararModal{{ feedback.id }}" tabindex="-1">
+                        <div class="modal fade" id="compararModal{{ feedback.id }}" tabindex="-1" data-bs-backdrop="static">
                             <div class="modal-dialog modal-xl modal-dialog-centered">
                                 <div class="modal-content shadow-lg border-0">
                                     <div class="modal-header bg-light border-bottom">
                                         <h5 class="modal-title fw-bold">
-                                            <i class="fas fa-columns me-2 text-orange"></i> Comparação de Conteúdo
+                                            <i class="fas fa-columns me-2 text-orange"></i> Comparação de Conteúdo e Aprovação
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
@@ -264,7 +264,6 @@
                                                         <i class="fas fa-file-alt me-1"></i> Original
                                                     </div>
                                                     <div class="card-body bg-white p-0">
-                                                        <!-- Container de texto esquerdo -->
                                                         <div class="sync-left p-3 font-monospace text-dark" style="height: 450px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;">
                                                             {% if feedback.tipo == 'problema' %}
                                                                 {% if feedback.problema %}
@@ -294,29 +293,28 @@
                                                 </div>
                                             </div>
 
-                                            <!-- Lado Direito: Especialista -->
+                                            <!-- Lado Direito: Especialista (Granular) -->
                                             <div class="col-md-6">
                                                 <div class="card h-100 border-orange shadow-sm">
                                                     <div class="card-header bg-orange text-white fw-bold py-2">
                                                         <i class="fas fa-user-md me-1"></i> Sugestão ({{ feedback.especialista.first_name }})
                                                     </div>
                                                     <div class="card-body bg-orange bg-opacity-10 p-0">
-                                                        <!-- Container de texto direito -->
                                                         <div class="sync-right p-3 font-monospace text-dark" style="height: 450px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;">
                                                             {% if feedback.tipo == 'pergunta' and feedback.comentarios|has_gabarito %}
                                                                 {% with partes=feedback.comentarios|split_feedback %}
                                                                     <strong class="text-orange d-block mb-1">Pergunta Revisada:</strong>
-                                                                    {{ partes|get_part:0|linebreaksbr }}
+                                                                    <div class="bloco-revisao">{{ partes|get_part:0|linebreaksbr|safe }}</div>
                                                                     
                                                                     {% if partes|get_part:1 %}
                                                                     <hr class="border-orange opacity-50 my-3">
                                                                     <strong class="text-orange d-block mb-1">Gabarito Revisado:</strong>
-                                                                    {{ partes|get_part:1|linebreaksbr }}
+                                                                    <div class="bloco-revisao">{{ partes|get_part:1|linebreaksbr|safe }}</div>
                                                                     {% endif %}
                                                                 {% endwith %}
                                                             {% else %}
                                                                 <strong class="text-orange d-block mb-1">Revisão do Especialista:</strong>
-                                                                {{ feedback.comentarios|safe }}
+                                                                <div class="bloco-revisao">{{ feedback.comentarios|safe }}</div>
                                                             {% endif %}
                                                         </div>
                                                     </div>
@@ -344,18 +342,23 @@
                                         </div>
 
                                     </div>
+                                    
+                                    <!-- Footer com envio granular -->
                                     <div class="modal-footer bg-white justify-content-between p-3">
                                         <div class="text-muted small">
-                                            <i class="fas fa-info-circle text-primary"></i> Ao aceitar, marcas este feedback como resolvido.
+                                            <i class="fas fa-info-circle text-primary"></i> <strong class="text-dark">Novo:</strong> Aceite (<i class="fas fa-check text-success"></i>) ou rejeite (<i class="fas fa-times text-danger"></i>) as marcações no texto acima antes de salvar.
                                         </div>
                                         <div>
                                             <button type="button" class="btn btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#formRejeicao{{ feedback.id }}" aria-expanded="false">
-                                                <i class="fas fa-times me-1"></i> Rejeitar
+                                                <i class="fas fa-times me-1"></i> Rejeitar Tudo
                                             </button>
-                                            <form method="post" action="{% url 'mimir:aceitarFeedback' feedback.id %}" class="d-inline ms-2">
+                                            
+                                            <!-- Formulário Granular -->
+                                            <form method="post" action="{% url 'mimir:aceitarFeedback' feedback.id %}" class="d-inline ms-2" id="form_aceitar_{{ feedback.id }}">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-success px-4 shadow-sm">
-                                                    <i class="fas fa-check-double me-1"></i> Aceitar / Utilizar
+                                                <input type="hidden" name="texto_final_resolvido" id="input_texto_final_{{ feedback.id }}">
+                                                <button type="button" class="btn btn-success px-4 shadow-sm" onclick="salvarRevisaoGranular('{{ feedback.id }}', '{{ feedback.tipo }}')">
+                                                    <i class="fas fa-save me-1"></i> Salvar Revisão Final
                                                 </button>
                                             </form>
                                         </div>
@@ -624,49 +627,137 @@
 </style>
 
 <script>
-// Script de Sincronização de Scroll para o Diff Viewer
 document.addEventListener('DOMContentLoaded', function() {
     
     // Ouve o evento de exibição de qualquer modal do Bootstrap
     document.addEventListener('shown.bs.modal', function (event) {
         const modal = event.target;
-        const syncContainers = modal.querySelectorAll('.sync-scroll-container');
         
+        // --- 1. Sincronização de Scroll ---
+        const syncContainers = modal.querySelectorAll('.sync-scroll-container');
         syncContainers.forEach(container => {
             const left = container.querySelector('.sync-left');
             const right = container.querySelector('.sync-right');
-            
             if(left && right) {
-                // Remove listeners antigos para evitar repetição (limpeza preventiva)
                 left.replaceWith(left.cloneNode(true));
                 right.replaceWith(right.cloneNode(true));
-                
                 const newLeft = container.querySelector('.sync-left');
                 const newRight = container.querySelector('.sync-right');
 
                 newLeft.addEventListener('scroll', function(e) {
-                    if(e.target.isSyncing) {
-                        e.target.isSyncing = false;
-                        return;
-                    }
+                    if(e.target.isSyncing) { e.target.isSyncing = false; return; }
                     newRight.isSyncing = true;
-                    // Usa porcentagem para garantir precisão se houver pequenas diferenças de altura
                     const percentage = this.scrollTop / (this.scrollHeight - this.clientHeight);
                     newRight.scrollTop = percentage * (newRight.scrollHeight - newRight.clientHeight);
                 });
                 
                 newRight.addEventListener('scroll', function(e) {
-                    if(e.target.isSyncing) {
-                        e.target.isSyncing = false;
-                        return;
-                    }
+                    if(e.target.isSyncing) { e.target.isSyncing = false; return; }
                     newLeft.isSyncing = true;
                     const percentage = this.scrollTop / (this.scrollHeight - this.clientHeight);
                     newLeft.scrollTop = percentage * (newLeft.scrollHeight - newLeft.clientHeight);
                 });
             }
         });
+
+        // --- 2. Injeção da Revisão Granular Automática ---
+        const blocosRevisao = modal.querySelectorAll('.bloco-revisao');
+        blocosRevisao.forEach(bloco => {
+            const alteracoes = bloco.querySelectorAll('ins, del');
+            
+            alteracoes.forEach(el => {
+                // NOVO: Ignorar alterações que são apenas quebras de linha ou espaços vazios
+                const htmlInterno = el.innerHTML.trim();
+                const apenasQuebraLinha = htmlInterno.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/gi, '').trim() === '';
+
+                if (apenasQuebraLinha) {
+                    // Resolve essas pequenas quebras estruturais silenciosamente
+                    const isInsert = el.tagName.toLowerCase() === 'ins';
+                    if (isInsert) {
+                        el.outerHTML = el.innerHTML;
+                    } else {
+                        el.remove();
+                    }
+                    return; // Pula a injeção dos botões para não poluir a tela
+                }
+
+                // Evita duplicar botões se o modal já os tem
+                if(el.nextElementSibling && el.nextElementSibling.classList.contains('btn-acoes-revisao')) return;
+
+                const spanGrp = document.createElement('span');
+                spanGrp.className = 'btn-acoes-revisao badge bg-white border border-secondary shadow-sm mx-1 align-middle';
+                
+                const btnOk = document.createElement('i');
+                btnOk.className = 'fas fa-check text-success px-2 py-1 cursor-pointer';
+                btnOk.style.cursor = 'pointer';
+                btnOk.title = 'Aceitar sugestão';
+                btnOk.onclick = () => resolverMarca(el, spanGrp, true);
+
+                const btnNo = document.createElement('i');
+                btnNo.className = 'fas fa-times text-danger px-2 py-1 cursor-pointer border-start';
+                btnNo.style.cursor = 'pointer';
+                btnNo.title = 'Rejeitar sugestão';
+                btnNo.onclick = () => resolverMarca(el, spanGrp, false);
+
+                spanGrp.appendChild(btnOk);
+                spanGrp.appendChild(btnNo);
+
+                el.parentNode.insertBefore(spanGrp, el.nextSibling);
+            });
+        });
     });
 });
+
+// Executa a ação escolhida pelo autor
+function resolverMarca(el, spanGrp, aceitar) {
+    const isInsert = el.tagName.toLowerCase() === 'ins';
+    
+    if (aceitar) {
+        if (isInsert) {
+            el.outerHTML = el.innerHTML; // Mantém o texto, remove a cor verde
+        } else {
+            el.remove(); // Apaga definitivamente o texto que estava vermelho
+        }
+    } else {
+        if (isInsert) {
+            el.remove(); // Rejeita e apaga a adição verde
+        } else {
+            el.outerHTML = el.innerHTML; // Rejeita a exclusão, restaurando o texto original
+        }
+    }
+    spanGrp.remove(); // Remove os botões de ação associados
+}
+
+// Prepara e submete os dados finais
+function salvarRevisaoGranular(feedbackId, tipo) {
+    const modal = document.getElementById(`compararModal${feedbackId}`);
+    const pendentes = modal.querySelectorAll('.bloco-revisao ins, .bloco-revisao del');
+    
+    if (pendentes.length > 0) {
+        alert("Ação necessária: Você precisa aceitar (✓) ou rejeitar (X) todas as marcações coloridas do texto antes de salvar a versão final.");
+        return;
+    }
+
+    let textoFinal = "";
+    
+    if (tipo === 'pergunta') {
+        // Reconstrói o padrão "Pergunta: ... Gabarito: ..." que o backend espera fatiar
+        const blocos = modal.querySelectorAll('.bloco-revisao');
+        if (blocos.length >= 2) {
+            let descPergunta = (blocos[0].innerText || blocos[0].textContent).trim();
+            let descGabarito = (blocos[1].innerText || blocos[1].textContent).trim();
+            textoFinal = `Pergunta:\n${descPergunta}\n\nGabarito:\n${descGabarito}`;
+        } else if (blocos.length === 1) {
+            textoFinal = (blocos[0].innerText || blocos[0].textContent).trim();
+        }
+    } else {
+        // Problema: Apenas pega o texto limpo do bloco unificado
+        const bloco = modal.querySelector('.bloco-revisao');
+        textoFinal = (bloco.innerText || bloco.textContent).trim();
+    }
+
+    document.getElementById(`input_texto_final_${feedbackId}`).value = textoFinal;
+    document.getElementById(`form_aceitar_${feedbackId}`).submit();
+}
 </script>
 {% endblock %}
