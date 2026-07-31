@@ -514,26 +514,63 @@ def salvarPerguntasForm(request):
         
         return redirect('mimir:visualizarPerguntas')
 
-@login_required(login_url='/login')
+@login_required
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def visualizarPerguntasFonte(request, pID):
     pergunta = get_object_or_404(Pergunta, id=pID)    
 
-    total_perguntas_assunto = Pergunta.objects.filter(
-        assunto=pergunta.assunto,
-    ).count()
-    
-    # Perguntas do mesmo tipo (opcional)
+    total_perguntas_assunto = Pergunta.objects.filter(assunto=pergunta.assunto).count()
     perguntas_mesmo_tipo = Pergunta.objects.filter(
         tipoDePergunta=pergunta.tipoDePergunta,
         assunto=pergunta.assunto
-    ).exclude(id=pergunta.id)[:5]  # Limita a 5 resultados
+    ).exclude(id=pergunta.id)[:5]
+    
+    # NOVO: Carregar especialistas para o modal de feedback
+    especialistas = User.objects.filter(
+        is_active=True,
+        groups__name='Especialista'
+    ).exclude(id=request.user.id).order_by('first_name', 'last_name')
+    
     return render(request, "mimir/detalhesPergunta.html", {
         "pergunta": pergunta,
         "total_perguntas_assunto" : total_perguntas_assunto,
-        "perguntas_mesmo_tipo" : perguntas_mesmo_tipo
+        "perguntas_mesmo_tipo" : perguntas_mesmo_tipo,
+        "especialistas": especialistas, # Adicionado ao contexto
     })
+
+# NOVO: View para receber o feedback direto da matriz da pergunta
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def solicitarFeedbackPerguntaDireto(request, pergunta_id):
+    pergunta = get_object_or_404(Pergunta, id=pergunta_id)
+    especialista_id = request.POST.get('especialista_id')
+    mensagem = request.POST.get('mensagem', '')
+    
+    try:
+        especialista = User.objects.get(id=especialista_id)
+        
+        # Evitar duplicidade de pendências
+        if FeedbackEspecialista.objects.filter(pergunta=pergunta, especialista=especialista, status='pendente').exists():
+            messages.warning(request, f'Já existe uma solicitação pendente para {especialista.get_full_name()}.')
+        else:
+            FeedbackEspecialista.objects.create(
+                pergunta=pergunta,
+                tipo='pergunta',
+                especialista=especialista,
+                solicitante=request.user,
+                mensagem_solicitacao=mensagem,
+                comentarios='',
+                status='pendente'
+            )
+            messages.success(request, f'Feedback solicitado com sucesso para {especialista.get_full_name()}.')
+            
+    except User.DoesNotExist:
+        messages.error(request, 'Especialista não encontrado.')
+        
+    return redirect('mimir:visualizarPergunta', pID=pergunta.id)
 
 @login_required(login_url='/login')
 @acesso_mimir_requerido
