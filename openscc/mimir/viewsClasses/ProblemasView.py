@@ -281,6 +281,15 @@ class RegerarParteView(LoginRequiredMixin, View):
                 #nova_parte = chamarApiLLM(prompt)
                 
                 if nova_parte:
+
+                    if parte.enunciado != nova_parte:
+                        HistoricoParte.objects.create(
+                            parte=parte,
+                            enunciado=parte.enunciado,
+                            salvo_por=request.user
+                        )
+                    # ----------------------------------
+
                     # Atualizar a parte existente
                     parte.enunciado = nova_parte
                     parte.save()
