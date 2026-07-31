@@ -1302,12 +1302,15 @@ def visualizarFeedbacksPergunta(request, prova_id, pergunta_id):
 @grupo_requerido('Professor')
 def aceitarFeedback(request, feedback_id):
     """
-    View para aceitar e aplicar o feedback do especialista
+    View para aceitar e aplicar o feedback do especialista (Agora recebendo o texto resolvido granularmente)
     """
     feedback = get_object_or_404(FeedbackEspecialista, id=feedback_id, solicitante=request.user)
     
+    # Captura o texto que o usuário resolveu na interface
+    texto_final_resolvido = request.POST.get('texto_final_resolvido', '')
+    
     try:
-        feedback.aceitar_feedback()
+        feedback.aceitar_feedback(texto_final_resolvido)
         messages.success(request, 'Feedback aceito e aplicado com sucesso!')
     except Exception as e:
         messages.error(request, f'Erro ao aplicar feedback: {str(e)}')
@@ -2619,7 +2622,18 @@ def exportarProblemaComoFonte(request, problema_id):
     for parte in problema.partes.all().order_by('ordem'):
         linhas.append(f"\n--- PARTE {parte.ordem} ---")
         linhas.append(parte.enunciado)
-        
+
+    # Inclui as Perguntas de Aprendizado (Learning Issues) e suas respostas, se existirem
+    perguntas_aprendizado = PerguntaAprendizado.objects.filter(parte__problema=problema)
+    if perguntas_aprendizado.exists():
+        linhas.append("\nPERGUNTAS DE APRENDIZADO (LEARNING ISSUES):")
+        for pergunta in perguntas_aprendizado.select_related('parte'):
+            linhas.append(f"\n[Parte {pergunta.parte.ordem}] Pergunta: {pergunta.texto}")
+            if pergunta.resposta:
+                linhas.append(f"Resposta: {pergunta.resposta}")
+            else:
+                linhas.append("Resposta: (ainda não respondida)")
+
     # Inclui o Guia do Tutor se existir para dar mais contexto à IA
     if hasattr(problema, 'guia_tutor') and problema.guia_tutor:
         linhas.append("\n--- GUIA DO TUTOR ---")
@@ -3575,3 +3589,38 @@ def analisePreditivaProjeto(request, projeto_id):
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False})
+
+from django.views.decorators.http import require_POST
+
+@login_required
+@require_POST
+def restaurarVersaoParte(request, historico_id):
+    """View via AJAX para restaurar uma versão antiga do histórico da Parte do PBL"""
+    try:
+        historico = get_object_or_404(HistoricoParte, id=historico_id)
+        parte = historico.parte
+        
+        # Verificar se o usuário tem permissão (Autor do problema)
+        if parte.problema.assunto.user != request.user:
+            return JsonResponse({'status': 'error', 'message': 'Acesso negado. Apenas o autor do problema pode restaurar versões.'}, status=403)
+
+        # Guarda a versão que estava na tela AGORA no histórico antes de a perder
+        if parte.enunciado != historico.enunciado:
+            HistoricoParte.objects.create(
+                parte=parte,
+                enunciado=parte.enunciado,
+                salvo_por=request.user
+            )
+
+        # Restaura o texto antigo da parte
+        parte.enunciado = historico.enunciado
+        parte.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Versão restaurada com sucesso!',
+            'novo_enunciado': parte.enunciado
+        })
+        
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Erro: {str(e)}'}, status=500)

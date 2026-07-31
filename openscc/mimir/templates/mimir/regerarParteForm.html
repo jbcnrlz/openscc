@@ -1,123 +1,159 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h4 class="card-title mb-0">
-                        <i class="fas fa-sync-alt"></i>
-                        Regerar Parte {{ parte_ordem }}
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-info">
-                        <h6><i class="fas fa-info-circle"></i> Como funciona:</h6>
-                        <p class="mb-0">
-                            Descreva abaixo como você quer que a <strong>Parte {{ parte_ordem }}</strong> seja modificada. 
-                            A IA irá regenerar esta parte seguindo suas instruções específicas.
-                        </p>
+<!-- Carregando o SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="container-fluid px-4 mt-4">
+    
+    <!-- Cabeçalho Principal -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <h2 class="h4 mb-0 text-dark fw-bold">
+            <i class="fas fa-magic me-2 text-warning"></i> Regerar Parte {{ parte_ordem }}
+        </h2>
+        <div>
+            <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
+                <i class="fas fa-arrow-left me-1"></i> Voltar para o Problema
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Coluna Principal: Formulário e Preview -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 border-top border-warning border-4 mb-4">
+                <div class="card-body p-4">
+                    
+                    <div class="d-flex align-items-center mb-4 p-3 bg-warning bg-opacity-10 border border-warning rounded">
+                        <i class="fas fa-info-circle fa-2x text-warning me-3"></i>
+                        <div>
+                            <h6 class="fw-bold mb-1 text-dark">Como funciona a Regeração (RAG)</h6>
+                            <p class="mb-0 small text-dark">
+                                Descreva abaixo como você quer que a <strong>Parte {{ parte_ordem }}</strong> seja modificada. 
+                                A Inteligência Artificial irá reescrever esta fatia seguindo as suas instruções, mas mantendo a coerência narrativa com as partes anteriores do caso clínico.
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="mb-4">
-                        <h6>Problema: {{ problema.titulo }}</h6>
-                        <p class="text-muted mb-0">Tema: {{ problema.tema.nome }} | Assunto: {{ problema.assunto.nome }}</p>
+                    <div class="mb-4 pb-3 border-bottom">
+                        <h6 class="fw-bold text-dark mb-1"><i class="fas fa-file-medical me-2 text-secondary"></i> {{ problema.titulo }}</h6>
+                        <p class="text-muted small mb-0"><strong>Tema:</strong> {{ problema.tema.nome }} | <strong>Assunto:</strong> {{ problema.assunto.nome }}</p>
                     </div>
 
                     <form method="post" id="regerarForm">
                         {% csrf_token %}
                         
                         {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                            {{ error }}
-                            {% endfor %}
+                        <div class="alert alert-danger shadow-sm">
+                            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
                         </div>
                         {% endif %}
 
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    {{ form.parte_ordem.label_tag }}
-                                    {{ form.parte_ordem }}
-                                    {% if form.parte_ordem.errors %}
-                                    <div class="text-danger">
-                                        {% for error in form.parte_ordem.errors %}
-                                        <small>{{ error }}</small>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-secondary text-uppercase tracking-wider">Fatia Alvo</label>
+                                {{ form.parte_ordem }}
+                                {% if form.parte_ordem.errors %}
+                                    <div class="text-danger small mt-1">{% for error in form.parte_ordem.errors %}{{ error }}{% endfor %}</div>
+                                {% endif %}
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.instrucoes.label_tag }}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-secondary text-uppercase tracking-wider">Instruções para a IA</label>
                             {{ form.instrucoes }}
                             {% if form.instrucoes.help_text %}
-                            <div class="form-text">{{ form.instrucoes.help_text }}</div>
+                                <div class="form-text small mt-2"><i class="fas fa-lightbulb text-warning me-1"></i> {{ form.instrucoes.help_text }}</div>
                             {% endif %}
                             {% if form.instrucoes.errors %}
-                            <div class="text-danger">
-                                {% for error in form.instrucoes.errors %}
-                                <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
+                                <div class="text-danger small mt-1">{% for error in form.instrucoes.errors %}{{ error }}{% endfor %}</div>
                             {% endif %}
                         </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'mimir:problemaDetail' problema.pk %}" class="btn btn-secondary me-md-2">
-                                <i class="fas fa-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" id="btnConfirmar" class="btn btn-warning">
-                                <i class="fas fa-sync-alt"></i> Confirmar Regeração
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <button type="button" id="btnPreview" class="btn btn-outline-primary shadow-sm fw-bold px-4">
+                                <i class="fas fa-eye me-1"></i> Gerar Preview
+                            </button>
+                            <button type="submit" id="btnConfirmar" class="btn btn-warning shadow-sm fw-bold px-4 text-dark">
+                                <i class="fas fa-sync-alt me-1"></i> Aplicar e Regerar
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <!-- Exemplos de Instruções -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Exemplos de Instruções</h5>
+            <div class="card shadow-sm border-0 border-top border-primary border-4 mb-4 d-none" id="previewSection">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-search me-2"></i> Pré-visualização da Geração</h6>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">Rascunho RAG</span>
+                </div>
+                <div class="card-body bg-light p-4">
+                    <div id="previewContent" class="p-4 bg-white border rounded shadow-sm text-dark" style="min-height: 150px; font-size: 0.95rem; line-height: 1.6; text-align: justify;">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Coluna Lateral: Dicas e Exemplos -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 bg-light h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-book-reader text-success me-2"></i> Exemplos de Instruções</h6>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Para adicionar detalhes:</h6>
-                            <ul class="small">
-                                <li>"Adicione mais sintomas específicos"</li>
-                                <li>"Inclua valores numéricos nos exames"</li>
-                                <li>"Descreva com mais detalhes o exame físico"</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Para modificar conteúdo:</h6>
-                            <ul class="small">
-                                <li>"Mude o desfecho para um cenário mais complexo"</li>
-                                <li>"Inclua uma complicação inesperada"</li>
-                                <li>"Faça o caso evoluir de forma diferente"</li>
-                            </ul>
-                        </div>
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-success small text-uppercase tracking-wider mb-2"><i class="fas fa-plus-circle me-1"></i> Adicionar Detalhes</h6>
+                        <ul class="list-group list-group-flush shadow-sm rounded">
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-success"></i>"Adicione mais sintomas específicos"</li>
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-success"></i>"Inclua valores numéricos reais nos exames"</li>
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-success"></i>"Descreva com mais detalhes o exame físico"</li>
+                        </ul>
                     </div>
-                    <div class="row mt-2">
-                        <div class="col-12">
-                            <h6>Para melhorar clareza:</h6>
-                            <ul class="small">
-                                <li>"Simplifique a linguagem técnica"</li>
-                                <li>"Organize as informações em tópicos"</li>
-                                <li>"Adicione marcadores para listas"</li>
-                            </ul>
-                        </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-danger small text-uppercase tracking-wider mb-2"><i class="fas fa-exchange-alt me-1"></i> Modificar Cenário</h6>
+                        <ul class="list-group list-group-flush shadow-sm rounded">
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-danger"></i>"Mude o desfecho para um cenário complexo"</li>
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-danger"></i>"Inclua uma complicação inesperada"</li>
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-danger"></i>"Faça o quadro do paciente evoluir rapidamente"</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h6 class="fw-bold text-primary small text-uppercase tracking-wider mb-2"><i class="fas fa-align-left me-1"></i> Estrutura e Clareza</h6>
+                        <ul class="list-group list-group-flush shadow-sm rounded">
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-primary"></i>"Simplifique a linguagem para o 1º ano"</li>
+                            <li class="list-group-item small text-muted border-0"><i class="fas fa-angle-right me-2 text-primary"></i>"Organize as informações vitais em tópicos"</li>
+                        </ul>
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+
+<style>
+.tracking-wider { letter-spacing: 0.05em; }
+#id_instrucoes {
+    min-height: 180px;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.075);
+    border: 1px solid #ced4da;
+}
+#id_instrucoes:focus {
+    border-color: #f6c23e;
+    box-shadow: 0 0 0 0.25rem rgba(246, 194, 62, 0.25);
+}
+#id_parte_ordem {
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid #ced4da;
+    width: 100%;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -127,28 +163,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewContent = document.getElementById('previewContent');
     const form = document.getElementById('regerarForm');
     
-    // Gerar preview
     previewBtn.addEventListener('click', function() {
         const parteOrdem = document.getElementById('id_parte_ordem').value;
         const instrucoes = document.getElementById('id_instrucoes').value;
         
-        if (!parteOrdem || !instrucoes) {
-            alert('Por favor, preencha o número da parte e as instruções.');
+        if (!parteOrdem || !instrucoes.trim()) {
+            // SUBSTITUIÇÃO AQUI: SweetAlert no lugar do alert()
+            Swal.fire({
+                icon: 'warning',
+                title: 'Quase lá!',
+                text: 'Por favor, preencha as instruções antes de solicitar a pré-visualização.',
+                confirmButtonColor: '#fd7e14'
+            });
             return;
         }
         
-        // Mostrar loading
         previewContent.innerHTML = `
-            <div class="text-center">
-                <div class="spinner-border text-primary" role="status">
+            <div class="text-center py-4 text-primary">
+                <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
                     <span class="visually-hidden">Carregando...</span>
                 </div>
-                <p class="mt-2">Gerando preview...</p>
+                <h6 class="mt-3 fw-bold">Analisando contexto e regerando fatia...</h6>
+                <small class="text-muted">Isso pode levar alguns segundos dependendo do tamanho das fontes.</small>
             </div>
         `;
         previewSection.classList.remove('d-none');
+        previewSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
-        // Fazer requisição AJAX
         fetch(`/problemas/{{ problema.pk }}/regerar-parte-ajax/`, {
             method: 'POST',
             headers: {
@@ -164,9 +205,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 confirmBtn.disabled = false;
             } else {
                 previewContent.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        ${data.message}
+                    <div class="alert alert-danger bg-danger bg-opacity-10 border-danger mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Erro:</strong> ${data.message}
                     </div>
                 `;
                 confirmBtn.disabled = true;
@@ -174,33 +215,37 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             previewContent.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Erro ao gerar preview. Tente novamente.
+                <div class="alert alert-danger bg-danger bg-opacity-10 border-danger mb-0">
+                    <i class="fas fa-wifi me-2"></i>
+                    Erro de conexão ao gerar preview. Verifique o console ou tente novamente.
                 </div>
             `;
             confirmBtn.disabled = true;
         });
     });
     
-    // Confirmar regeração
     form.addEventListener('submit', function(e) {
         const instrucoes = document.getElementById('id_instrucoes').value;
         if (!instrucoes.trim()) {
             e.preventDefault();
-            alert('Por favor, forneça instruções para a regeração.');
+            // SUBSTITUIÇÃO AQUI: SweetAlert no lugar do alert()
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, forneça as instruções para a regeração antes de confirmar.',
+                confirmButtonColor: '#fd7e14'
+            });
             return;
         }
         
-        // Mostrar loading no botão de confirmação
         confirmBtn.innerHTML = `
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            Regerando...
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Aplicando no Banco...
         `;
         confirmBtn.disabled = true;
+        previewBtn.disabled = true;
     });
     
-    // Função para obter o token CSRF
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -217,13 +262,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
-<style>
-#previewContent {
-    font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    white-space: pre-wrap;
-}
-</style>
 {% endblock %}

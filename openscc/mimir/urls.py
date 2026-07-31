@@ -146,4 +146,5 @@ urlpatterns = [
      path('pdi/projeto/upload-imagem-editor/', views.uploadImagemTinymce, name='uploadImagemTinymce'),
      path('pdi/projeto/parecer/cadastrar/', views.cadastrarParecerHistorico, name='cadastrarParecerHistorico'),
      path('pdi/projeto/<int:projeto_id>/analise-preditiva/', views.analisePreditivaProjeto, name='analisePreditivaProjeto'),
+     path('pbl/parte/historico/<int:historico_id>/restaurar/', views.restaurarVersaoParte, name='restaurarVersaoParte'),
 ]

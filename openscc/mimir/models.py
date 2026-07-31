@@ -473,36 +473,37 @@ class FeedbackEspecialista(models.Model):
         if self.problema and self.pergunta:
             raise ValidationError('Não pode estar associado a um problema e uma pergunta simultaneamente.')
         
-    def aceitar_feedback(self):
+    def aceitar_feedback(self, texto_final_resolvido=""):
         """
-        Aceita e aplica o feedback do especialista (Lidando com marcações de Editor Visual).
+        Aplica o feedback do especialista utilizando o texto já revisado e resolvido pelo usuário no Frontend.
         """
+        import re
+        from django.utils.html import strip_tags
+        
+        texto_para_processar = texto_final_resolvido if texto_final_resolvido else self.comentarios
 
         if self.tipo == 'pergunta' and self.pergunta:
-            self.pergunta.aplicar_feedback(self)
+            # O fornecerFeedback.html formata os dados com os prefixos "Pergunta:" e "Gabarito:"
+            # Precisamos extraí-los do texto limpo que veio do Frontend
+            match = re.search(r'Pergunta:\s*(.*?)\s*Gabarito:\s*(.*)', texto_para_processar, re.IGNORECASE | re.DOTALL)
             
+            if match:
+                self.pergunta.pergunta = match.group(1).strip()
+                self.pergunta.gabarito = match.group(2).strip()
+                self.pergunta.save()
+            else:
+                # Fallback caso o especialista tenha apagado as palavras chave do editor
+                self.pergunta.pergunta = texto_para_processar
+                self.pergunta.save()
+                
         elif self.tipo == 'problema' and self.problema:
-            texto_feedback = self.comentarios
-            
-            # 1. LIMPEZA DE REVISÃO (TRACK CHANGES)
-            # Remove qualquer texto que o especialista marcou com a ferramenta "Riscado" (<del>, <s>, <strike>)
-            texto_limpo = re.sub(r'<s\b[^>]*>.*?</s>', '', texto_feedback, flags=re.IGNORECASE|re.DOTALL)
-            texto_limpo = re.sub(r'<del\b[^>]*>.*?</del>', '', texto_limpo, flags=re.IGNORECASE|re.DOTALL)
-            texto_limpo = re.sub(r'<strike\b[^>]*>.*?</strike>', '', texto_limpo, flags=re.IGNORECASE|re.DOTALL)
-            
-            # Remove as formatações de cor inseridas para destacar a correção, 
-            # mantendo o texto que estava dentro delas.
-            texto_limpo = re.sub(r'color:\s*(?:red|green|#[0-9a-fA-F]{3,6}|rgb\([^)]+\));?', '', texto_limpo, flags=re.IGNORECASE)
-            
-            # 2. FATIAMENTO DAS PARTES
-            # Busca padrões como <p><strong>Parte 1:</strong></p> ou apenas Parte 1:
-            partes_split = re.split(r'(?im)(?:<[^>]+>)*\s*parte\s+\d+[\:\-\.]?\s*(?:</[^>]+>)*', texto_limpo)
+            # FATIAMENTO DAS PARTES DO PROBLEMA
+            partes_split = re.split(r'(?im)(?:<[^>]+>)*\s*parte\s+\d+[\:\-\.]?\s*(?:</[^>]+>)*', texto_para_processar)
             partes_limpas = [p.strip() for p in partes_split if p.strip()]
             
-            # Apaga as partes antigas
+            # Apaga as partes antigas e recria com o texto aceito
             self.problema.partes.all().delete()
             
-            # Salva o texto novo e limpo
             if len(partes_limpas) > 1:
                 for i, texto in enumerate(partes_limpas, 1):
                     self.problema.partes.create(
@@ -511,7 +512,7 @@ class FeedbackEspecialista(models.Model):
                     )
             else:
                 self.problema.partes.create(
-                    enunciado=texto_limpo,
+                    enunciado=texto_para_processar,
                     ordem=1
                 )
 
@@ -961,3 +962,18 @@ class ParecerHistorico(models.Model):
 
     def __str__(self):
         return self.titulo
+
+class HistoricoParte(models.Model):
+    """Guarda as versões anteriores do enunciado de uma parte antes dela ser editada ou regerada pela IA."""
+    parte = models.ForeignKey(Parte, on_delete=models.CASCADE, related_name='historico')
+    enunciado = models.TextField(verbose_name="Texto da Versão Anterior")
+    salvo_em = models.DateTimeField(auto_now_add=True)
+    salvo_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Histórico de Parte"
+        verbose_name_plural = "Históricos de Partes"
+        ordering = ['-salvo_em']
+
+    def __str__(self):
+        return f"Versão da Parte {self.parte.ordem} - {self.salvo_em.strftime('%d/%m/%Y %H:%M')}"

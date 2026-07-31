@@ -2,6 +2,9 @@
 {% load feedback_tags %}
 
 {% block mainContent %}
+<!-- ========================================== -->
+<!-- 1. CONTEÚDO VISÍVEL DA PÁGINA              -->
+<!-- ========================================== -->
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
         <h2 class="h4 mb-0 text-dark fw-bold">
@@ -12,7 +15,7 @@
                 <a href="{% url 'mimir:problemaList' %}" class="btn btn-outline-secondary btn-sm shadow-sm me-2 fw-bold">
                     <i class="fas fa-arrow-left me-1"></i> Voltar
                 </a>
-                <button class="btn btn-outline-danger btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <button type="button" class="btn btn-outline-danger btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#deleteModal">
                     <i class="fas fa-trash me-1"></i> Excluir Problema
                 </button>
             {% else %}
@@ -38,6 +41,7 @@
     {% endif %}
 
     <div class="row">
+        <!-- COLUNA ESQUERDA: INFOS -->
         <div class="col-md-4">
             
             <div class="card shadow-sm border-0 mb-4">
@@ -68,12 +72,12 @@
                     {% if eh_autor %}
                         <p class="small text-muted mb-3">Solicite que um especialista revise este caso clínico por completo.</p>
                         <div class="d-grid gap-2">
-                            <button class="btn btn-outline-orange btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#feedbackModalProblema">
+                            <button type="button" class="btn btn-outline-orange btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#feedbackModalProblema">
                                 <i class="fas fa-comment-medical me-1"></i> Solicitar Feedback
                             </button>
                             
                             {% if problema.feedbacks.exists %}
-                            <button class="btn btn-orange text-white btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#verFeedbacksModalProblema">
+                            <button type="button" class="btn btn-orange text-white btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#verFeedbacksModalProblema">
                                 <i class="fas fa-inbox me-1"></i> Ver Feedbacks Recebidos 
                                 <span class="badge bg-white text-orange ms-1">{{ problema.feedbacks.count }}</span>
                             </button>
@@ -195,7 +199,7 @@
                             <i class="fas fa-file-archive me-2"></i> Dossiê Completo
                         </a>
                         {% else %}
-                        <button class="btn btn-outline-secondary btn-sm bg-white text-start" disabled>
+                        <button type="button" class="btn btn-outline-secondary btn-sm bg-white text-start" disabled>
                             <i class="fas fa-file-pdf me-2"></i> Apenas Guia (Indisponível)
                         </button>
                         {% endif %}
@@ -204,6 +208,7 @@
             </div>
         </div>
 
+        <!-- COLUNA DIREITA: ESTRUTURA DO PROBLEMA -->
         <div class="col-md-8">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
@@ -222,18 +227,28 @@
                             
                             {% if eh_autor %}
                             <div class="d-flex gap-2">
-                                <button class="btn btn-outline-primary btn-sm fw-bold" 
+                                <button type="button" class="btn btn-outline-primary btn-sm fw-bold" 
                                         onclick="toggleEditMode({{ parte.ordem }})"
                                         id="edit-btn-{{ parte.ordem }}" title="Editar Texto">
                                     <i class="fas fa-pen"></i> Editar
                                 </button>
                                 
-                                <button class="btn btn-outline-success btn-sm fw-bold" 
+                                <!-- Botões que chamam os modais -->
+                                <button type="button" class="btn btn-outline-success btn-sm fw-bold" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#midiasModal{{ parte.ordem }}" title="Anexos e Imagens">
                                     <i class="fas fa-paperclip"></i> Mídias
                                     {% if parte.midias.exists %}
                                     <span class="badge bg-success ms-1">{{ parte.midias.count }}</span>
+                                    {% endif %}
+                                </button>
+
+                                <button type="button" class="btn btn-outline-info btn-sm fw-bold" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#historicoModal{{ parte.ordem }}" title="Histórico de Versões">
+                                    <i class="fas fa-history"></i> Histórico
+                                    {% if parte.historico.exists %}
+                                    <span class="badge bg-info text-dark ms-1">{{ parte.historico.count }}</span>
                                     {% endif %}
                                 </button>
                                 
@@ -247,7 +262,7 @@
                         
                         <div class="enunciado-view" id="enunciado-view-{{ parte.ordem }}">
                             <div class="enunciado text-dark" style="text-align: justify;">
-                                {{ parte.enunciado|safe }}
+                                {{ parte.enunciado|linebreaksbr|safe }}
                             </div>
                             
                             {% if parte.midias.exists %}
@@ -262,8 +277,8 @@
                                             <div class="card-body text-center p-3">
                                                 <i class="{{ midia.get_icone_tipo }} fa-2x mb-2 text-primary opacity-75"></i>
                                                 <div class="midia-info">
-                                                    <small class="d-block text-truncate fw-bold text-dark" style="max-width: 130px;" title="{{ midia.arquivo.name|basename }}">
-                                                        {{ midia.arquivo.name|basename }}
+                                                    <small class="d-block text-truncate fw-bold text-dark" style="max-width: 130px;" title="{{ midia.arquivo.name }}">
+                                                        {{ midia.arquivo.name }}
                                                     </small>
                                                     {% if midia.descricao %}
                                                     <small class="text-muted d-block mt-1" title="{{ midia.descricao }}">
@@ -281,6 +296,41 @@
                                     </div>
                                     {% endfor %}
                                 </div>
+                            </div>
+                            {% endif %}
+
+                            {% if parte.perguntas_aprendizado.exists %}
+                            <div class="perguntas-aprendizado mt-4 pt-3 border-top">
+                                <h6 class="text-secondary small fw-bold text-uppercase tracking-wider mb-3">
+                                    <i class="fas fa-question-circle me-1"></i> Perguntas de Aprendizado (Learning Issues)
+                                </h6>
+                                {% for pergunta in parte.perguntas_aprendizado.all %}
+                                <div class="card border-0 bg-light shadow-sm mb-3">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex">
+                                            <div class="flex-shrink-0 me-3">
+                                                <span class="badge bg-primary rounded-circle" style="width: 30px; height: 30px; font-size: 0.8rem; line-height: 30px;">{{ forloop.counter }}</span>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <p class="mb-1 fw-bold text-dark small">{{ pergunta.texto|linebreaksbr }}</p>
+                                                {% if pergunta.aluno %}
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="fas fa-user me-1"></i> Por: {{ pergunta.aluno.get_full_name|default:pergunta.aluno.username }}
+                                                </small>
+                                                {% endif %}
+                                                {% if pergunta.resposta %}
+                                                <div class="mt-2 p-2 bg-white border rounded small text-dark">
+                                                    <strong class="text-success"><i class="fas fa-check-circle me-1"></i> Resposta:</strong>
+                                                    {{ pergunta.resposta|linebreaksbr }}
+                                                </div>
+                                                {% else %}
+                                                <small class="text-muted fst-italic"><i class="fas fa-clock me-1"></i> Aguardando resposta</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
                             </div>
                             {% endif %}
                         </div>
@@ -307,95 +357,6 @@
                         </div>
                         {% endif %}
                     </div>
-
-                    {% if eh_autor %}
-                    <div class="modal fade" id="midiasModal{{ parte.ordem }}" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content shadow-lg border-0">
-                                <div class="modal-header bg-light">
-                                    <h5 class="modal-title fw-bold"><i class="fas fa-paperclip me-2 text-success"></i> Gestão de Anexos - Parte {{ parte.ordem }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body bg-light p-4">
-                                    <div class="card mb-4 border-success shadow-sm">
-                                        <div class="card-header bg-success text-white fw-bold">Novo Anexo</div>
-                                        <div class="card-body">
-                                            <form method="post" action="{% url 'mimir:adicionarMidiaParte' parte.id %}" enctype="multipart/form-data" id="midiaForm{{ parte.ordem }}">
-                                                {% csrf_token %}
-                                                <div class="row g-3">
-                                                    <div class="col-md-8">
-                                                        <label for="arquivo{{ parte.ordem }}" class="form-label small fw-bold">Arquivo *</label>
-                                                        <input type="file" class="form-control form-control-sm" id="arquivo{{ parte.ordem }}" name="arquivo" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt" required>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label for="tipo{{ parte.ordem }}" class="form-label small fw-bold">Categoria *</label>
-                                                        <select class="form-select form-select-sm" id="tipo{{ parte.ordem }}" name="tipo" required>
-                                                            <option value="imagem">Imagem</option>
-                                                            <option value="audio">Áudio</option>
-                                                            <option value="pdf">PDF</option>
-                                                            <option value="documento">Documento</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-9">
-                                                        <label for="descricao{{ parte.ordem }}" class="form-label small fw-bold">Descrição (Legenda)</label>
-                                                        <input type="text" class="form-control form-control-sm" id="descricao{{ parte.ordem }}" name="descricao" placeholder="Ex: Raio-X do paciente...">
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <label for="ordem{{ parte.ordem }}" class="form-label small fw-bold">Ordem</label>
-                                                        <input type="number" class="form-control form-control-sm" id="ordem{{ parte.ordem }}" name="ordem" value="{{ parte.midias.count|add:1 }}" min="1">
-                                                    </div>
-                                                    <div class="col-12 mt-3 text-end">
-                                                        <button type="submit" class="btn btn-success btn-sm shadow-sm"><i class="fas fa-upload me-1"></i> Fazer Upload</button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-white border-bottom fw-bold text-secondary">
-                                            Arquivos Atuais ({{ parte.midias.count }})
-                                        </div>
-                                        <div class="card-body p-0">
-                                            {% if parte.midias.exists %}
-                                            <div class="table-responsive">
-                                                <table class="table table-hover align-middle mb-0">
-                                                    <thead class="table-light small">
-                                                        <tr>
-                                                            <th class="ps-3">Arquivo</th>
-                                                            <th>Descrição</th>
-                                                            <th class="text-end pe-3">Remover</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for midia in parte.midias.all %}
-                                                        <tr>
-                                                            <td class="ps-3">
-                                                                <i class="{{ midia.get_icone_tipo }} text-primary me-2"></i>
-                                                                <a href="{{ midia.arquivo.url }}" target="_blank" class="text-decoration-none text-dark fw-bold small">{{ midia.arquivo.name|basename }}</a>
-                                                            </td>
-                                                            <td class="small text-muted">{{ midia.descricao|default:"-" }}</td>
-                                                            <td class="text-end pe-3">
-                                                                <form method="post" action="{% url 'mimir:excluirMidiaParte' midia.id %}" class="d-inline" onsubmit="return confirm('Excluir esta mídia permanentemente?');">
-                                                                    {% csrf_token %}
-                                                                    <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2"><i class="fas fa-trash"></i></button>
-                                                                </form>
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            {% else %}
-                                            <div class="p-4 text-center text-muted small"><i class="fas fa-folder-open mb-2 fa-2x opacity-50 d-block"></i> Nenhuma mídia anexada.</div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
 
                     {% empty %}
                     <div class="alert alert-info text-center py-5 shadow-sm">
@@ -456,160 +417,311 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- 2. ÁREA EXCLUSIVA DE MODAIS                -->
+<!-- ========================================== -->
+
 {% if eh_autor %}
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> Excluir Problema PBL</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <p class="text-dark">Tem certeza que deseja apagar permanentemente o caso <strong>"{{ problema.titulo }}"</strong>?</p>
-                <div class="alert alert-danger mb-0 bg-danger bg-opacity-10 border-danger small">
-                    Esta ação apagará <strong>{{ problema.parte_set.count }} fatias</strong>, todos os anexos e o Guia do Tutor.
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <a href="{% url 'mimir:problemaDelete' problema.pk %}" class="btn btn-danger px-4 shadow-sm">Sim, Excluir</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="feedbackModalProblema" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-orange text-white">
-                <h5 class="modal-title fw-bold"><i class="fas fa-user-md me-2"></i> Solicitar Avaliação Técnica (Caso Completo)</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'mimir:solicitarFeedback' problema.pk %}">
-                {% csrf_token %}
-                <div class="modal-body p-4 bg-light">
-                    
-                    <div class="mb-4">
-                        <label for="especialista_id" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">Especialista Revisor *</label>
-                        <select name="especialista_id" class="form-select border-orange" id="especialista_id" required>
-                            <option value="">Selecione na rede do Mimir...</option>
-                            {% for especialista in especialistas %}
-                            <option value="{{ especialista.id }}">
-                                {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
-                            </option>
-                            {% empty %}
-                            <option value="" disabled>Nenhum especialista cadastrado na plataforma</option>
-                            {% endfor %}
-                        </select>
+    <!-- Modais das Partes Individuais (Gerados no Loop) -->
+    {% for parte in partes %}
+        
+        <!-- Modal: Anexos da Parte -->
+        <div class="modal fade" id="midiasModal{{ parte.ordem }}" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-paperclip me-2 text-success"></i> Gestão de Anexos - Parte {{ parte.ordem }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="mensagem" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">Instruções para o Revisor (Opcional)</label>
-                        <textarea name="mensagem" class="form-control" id="mensagem" rows="4" 
-                                  placeholder="Ex: Por favor, analise a verossimilhança dos sinais vitais apresentados na Parte 2 e o desfecho laboratorial."></textarea>
-                    </div>
-                    
-                    <div class="alert alert-warning mb-0 border-warning bg-warning bg-opacity-10 d-flex">
-                        <i class="fas fa-info-circle fs-4 me-3 text-warning mt-1"></i>
-                        <small class="text-dark">O especialista receberá acesso de leitura a <strong>todas as partes</strong> deste problema e poderá redigir comentários globais ou pontuais sobre a estrutura do caso.</small>
-                    </div>
-                </div>
-                <div class="modal-footer bg-white">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-orange text-white px-4 shadow-sm" {% if not especialistas %}disabled{% endif %}>
-                        <i class="fas fa-paper-plane me-1"></i> Enviar Pedido
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{% if problema.feedbacks.exists %}
-<div class="modal fade" id="verFeedbacksModalProblema" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-orange text-white">
-                <h5 class="modal-title fw-bold"><i class="fas fa-inbox me-2"></i> Feedbacks Recebidos para este Problema</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body bg-light p-4">
-                {% for feedback in problema.feedbacks.all %}
-                <div class="card mb-4 border-0 shadow-sm {% if feedback.utilizado %}border-start border-success border-4{% else %}border-start border-warning border-4{% endif %}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                            <h6 class="fw-bold text-dark mb-0">
-                                <i class="fas fa-user-md text-orange me-2"></i> {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}
-                            </h6>
-                            <span class="badge {% if feedback.utilizado %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                {% if feedback.utilizado %}Aplicado{% elif feedback.comentarios %}Respondido{% else %}Aguardando{% endif %}
-                            </span>
-                        </div>
-                        
-                        {% if feedback.mensagem_solicitacao %}
-                        <div class="mb-3">
-                            <strong class="small text-secondary text-uppercase tracking-wider">O que você pediu:</strong>
-                            <p class="mb-0 text-muted small bg-light p-2 rounded border mt-1">{{ feedback.mensagem_solicitacao|linebreaksbr }}</p>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="mb-3">
-                            <strong class="small text-secondary text-uppercase tracking-wider text-orange">Parecer do Especialista:</strong>
-                            {% if feedback.comentarios %}
-                                <div class="bg-orange bg-opacity-10 p-3 rounded border border-orange mt-1 text-dark small">
-                                    {{ feedback.comentarios|linebreaksbr }}
-                                </div>
-                            {% else %}
-                                <p class="text-muted small mt-1 font-italic">O especialista ainda não redigiu o parecer.</p>
-                            {% endif %}
-                        </div>
-
-                        {% if feedback.resposta_autor %}
-                        <div class="mb-3">
-                            <strong class="small text-danger text-uppercase tracking-wider">Sua justificativa (Rejeição):</strong>
-                            <p class="mb-0 text-muted small bg-danger bg-opacity-10 p-2 rounded border border-danger mt-1">{{ feedback.resposta_autor|linebreaksbr }}</p>
-                        </div>
-                        {% endif %}
-
-                        <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
-                            {% if feedback.comentarios and not feedback.utilizado %}
-                            
-                            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#replyBox{{ feedback.id }}">
-                                <i class="fas fa-times me-1"></i> Rejeitar
-                            </button>
-
-                            <form method="post" action="{% url 'mimir:marcarFeedbackUtilizado' feedback.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-success btn-sm shadow-sm">
-                                    <i class="fas fa-check-double me-1"></i> Marcar como Útil / Fechar
-                                </button>
-                            </form>
-
-                            <div class="collapse w-100 mt-2" id="replyBox{{ feedback.id }}">
-                                <form method="post" action="{% url 'mimir:responderFeedback' feedback.id %}" class="bg-white p-3 border rounded shadow-sm">
+                    <div class="modal-body bg-light p-4">
+                        <div class="card mb-4 border-success shadow-sm">
+                            <div class="card-header bg-success text-white fw-bold">Novo Anexo</div>
+                            <div class="card-body">
+                                <form method="post" action="{% url 'mimir:adicionarMidiaParte' parte.id %}" enctype="multipart/form-data" id="midiaForm{{ parte.ordem }}">
                                     {% csrf_token %}
-                                    <label class="form-label small fw-bold text-danger">Motivo da Rejeição:</label>
-                                    <textarea name="resposta_autor" class="form-control form-control-sm mb-2" rows="2" placeholder="Explique por que não irá utilizar a sugestão..."></textarea>
-                                    <div class="text-end">
-                                        <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-paper-plane me-1"></i> Enviar</button>
+                                    <div class="row g-3">
+                                        <div class="col-md-8">
+                                            <label for="arquivo{{ parte.ordem }}" class="form-label small fw-bold">Arquivo *</label>
+                                            <input type="file" class="form-control form-control-sm" id="arquivo{{ parte.ordem }}" name="arquivo" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="tipo{{ parte.ordem }}" class="form-label small fw-bold">Categoria *</label>
+                                            <select class="form-select form-select-sm" id="tipo{{ parte.ordem }}" name="tipo" required>
+                                                <option value="imagem">Imagem</option>
+                                                <option value="audio">Áudio</option>
+                                                <option value="pdf">PDF</option>
+                                                <option value="documento">Documento</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-9">
+                                            <label for="descricao{{ parte.ordem }}" class="form-label small fw-bold">Descrição (Legenda)</label>
+                                            <input type="text" class="form-control form-control-sm" id="descricao{{ parte.ordem }}" name="descricao" placeholder="Ex: Raio-X do paciente...">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="ordem{{ parte.ordem }}" class="form-label small fw-bold">Ordem</label>
+                                            <input type="number" class="form-control form-control-sm" id="ordem{{ parte.ordem }}" name="ordem" value="{{ parte.midias.count|add:1 }}" min="1">
+                                        </div>
+                                        <div class="col-12 mt-3 text-end">
+                                            <button type="submit" class="btn btn-success btn-sm shadow-sm"><i class="fas fa-upload me-1"></i> Fazer Upload</button>
+                                        </div>
                                     </div>
                                 </form>
                             </div>
-                            
-                            {% endif %}
+                        </div>
+
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white border-bottom fw-bold text-secondary">
+                                Arquivos Atuais ({{ parte.midias.count }})
+                            </div>
+                            <div class="card-body p-0">
+                                {% if parte.midias.exists %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th class="ps-3">Arquivo</th>
+                                                <th>Descrição</th>
+                                                <th class="text-end pe-3">Remover</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for midia in parte.midias.all %}
+                                            <tr>
+                                                <td class="ps-3">
+                                                    <i class="{{ midia.get_icone_tipo }} text-primary me-2"></i>
+                                                    <a href="{{ midia.arquivo.url }}" target="_blank" class="text-decoration-none text-dark fw-bold small">{{ midia.arquivo.name }}</a>
+                                                </td>
+                                                <td class="small text-muted">{{ midia.descricao|default:"-" }}</td>
+                                                <td class="text-end pe-3">
+                                                    <form method="post" action="{% url 'mimir:excluirMidiaParte' midia.id %}" class="d-inline" onsubmit="return confirm('Excluir esta mídia permanentemente?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2"><i class="fas fa-trash"></i></button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="p-4 text-center text-muted small"><i class="fas fa-folder-open mb-2 fa-2x opacity-50 d-block"></i> Nenhuma mídia anexada.</div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
-                {% endfor %}
             </div>
-            <div class="modal-footer bg-white">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar Visualização</button>
+        </div>
+
+        <!-- Modal: Histórico de Versões da Parte -->
+        <div class="modal fade" id="historicoModal{{ parte.ordem }}" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-history me-2"></i> Histórico de Versões - Parte {{ parte.ordem }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body bg-light p-4">
+                        {% if parte.historico.exists %}
+                            <div class="list-group">
+                            {% for versao in parte.historico.all %}
+                                <div class="list-group-item list-group-item-action flex-column align-items-start mb-3 border border-info rounded shadow-sm bg-white p-3">
+                                    <div class="d-flex w-100 justify-content-between border-bottom pb-2 mb-3">
+                                        <h6 class="mb-1 fw-bold text-dark"><i class="far fa-clock text-info me-1"></i> Salvo em {{ versao.salvo_em|date:"d/m/Y H:i" }}</h6>
+                                        <small class="text-muted"><i class="fas fa-user-edit me-1"></i> Por: {{ versao.salvo_por.first_name|default:"Sistema (IA)" }}</small>
+                                    </div>
+                                    
+                                    <div class="mb-3 text-dark small bg-light p-3 rounded" style="max-height: 250px; overflow-y: auto; text-align: justify;">
+                                        {{ versao.enunciado|linebreaksbr|safe }}
+                                    </div>
+                                    
+                                    <div class="text-end">
+                                        <button type="button" class="btn btn-sm btn-info text-white fw-bold shadow-sm" onclick="restaurarVersao({{ versao.id }}, {{ parte.ordem }}, '{% url 'mimir:restaurarVersaoParte' historico_id=versao.id %}')">
+                                            <i class="fas fa-undo-alt me-1"></i> Restaurar esta versão
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5 text-muted">
+                                <i class="fas fa-history fa-3x mb-3 opacity-25"></i>
+                                <h5>Nenhum histórico encontrado</h5>
+                                <p class="small">O texto desta parte nunca foi alterado ou regerado pela IA.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer bg-white">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    {% endfor %}
+
+
+    <!-- Modais Globais -->
+    
+    <!-- Modal: Deletar Problema -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> Excluir Problema PBL</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-dark">Tem certeza que deseja apagar permanentemente o caso <strong>"{{ problema.titulo }}"</strong>?</p>
+                    <div class="alert alert-danger mb-0 bg-danger bg-opacity-10 border-danger small">
+                        Esta ação apagará <strong>{{ problema.parte_set.count }} fatias</strong>, todos os anexos e o Guia do Tutor.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <a href="{% url 'mimir:problemaDelete' problema.pk %}" class="btn btn-danger px-4 shadow-sm">Sim, Excluir</a>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Modal: Solicitar Feedback Especialista -->
+    <div class="modal fade" id="feedbackModalProblema" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-orange text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-user-md me-2"></i> Solicitar Avaliação Técnica (Caso Completo)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{% url 'mimir:solicitarFeedback' problema.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-body p-4 bg-light">
+                        
+                        <div class="mb-4">
+                            <label for="especialista_id" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">Especialista Revisor *</label>
+                            <select name="especialista_id" class="form-select border-orange" id="especialista_id" required>
+                                <option value="">Selecione na rede do Mimir...</option>
+                                {% for especialista in especialistas %}
+                                <option value="{{ especialista.id }}">
+                                    {{ especialista.get_full_name|default:especialista.username }} - {{ especialista.email }}
+                                </option>
+                                {% empty %}
+                                <option value="" disabled>Nenhum especialista cadastrado na plataforma</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="mensagem" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">Instruções para o Revisor (Opcional)</label>
+                            <textarea name="mensagem" class="form-control" id="mensagem" rows="4" 
+                                      placeholder="Ex: Por favor, analise a verossimilhança dos sinais vitais apresentados na Parte 2 e o desfecho laboratorial."></textarea>
+                        </div>
+                        
+                        <div class="alert alert-warning mb-0 border-warning bg-warning bg-opacity-10 d-flex">
+                            <i class="fas fa-info-circle fs-4 me-3 text-warning mt-1"></i>
+                            <small class="text-dark">O especialista receberá acesso de leitura a <strong>todas as partes</strong> deste problema e poderá redigir comentários globais ou pontuais sobre a estrutura do caso.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-white">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-orange text-white px-4 shadow-sm" {% if not especialistas %}disabled{% endif %}>
+                            <i class="fas fa-paper-plane me-1"></i> Enviar Pedido
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ver Feedbacks Recebidos -->
+    {% if problema.feedbacks.exists %}
+    <div class="modal fade" id="verFeedbacksModalProblema" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-orange text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-inbox me-2"></i> Feedbacks Recebidos para este Problema</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light p-4">
+                    {% for feedback in problema.feedbacks.all %}
+                    <div class="card mb-4 border-0 shadow-sm {% if feedback.utilizado %}border-start border-success border-4{% else %}border-start border-warning border-4{% endif %}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                <h6 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-user-md text-orange me-2"></i> {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}
+                                </h6>
+                                <span class="badge {% if feedback.utilizado %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                    {% if feedback.utilizado %}Aplicado{% elif feedback.comentarios %}Respondido{% else %}Aguardando{% endif %}
+                                </span>
+                            </div>
+                            
+                            {% if feedback.mensagem_solicitacao %}
+                            <div class="mb-3">
+                                <strong class="small text-secondary text-uppercase tracking-wider">O que você pediu:</strong>
+                                <p class="mb-0 text-muted small bg-light p-2 rounded border mt-1">{{ feedback.mensagem_solicitacao|linebreaksbr }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <strong class="small text-secondary text-uppercase tracking-wider text-orange">Parecer do Especialista:</strong>
+                                {% if feedback.comentarios %}
+                                    <div class="bg-orange bg-opacity-10 p-3 rounded border border-orange mt-1 text-dark small">
+                                        {{ feedback.comentarios|linebreaksbr }}
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted small mt-1 font-italic">O especialista ainda não redigiu o parecer.</p>
+                                {% endif %}
+                            </div>
+
+                            {% if feedback.resposta_autor %}
+                            <div class="mb-3">
+                                <strong class="small text-danger text-uppercase tracking-wider">Sua justificativa (Rejeição):</strong>
+                                <p class="mb-0 text-muted small bg-danger bg-opacity-10 p-2 rounded border border-danger mt-1">{{ feedback.resposta_autor|linebreaksbr }}</p>
+                            </div>
+                            {% endif %}
+
+                            <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
+                                {% if feedback.comentarios and not feedback.utilizado %}
+                                
+                                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#replyBox{{ feedback.id }}">
+                                    <i class="fas fa-times me-1"></i> Rejeitar
+                                </button>
+
+                                <form method="post" action="{% url 'mimir:marcarFeedbackUtilizado' feedback.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm shadow-sm">
+                                        <i class="fas fa-check-double me-1"></i> Marcar como Útil / Fechar
+                                    </button>
+                                </form>
+
+                                <div class="collapse w-100 mt-2" id="replyBox{{ feedback.id }}">
+                                    <form method="post" action="{% url 'mimir:responderFeedback' feedback.id %}" class="bg-white p-3 border rounded shadow-sm">
+                                        {% csrf_token %}
+                                        <label class="form-label small fw-bold text-danger">Motivo da Rejeição:</label>
+                                        <textarea name="resposta_autor" class="form-control form-control-sm mb-2" rows="2" placeholder="Explique por que não irá utilizar a sugestão..."></textarea>
+                                        <div class="text-end">
+                                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-paper-plane me-1"></i> Enviar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer bg-white">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar Visualização</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 {% endif %}
-{% endif %} <style>
+
+<style>
 :root {
     --bs-orange: #fd7e14;
 }
@@ -642,7 +754,95 @@
 </style>
 
 <script>
-// Mantidas exatamente as mesmas funções JS (toggleEditMode, updateCharCount, forms AJAX) que você já possuía
+// --- FUNÇÕES DE RESTAURAÇÃO DE HISTÓRICO ---
+// --- FUNÇÃO DE RESTAURAÇÃO DE HISTÓRICO COM SWEETALERT ---
+function restaurarVersao(historicoId, parteOrdem, url) {
+    Swal.fire({
+        title: 'Restaurar versão?',
+        text: "O texto que está atualmente na tela será substituído pela versão antiga (porém não será perdido, pois será salvo no histórico).",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0dcaf0', // Cor info (azul claro)
+        cancelButtonColor: '#6c757d',  // Cor secondary (cinza)
+        confirmButtonText: '<i class="fas fa-undo me-1"></i> Sim, restaurar!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            
+            // O usuário confirmou. Esconde o modal do histórico para não travar a tela
+            const modalEl = document.getElementById(`historicoModal${parteOrdem}`);
+            const modalObj = bootstrap.Modal.getInstance(modalEl);
+            if(modalObj) modalObj.hide();
+
+            // Dispara requisição AJAX
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Atualiza a visualização do Card Principal
+                    const viewElement = document.getElementById(`enunciado-view-${parteOrdem}`);
+                    viewElement.querySelector('.enunciado').innerHTML = data.novo_enunciado.replace(/\n/g, '<br>');
+                    
+                    const textarea = document.getElementById(`enunciado-text-${parteOrdem}`);
+                    if (textarea) textarea.value = data.novo_enunciado;
+
+                    // Mostra notificação de sucesso e recarrega a página
+                    Swal.fire({
+                        title: 'Restaurado!',
+                        text: 'A versão foi aplicada com sucesso.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload();
+                    });
+
+                } else {
+                    showAlert(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Erro de conexão ao tentar restaurar a versão.', 'danger');
+            });
+        }
+    });
+}
+
+// --- FUNÇÃO SHOWALERT SUBSTITUÍDA POR TOASTS ELEGANTES ---
+function showAlert(message, type) {
+    // Configura os "Toasts" do SweetAlert2 (notificações no canto da tela)
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+        }
+    });
+
+    // Mapeia o tipo do Bootstrap para o ícone do SweetAlert
+    let swalIcon = 'info';
+    if (type === 'success') swalIcon = 'success';
+    if (type === 'danger') swalIcon = 'error';
+    if (type === 'warning') swalIcon = 'warning';
+
+    Toast.fire({
+        icon: swalIcon,
+        title: message
+    });
+}
+
+
+// --- FUNÇÕES DE EDIÇÃO MANUAL (Mantidas intactas) ---
 function toggleEditMode(parteOrdem) {
     const viewElement = document.getElementById(`enunciado-view-${parteOrdem}`);
     const editElement = document.getElementById(`enunciado-edit-${parteOrdem}`);
@@ -722,14 +922,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-
+/*
 function showAlert(message, type) {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show shadow-sm`;
     alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     const mainContent = document.querySelector('.container.mt-4');
     mainContent.insertBefore(alertDiv, mainContent.firstChild);
-    setTimeout(() => { if (alertDiv.parentNode) new bootstrap.Alert(alertDiv).close(); }, 5000);
-}
+    setTimeout(() => { if (alertDiv.p6arentNode) new bootstrap.Alert(alertDiv).close(); }, 5000);
+}*/
 </script>
 {% endblock %}
