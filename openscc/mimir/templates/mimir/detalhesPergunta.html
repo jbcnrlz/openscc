@@ -1,398 +1,455 @@
 {% extends "mimirBase.html" %}
-
 {% block mainContent %}
-<div class="container mt-4">
-    <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ titulo }}</h2>
-        <div class="btn-group">
-            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left"></i> Voltar para Lista
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="container-fluid px-4 mt-4">
+    <!-- Cabeçalho Principal -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <h2 class="h4 mb-0 text-dark fw-bold">
+            <i class="fas fa-question-circle me-2 text-primary"></i> Detalhes da Pergunta #{{ pergunta.id }}
+        </h2>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
+                <i class="fas fa-arrow-left me-1"></i> Voltar à Matriz
             </a>
-            <a href="{% url 'mimir:editarPergunta' pergunta.id %}" class="btn btn-warning">
-                <i class="bi bi-pencil"></i> Editar
+            <a href="{% url 'mimir:editarPergunta' pergunta.id %}" class="btn btn-outline-primary btn-sm fw-bold shadow-sm">
+                <i class="fas fa-pen me-1"></i> Editar
             </a>
-            <a href="#" class="btn btn-danger"
-               onclick="return confirm('Tem certeza que deseja excluir esta pergunta?')">
-                <i class="bi bi-trash"></i> Excluir
-            </a>
+            <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="confirmarExclusao()">
+                <i class="fas fa-trash me-1"></i> Excluir
+            </button>
+            
+            <!-- Formulário Oculto para Exclusão -->
+            <form id="formExcluirPergunta" method="post" action="{% url 'mimir:deletarPergunta' pergunta.id %}" class="d-none">
+                {% csrf_token %}
+            </form>
         </div>
     </div>
 
-    <!-- Cartão Principal -->
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">
-                <i class="bi bi-info-circle"></i> Informações da Pergunta
-            </h5>
+    <!-- Notificações -->
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-        <div class="card-body">
-            <!-- Metadados -->
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <table class="table table-bordered">
-                        <tr>
-                            <th width="30%">Assunto:</th>
-                            <td>
-                                <span class="badge bg-info">{{ pergunta.assunto.nome }}</span>
-                                <small class="text-muted d-block mt-1">
-                                    Total neste assunto: {{ total_perguntas_assunto }} perguntas
-                                </small>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Tipo:</th>
-                            <td>
-                                <span class="badge bg-secondary">{{ pergunta.tipoDePergunta.descricao }}</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Imagens:</th>
-                            <td>
-                                <span class="badge bg-warning">{{ pergunta.imagens.count }}</span>
-                                <small class="text-muted d-block mt-1">
-                                    {{ pergunta.imagens.count }} imagem(ns) anexada(s)
-                                </small>
-                            </td>
-                        </tr>
-                    </table>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- COLUNA ESQUERDA: INFOS E FEEDBACKS -->
+        <div class="col-lg-4">
+            
+            <!-- Card Metadados -->
+            <div class="card shadow-sm border-0 border-top border-primary border-4 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="card-title mb-0 fw-bold text-secondary text-uppercase tracking-wider">
+                        <i class="fas fa-info-circle me-1"></i> Metadados
+                    </h6>
                 </div>
-                <div class="col-md-6">
-                    <div class="alert alert-light">
-                        <h6><i class="bi bi-lightbulb"></i> Dicas:</h6>
-                        <ul class="small mb-0">
-                            <li>Use esta visualização para revisar a pergunta antes de aplicar</li>
-                            <li>Verifique se o gabarito está correto e completo</li>
-                            <li>Considere adicionar feedback adicional para os alunos</li>
-                        </ul>
+                <div class="card-body bg-light text-muted small p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                            <strong class="text-dark">Assunto:</strong>
+                            <span class="badge bg-primary">{{ pergunta.assunto.nome }}</span>
+                        </li>
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                            <strong class="text-dark">Tipo:</strong>
+                            <span class="badge bg-secondary">{{ pergunta.tipoDePergunta.descricao }}</span>
+                        </li>
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                            <strong class="text-dark">Total no Assunto:</strong>
+                            <span class="text-muted">{{ total_perguntas_assunto }} pergunta(s)</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card Avaliação Especializada (INJETADO AQUI) -->
+            <div class="card shadow-sm border-0 border-top border-orange border-4 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="card-title mb-0 fw-bold text-secondary text-uppercase tracking-wider">
+                        <i class="fas fa-comments text-orange me-1"></i> Avaliação Técnica
+                    </h6>
+                </div>
+                <div class="card-body bg-orange bg-opacity-10 text-center">
+                    <p class="small text-dark mb-3">Solicite que um especialista revise a clareza do enunciado e a precisão do gabarito desta questão.</p>
+                    
+                    <div class="d-grid gap-2">
+                        <!-- Botão principal alterado para cor sólida (btn-orange text-white) -->
+                        <button type="button" class="btn btn-orange text-white btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#feedbackModalPergunta">
+                            <i class="fas fa-paper-plane me-1"></i> Solicitar Avaliação
+                        </button>
+                        
+                        {% if pergunta.feedbacks.exists %}
+                        <!-- Botão secundário alterado para btn-dark para dar contraste -->
+                        <button type="button" class="btn btn-dark text-white btn-sm shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#verFeedbacksModalPergunta">
+                            <i class="fas fa-inbox me-1"></i> Ver Respostas 
+                            <span class="badge bg-orange text-white ms-1">{{ pergunta.feedbacks.count }}</span>
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
 
+            <!-- Card Análise Quantitativa -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="card-title mb-0 fw-bold text-secondary text-uppercase tracking-wider">
+                        <i class="fas fa-chart-bar me-1"></i> Análise Textual
+                    </h6>
+                </div>
+                <div class="card-body bg-light p-3">
+                    <div class="row text-center g-2">
+                        <div class="col-6">
+                            <div class="p-2 bg-white rounded border shadow-sm h-100">
+                                <h6 class="text-muted small mb-1">Palavras</h6>
+                                <span class="h5 fw-bold text-primary mb-0">{{ pergunta.pergunta|wordcount }}</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 bg-white rounded border shadow-sm h-100">
+                                <h6 class="text-muted small mb-1">Caracteres</h6>
+                                <span class="h5 fw-bold text-info mb-0">{{ pergunta.pergunta|length }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <div class="p-2 bg-white rounded border shadow-sm text-start d-flex justify-content-between align-items-center">
+                                <h6 class="text-muted small mb-0">Extensão:</h6>
+                                <span class="badge {% if pergunta.pergunta|length > 200 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {% if pergunta.pergunta|length > 200 %}Longa{% else %}Curta{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- COLUNA DIREITA: CONTEÚDO DA PERGUNTA -->
+        <div class="col-lg-8">
+            
             <!-- Enunciado -->
-            <div class="mb-4">
-                <h5 class="text-primary">
-                    <i class="bi bi-chat-square-text"></i> Enunciado da Pergunta
-                </h5>
-                <div class="p-3 bg-light rounded border">
-                    {{ pergunta.pergunta|linebreaks }}
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-quote-left text-primary me-2"></i> Enunciado</h5>
+                </div>
+                <div class="card-body bg-light p-4">
+                    <div class="text-dark" style="font-size: 1.05rem; line-height: 1.7; text-align: justify;">
+                        {{ pergunta.pergunta|linebreaksbr|safe }}
+                    </div>
                 </div>
             </div>
 
-            <!-- Imagens da Pergunta -->
+            <!-- Imagens -->
             {% if pergunta.imagens.all %}
-            <div class="mb-4">
-                <h5 class="text-info">
-                    <i class="bi bi-images"></i> Imagens da Pergunta
-                    <span class="badge bg-info ms-2">{{ pergunta.imagens.count }}</span>
-                </h5>
-                <div class="row">
-                    {% for imagem in pergunta.imagens.all %}
-                    <div class="col-md-4 col-lg-3 mb-3">
-                        <div class="card h-100">
-                            <img src="{{ imagem.imagem.url }}" 
-                                 class="card-img-top" 
-                                 alt="Imagem da pergunta {{ forloop.counter }}"
-                                 style="height: 200px; object-fit: contain; background-color: #f8f9fa;"
-                                 data-bs-toggle="modal" 
-                                 data-bs-target="#imageModal{{ forloop.counter }}"
-                                 onclick="openImageModal('{{ imagem.imagem.url }}')">
-                            <div class="card-body text-center">
-                                <small class="text-muted">Imagem {{ forloop.counter }}</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Modal para visualização em tela cheia -->
-                    <div class="modal fade" id="imageModal{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-lg modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Imagem {{ forloop.counter }} - Pergunta #{{ pergunta.id }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body text-center">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-images text-info me-2"></i> Anexos Visuais</h5>
+                    <span class="badge bg-info">{{ pergunta.imagens.count }} imagem(ns)</span>
+                </div>
+                <div class="card-body bg-light p-4">
+                    <div class="row g-3">
+                        {% for imagem in pergunta.imagens.all %}
+                        <div class="col-md-4">
+                            <div class="card h-100 border-0 shadow-sm img-hover-zoom">
+                                <div class="bg-white text-center p-2 rounded" style="height: 180px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                                     <img src="{{ imagem.imagem.url }}" 
-                                         class="img-fluid" 
-                                         alt="Imagem da pergunta {{ forloop.counter }}"
-                                         style="max-height: 70vh;">
-                                </div>
-                                <div class="modal-footer">
-                                    <small class="text-muted me-auto">
-                                        Adicionada em: {{ imagem.criado_em|date:"d/m/Y H:i" }}
-                                    </small>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                         class="img-fluid rounded cursor-pointer" 
+                                         alt="Imagem {{ forloop.counter }}"
+                                         style="max-height: 100%; object-fit: contain;"
+                                         onclick="abrirGaleria('{{ imagem.imagem.url }}', '{{ imagem.criado_em|date:"d/m/Y H:i" }}')">
                                 </div>
                             </div>
                         </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
             </div>
             {% endif %}
 
-            <!-- Gabarito/Resposta -->
-            <div class="mb-4">
-                <h5 class="text-success">
-                    <i class="bi bi-check-circle"></i> Gabarito/Resposta Correta
-                </h5>
-                <div class="p-3 bg-success text-white rounded">
-                    {{ pergunta.gabarito|linebreaks }}
+            <!-- Gabarito -->
+            <div class="card shadow-sm border-0 border-start border-success border-4 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 fw-bold text-dark"><i class="fas fa-check-circle text-success me-2"></i> Gabarito / Padrão de Resposta</h5>
+                </div>
+                <div class="card-body bg-success bg-opacity-10 p-4">
+                    <div class="text-dark" style="font-size: 1rem; line-height: 1.6;">
+                        {{ pergunta.gabarito|linebreaksbr|safe }}
+                    </div>
                 </div>
             </div>
 
-            <!-- Análise da Pergunta -->
-            <div class="mb-4">
-                <h5 class="text-info">
-                    <i class="bi bi-graph-up"></i> Análise da Pergunta
-                </h5>
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6>Complexidade</h6>
-                                <span class="h4 text-primary">{% if pergunta.pergunta|length > 200 %}Alta{% else %}Média{% endif %}</span>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAIS E COMPONENTES INVISÍVEIS            -->
+<!-- ========================================== -->
+
+<!-- Modal de Imagem Tela Cheia -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 pb-0 justify-content-end">
+                <button type="button" class="btn-close btn-close-white fs-4" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img id="modalImageFullscreen" src="" class="img-fluid rounded shadow-lg" style="max-height: 85vh; border: 4px solid white;">
+                <p id="modalImageDate" class="text-white mt-2 mb-0 small text-shadow"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Solicitar Feedback Modernizado -->
+<div class="modal fade" id="feedbackModalPergunta" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 overflow-hidden">
+            <!-- Header Integrado -->
+            <div class="bg-orange px-4 py-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-user-md me-2"></i> Solicitar Avaliação Técnica</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <p class="mb-0 text-white opacity-75 small">
+                    Selecione um especialista da rede para revisar o enunciado e validar o gabarito desta questão.
+                </p>
+            </div>
+
+            <form method="post" action="{% url 'mimir:solicitarFeedbackPerguntaDireto' pergunta.id %}">
+                {% csrf_token %}
+                <div class="modal-body p-4 bg-light">
+                    
+                    <!-- Campo de Seleção do Especialista -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body p-3">
+                            <label for="especialista_id" class="form-label fw-bold text-dark small text-uppercase tracking-wider mb-2">
+                                <i class="fas fa-search me-1 text-orange"></i> Buscar Especialista *
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-user-tie"></i></span>
+                                <select name="especialista_id" class="form-select border-start-0 ps-0" id="especialista_id" required style="box-shadow: none;">
+                                    <option value="" selected disabled>Escolha um avaliador disponível...</option>
+                                    {% for especialista in especialistas %}
+                                    <option value="{{ especialista.id }}">
+                                        {{ especialista.get_full_name|default:especialista.username }} {% if especialista.email %}({{ especialista.email }}){% endif %}
+                                    </option>
+                                    {% empty %}
+                                    <option value="" disabled>Nenhum especialista cadastrado na plataforma</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6>Caracteres</h6>
-                                <span class="h4 text-info">{{ pergunta.pergunta|length }}</span>
+                    
+                    <!-- Campo de Mensagem com Chips (Atalhos) -->
+                    <div class="card border-0 shadow-sm mb-2">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label for="mensagem_feedback" class="form-label fw-bold text-dark small text-uppercase tracking-wider mb-0">
+                                    <i class="fas fa-pen me-1 text-orange"></i> Foco da Revisão <span class="text-muted text-capitalize fw-normal">(Opcional)</span>
+                                </label>
                             </div>
+                            
+                            <!-- Chips Clicáveis -->
+                            <div class="mb-3 d-flex flex-wrap gap-2">
+                                <span class="badge bg-white text-secondary border cursor-pointer hover-chip" onclick="inserirTextoAtalho('Avaliar o nível de dificuldade da questão.')">
+                                    <i class="fas fa-tachometer-alt me-1"></i> Nível de Dificuldade
+                                </span>
+                                <span class="badge bg-white text-secondary border cursor-pointer hover-chip" onclick="inserirTextoAtalho('Verificar se o gabarito está completo e correto.')">
+                                    <i class="fas fa-check-double me-1"></i> Revisar Gabarito
+                                </span>
+                                <span class="badge bg-white text-secondary border cursor-pointer hover-chip" onclick="inserirTextoAtalho('Melhorar a clareza e objetividade do enunciado.')">
+                                    <i class="fas fa-align-left me-1"></i> Clareza do Texto
+                                </span>
+                                <span class="badge bg-white text-secondary border cursor-pointer hover-chip" onclick="inserirTextoAtalho('Analisar alinhamento com a taxonomia de Bloom solicitada.')">
+                                    <i class="fas fa-bullseye me-1"></i> Alinhamento Pedagógico
+                                </span>
+                            </div>
+
+                            <textarea name="mensagem" class="form-control bg-light border-0 custom-textarea p-3" id="mensagem_feedback" rows="3" 
+                                      placeholder="Ou digite aqui instruções específicas e personalizadas para o revisor..."></textarea>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6>Palavras</h6>
-                                <span class="h4 text-warning">{{ pergunta.pergunta|wordcount }}</span>
-                            </div>
-                        </div>
+                    
+                </div>
+                
+                <div class="modal-footer bg-white border-top-0 pt-0 px-4 pb-4 d-flex justify-content-between align-items-center">
+                    <div class="small text-muted">
+                        <i class="fas fa-shield-alt text-success me-1"></i> O avaliador terá acesso automático ao gabarito.
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6>Imagens</h6>
-                                <span class="h4 text-success">{{ pergunta.imagens.count }}</span>
-                            </div>
-                        </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light border text-secondary fw-bold px-4 shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-orange text-white px-4 shadow-sm fw-bold" onclick="mostrarLoadingBtn(this)" {% if not especialistas %}disabled{% endif %}>
+                            <i class="fas fa-paper-plane me-1"></i> Enviar Pedido
+                        </button>
                     </div>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <!-- Ações Rápidas -->
-    <div class="card mt-4">
-        <div class="card-body text-center">
-            <h5 class="mb-3">Ações Rápidas</h5>
-            <div class="btn-group" role="group">
-                <a href="{% url 'mimir:editarPergunta' pergunta.id %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i> Editar Esta Pergunta
-                </a>
-                {% if pergunta.imagens.all %}
-                <button type="button" class="btn btn-info" onclick="openAllImages()">
-                    <i class="bi bi-images"></i> Ver Todas as Imagens
-                </button>
-                {% endif %}
+<!-- Modal: Ver Feedbacks Recebidos -->
+{% if pergunta.feedbacks.exists %}
+<div class="modal fade" id="verFeedbacksModalPergunta" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-orange text-white">
+                <h5 class="modal-title fw-bold"><i class="fas fa-inbox me-2"></i> Pareceres Técnicos Recebidos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-        </div>
-    </div>
-
-    <!-- Perguntas Relacionadas -->
-    {% if perguntas_mesmo_tipo %}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="bi bi-link"></i> Perguntas do Mesmo Tipo
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for pergunta_rel in perguntas_mesmo_tipo %}
-                <div class="col-md-6 mb-2">
-                    <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                        <div>
-                            <small class="text-muted">#{{ pergunta_rel.id }}</small>
-                            <div class="small">{{ pergunta_rel.pergunta|truncatewords:10 }}</div>
-                            {% if pergunta_rel.imagens.count > 0 %}
-                            <small class="text-info">
-                                <i class="bi bi-image"></i> {{ pergunta_rel.imagens.count }} imagem(ns)
-                            </small>
+            <div class="modal-body bg-light p-4">
+                {% for feedback in pergunta.feedbacks.all %}
+                <div class="card mb-4 border-0 shadow-sm {% if feedback.utilizado %}border-start border-success border-4{% else %}border-start border-warning border-4{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <h6 class="fw-bold text-dark mb-0">
+                                <i class="fas fa-user-md text-orange me-2"></i> {{ feedback.especialista.get_full_name|default:feedback.especialista.username }}
+                            </h6>
+                            <span class="badge {% if feedback.utilizado %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {% if feedback.utilizado %}Aplicado{% elif feedback.comentarios %}Respondido{% else %}Aguardando{% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <strong class="small text-secondary text-uppercase tracking-wider text-orange">Parecer do Especialista:</strong>
+                            {% if feedback.comentarios %}
+                                <div class="bg-orange bg-opacity-10 p-3 rounded border border-orange mt-1 text-dark small">
+                                    {{ feedback.comentarios|safe }}
+                                </div>
+                            {% else %}
+                                <p class="text-muted small mt-1 font-italic">O especialista ainda não redigiu o parecer.</p>
                             {% endif %}
                         </div>
-                        <a href="{% url 'mimir:visualizarPergunta' pergunta_rel.id %}" 
-                           class="btn btn-sm btn-outline-primary">Ver</a>
+
+                        <!-- Ações para feedback -->
+                        <div class="d-flex justify-content-end mt-3 pt-3 border-top">
+                            <a href="{% url 'mimir:meusFeedbacks' %}" class="btn btn-outline-orange btn-sm shadow-sm">
+                                <i class="fas fa-external-link-alt me-1"></i> Gerenciar na Central de Feedbacks
+                            </a>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
-<!-- Modal único para visualização de imagens -->
-<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="imageModalTitle">Visualização de Imagem</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center">
-                <img id="modalImage" src="" class="img-fluid" alt="Imagem da pergunta" style="max-height: 80vh;">
-            </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-white">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-// Destacar seções ao passar o mouse
-document.addEventListener('DOMContentLoaded', function() {
-    const sections = document.querySelectorAll('.card');
-    sections.forEach(section => {
-        section.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-2px)';
-            this.style.transition = 'transform 0.2s';
-        });
-        section.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
-        });
-    });
-});
-
-// Função para abrir modal de imagem
-function openImageModal(imageUrl) {
-    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
-    document.getElementById('modalImage').src = imageUrl;
-    modal.show();
-}
-
-// Função para abrir todas as imagens em sequência
-function openAllImages() {
-    const images = document.querySelectorAll('.card-img-top');
-    if (images.length > 0) {
-        let currentIndex = 0;
-        
-        function showNextImage() {
-            if (currentIndex < images.length) {
-                images[currentIndex].click();
-                currentIndex++;
-                // Fechar modal automaticamente após 5 segundos e mostrar próxima
-                setTimeout(() => {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('imageModal'));
-                    if (modal) {
-                        modal.hide();
-                        setTimeout(showNextImage, 500);
-                    }
-                }, 5000);
-            }
-        }
-        
-        showNextImage();
-    }
-}
-
-// Zoom na imagem ao passar o mouse (para as miniaturas)
-document.querySelectorAll('.card-img-top').forEach(img => {
-    img.addEventListener('mouseenter', function() {
-        this.style.transform = 'scale(1.05)';
-        this.style.transition = 'transform 0.3s ease';
-    });
-    
-    img.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
-    });
-});
-
-// Teclas de navegação no modal de imagem
-document.addEventListener('keydown', function(e) {
-    const modal = document.getElementById('imageModal');
-    if (modal.classList.contains('show')) {
-        const images = document.querySelectorAll('.card-img-top');
-        const currentSrc = document.getElementById('modalImage').src;
-        let currentIndex = -1;
-        
-        // Encontrar índice da imagem atual
-        images.forEach((img, index) => {
-            if (img.src === currentSrc) {
-                currentIndex = index;
-            }
-        });
-        
-        if (e.key === 'ArrowRight' && currentIndex < images.length - 1) {
-            images[currentIndex + 1].click();
-        } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
-            images[currentIndex - 1].click();
-        } else if (e.key === 'Escape') {
-            bootstrap.Modal.getInstance(modal).hide();
-        }
-    }
-});
-</script>
+{% endif %}
 
 <style>
-.card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
+/* Variaveis e Cores */
+:root { --bs-orange: #fd7e14; }
+.text-orange { color: var(--bs-orange) !important; }
+.bg-orange { background-color: var(--bs-orange) !important; }
+.border-orange { border-color: var(--bs-orange) !important; }
+.btn-orange { background-color: var(--bs-orange); border-color: var(--bs-orange); }
+.btn-orange:hover { background-color: #e06a09; border-color: #e06a09; color: white; }
+.btn-outline-orange { border-color: var(--bs-orange); color: var(--bs-orange); }
+.btn-outline-orange:hover { background-color: var(--bs-orange); color: white; }
 
-.card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
+.tracking-wider { letter-spacing: 0.05em; }
+.cursor-pointer { cursor: pointer; }
 
-.bg-light {
-    background-color: #f8f9fa !important;
+/* Efeito de Hover nas Imagens */
+.img-hover-zoom {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
-
-.badge {
-    font-size: 0.8em;
+.img-hover-zoom:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
 }
-
-.table th {
-    background-color: #f8f9fa;
+.text-shadow {
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
 }
-
-/* Estilo para as imagens */
-.card-img-top {
-    cursor: pointer;
-    transition: transform 0.3s ease;
+/* Customização do modal de solicitação */
+.hover-chip {
+    transition: all 0.2s ease;
+    font-weight: normal;
+    padding: 0.4rem 0.6rem;
 }
-
-.card-img-top:hover {
-    transform: scale(1.02);
+.hover-chip:hover {
+    background-color: var(--bs-orange) !important;
+    color: white !important;
+    border-color: var(--bs-orange) !important;
 }
-
-/* Modal personalizado */
-.modal-content {
-    border-radius: 10px;
+.custom-textarea {
+    resize: none;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.05);
 }
-
-.modal-header {
-    border-bottom: 1px solid #dee2e6;
-    background-color: #f8f9fa;
-}
-
-/* Responsividade para imagens */
-@media (max-width: 768px) {
-    .col-md-4 {
-        flex: 0 0 50%;
-        max-width: 50%;
-    }
-}
-
-@media (max-width: 576px) {
-    .col-md-4 {
-        flex: 0 0 100%;
-        max-width: 100%;
-    }
+.custom-textarea:focus {
+    background-color: #fff !important;
+    border: 1px solid var(--bs-orange) !important;
+    box-shadow: 0 0 0 0.25rem rgba(253, 126, 20, 0.25) !important;
 }
 </style>
+
+<script>
+// --- Função para abrir a Galeria de Imagens em Tela Cheia ---
+function abrirGaleria(url, data) {
+    const modalImage = document.getElementById('modalImageFullscreen');
+    const modalDate = document.getElementById('modalImageDate');
+    
+    modalImage.src = url;
+    modalDate.innerHTML = `<i class="far fa-clock me-1"></i> Adicionada em: ${data}`;
+    
+    const myModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    myModal.show();
+}
+
+// --- Deleção com SweetAlert2 ---
+function confirmarExclusao() {
+    Swal.fire({
+        title: 'Excluir Pergunta?',
+        text: "Tem certeza de que deseja remover esta questão? A ação não pode ser desfeita.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '<i class="fas fa-trash me-1"></i> Sim, excluir!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('formExcluirPergunta').submit();
+        }
+    });
+}
+// Função para os "Chips" do Modal de Feedback
+function inserirTextoAtalho(texto) {
+    const textarea = document.getElementById('mensagem_feedback');
+    // Adiciona o texto do atalho. Se já tiver algo escrito, pula uma linha.
+    if (textarea.value.trim() !== '') {
+        textarea.value += '\n- ' + texto;
+    } else {
+        textarea.value = '- ' + texto;
+    }
+    // Pisca a borda para dar um feedback visual
+    textarea.style.transition = 'border-color 0.2s, background-color 0.2s';
+    textarea.style.backgroundColor = '#fff3cd';
+    setTimeout(() => { textarea.style.backgroundColor = ''; }, 300);
+    textarea.focus();
+}
+
+// Botão Loading de envio
+function mostrarLoadingBtn(btn) {
+    // Evita rodar se o select obrigatório estiver vazio
+    if (document.getElementById('especialista_id').value === "") return;
+    
+    // Pequeno timeout para deixar o form dar submit antes de desabilitar o botão
+    setTimeout(() => {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Enviando...';
+        btn.classList.add('disabled');
+    }, 50);
+}
+</script>
 {% endblock %}
