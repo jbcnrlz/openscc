@@ -57,6 +57,38 @@
                             </td>
                             <td class="text-end pe-4">
                                 {% if item.status == 'pendente' %}
+                                    
+                                    <!-- Verifica se o registro ProvaAluno já existe -->
+                                    {% if not item.prova_aluno %}
+                                        <!-- Primeira vez: Roteia para criar o vínculo da prova -->
+                                        <button class="btn btn-primary btn-sm px-3 shadow-sm rounded-pill" 
+                                                onclick="confirmarInicioProva('{% url 'mimir:criarProvaAluno' item.aplicacao.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'iniciar')">
+                                            <i class="fas fa-play me-1" style="font-size: 0.8rem;"></i> Iniciar
+                                        </button>
+                                    {% else %}
+                                        <!-- Já criado mas não iniciado: Roteia direto para a prova -->
+                                        <button class="btn btn-primary btn-sm px-3 shadow-sm rounded-pill" 
+                                                onclick="confirmarInicioProva('{% url 'mimir:iniciarProva' item.prova_aluno.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'iniciar')">
+                                            <i class="fas fa-play me-1" style="font-size: 0.8rem;"></i> Iniciar
+                                        </button>
+                                    {% endif %}
+
+                                {% elif item.status == 'em_andamento' %}
+                                    <!-- Em andamento: A prova já existe, usa o ID do ProvaAluno -->
+                                    <button class="btn btn-warning btn-sm px-3 shadow-sm rounded-pill text-dark" 
+                                            onclick="confirmarInicioProva('{% url 'mimir:iniciarProva' item.prova_aluno.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'continuar')">
+                                        <i class="fas fa-clock me-1" style="font-size: 0.8rem;"></i> Continuar
+                                    </button>
+
+                                {% else %}
+                                    <span class="badge bg-success px-3 py-2 rounded-pill">
+                                        <i class="fas fa-check-circle me-1"></i> Concluída
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <!--
+                            <td class="text-end pe-4">
+                                {% if item.status == 'pendente' %}
                                     <button class="btn btn-primary btn-sm px-3 shadow-sm rounded-pill" 
                                             onclick="confirmarInicioProva('{% url 'mimir:iniciarProva' item.aplicacao.id %}', '{{ item.aplicacao.prova.titulo|escapejs }}', 'iniciar')">
                                         <i class="fas fa-play me-1" style="font-size: 0.8rem;"></i> Iniciar
@@ -72,6 +104,7 @@
                                     </span>
                                 {% endif %}
                             </td>
+                            -->
                         </tr>
                         {% empty %}
                         <tr>
@@ -119,4 +152,4 @@
         });
     }
 </script>
-{% endblock %}
+{% endblock %} 
