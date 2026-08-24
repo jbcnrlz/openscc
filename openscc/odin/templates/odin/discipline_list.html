@@ -6,7 +6,7 @@
 <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h4 class="mb-0 text-secondary"><i class="bi bi-book me-2"></i>Catálogo de Disciplinas</h4>
-        <a href="{% url 'discipline_create' %}" class="btn btn-primary btn-sm">
+        <a href="{% url 'odin:discipline_create' %}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i> Nova Disciplina
         </a>
     </div>
@@ -40,7 +40,7 @@
                             </small>
                         </td>
                         <td class="text-end pe-4">
-                            <a href="{% url 'discipline_update' discipline.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                            <a href="{% url 'odin:discipline_update' discipline.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </a>
                         </td>

@@ -8,7 +8,7 @@
         <h3 class="text-secondary mb-0"><i class="bi bi-grid-3x3-gap me-2"></i>Matriz Curricular</h3>
         <p class="text-muted lead mb-0">{{ ppc.course.name }} - Versão {{ ppc.version_semester }}</p>
     </div>
-    <a href="{% url 'ppc_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar aos PPCs</a>
+    <a href="{% url 'odin:ppc_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar aos PPCs</a>
 </div>
 
 <div class="row g-4">
@@ -41,7 +41,7 @@
                     </div>
                     
                     {% if is_owner %}
-                    <form action="{% url 'matrix_item_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza de que deseja remover esta disciplina deste semestre?');">
+                    <form action="{% url 'odin:matrix_item_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza de que deseja remover esta disciplina deste semestre?');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover do Semestre">
                             <i class="bi bi-trash"></i>
@@ -67,7 +67,7 @@
                 <h5 class="mb-0"><i class="bi bi-node-plus me-2"></i>Alocar Disciplina</h5>
             </div>
             <div class="card-body">
-                <form action="{% url 'matrix_item_create' ppc.id %}" method="post">
+                <form action="{% url 'odin:matrix_item_create' ppc.id %}" method="post">
                     {% csrf_token %}
                     
                     <div class="mb-3">

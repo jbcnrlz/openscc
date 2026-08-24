@@ -1,6 +1,6 @@
 from django import forms
 from .models import *
-
+from django.contrib.auth.models import Group
 class FormativeAxisForm(forms.ModelForm):
     class Meta:
         model = FormativeAxis
@@ -103,3 +103,132 @@ class CurriculumMatrixForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Ao montar a grade, lista TODAS as disciplinas do catálogo da instituição
         self.fields['discipline'].queryset = Discipline.objects.all().order_by('name')
+
+class VestibularCampaignForm(forms.ModelForm):
+    class Meta:
+        model = VestibularCampaign
+        fields = ['course', 'name', 'start_date', 'end_date', 'vacancies', 'min_inscriptions', 'yield_paid', 'yield_sponsored']
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class CampaignDailyRecordForm(forms.ModelForm):
+    class Meta:
+        model = CampaignDailyRecord
+        fields = ['date', 'new_paid', 'sponsored_released']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+# --- Visão do Coordenador ---
+class CampaignActionForm(forms.ModelForm):
+    class Meta:
+        model = CampaignAction
+        fields = ['title', 'description', 'scheduled_date', 'location', 'responsible']
+        widgets = {
+            'scheduled_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Opcional: Filtrar a combo 'responsible' para mostrar apenas professores ativos
+        # self.fields['responsible'].queryset = User.objects.filter(is_active=True)
+
+# --- Visão do Professor (Execução) ---
+class ActionExpenseForm(forms.ModelForm):
+    class Meta:
+        model = ActionExpense
+        fields = ['description', 'amount', 'date_incurred', 'receipt_file']
+        widgets = {
+            'date_incurred': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class ActionPhotoForm(forms.ModelForm):
+    class Meta:
+        model = ActionPhoto
+        fields = ['image', 'caption']
+
+class CampaignLeadForm(forms.ModelForm):
+    class Meta:
+        model = CampaignLead
+        fields = ['name', 'phone', 'email', 'interested_course']
+
+# 1. Formulário do Aluno (Fase 1: Cadastro Inicial)
+class ICProjectCreateForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['title', 'advisor']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtra a lista para mostrar APENAS usuários do grupo "Professor"
+        self.fields['advisor'].queryset = User.objects.filter(
+            groups__name="Professor", 
+            is_active=True
+        ).order_by('first_name')
+
+# 2. Formulário do Aluno (Fase 2: Submissão do Arquivo)
+class ICProjectSubmitForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['project_file']
+
+# 3. Formulário da CEPE (Designar Parecerista)
+class CEPEAssignReviewerForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['reviewer']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Filtra a lista de pareceristas APENAS para professores ativos
+        qs = User.objects.filter(groups__name="Professor", is_active=True).order_by('first_name')
+        
+        # Regra de negócio: O orientador NÃO pode ser o parecerista do próprio aluno
+        if self.instance and self.instance.advisor:
+            qs = qs.exclude(id=self.instance.advisor.id)
+            
+        self.fields['reviewer'].queryset = qs
+# 4. Formulário do Parecerista Ad-hoc
+class ReviewerEvaluationForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['reviewer_feedback'] # Removemos o campo 'status' daqui
+        widgets = {
+            'reviewer_feedback': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 8, 
+                'placeholder': 'Descreva sua análise técnica e conclua com sua recomendação (Ex: Recomendo o deferimento com ressalvas...)'
+            }),
+        }
+        # 5. Formulário do Aluno (Fase Final: Relatório)
+
+# NOVO: Formulário de Decisão Final da CEPE
+class CEPEDecisionForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['status', 'cepe_feedback']
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-select fw-bold border-primary mb-3'}),
+            'cepe_feedback': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 4, 
+                'placeholder': 'Justificativa ou observações finais da CEPE (Opcional caso deferido, obrigatório caso indeferido)...'
+            }),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['status'].choices = [
+            ('', 'Selecione o Veredito Final da CEPE...'),
+            ('IN_PROGRESS', 'Deferido (Aprovado)'),
+            ('CHANGES_REQUESTED', 'Deferido com Ressalvas'),
+            ('REJECTED', 'Indeferido (Rejeitado)'),
+        ]
+
+class ICFinalReportForm(forms.ModelForm):
+    class Meta:
+        model = ScientificProject
+        fields = ['final_report_file']

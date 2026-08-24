@@ -319,6 +319,12 @@
                           Mimir
                         </a>
                       {% endif %}
+                      {% if user.isMembroAutorizadoOdin %}
+                        <a class="dropdown-item" href="{% url 'odin:dashboard' %}">
+                          <i class="fas fa-lock"></i>
+                          Odin
+                        </a>
+                      {% endif %}
                       <div class="dropdown-divider"></div>
                       <a class="dropdown-item" href="{% url 'submission:logout' %}">
                         <i class="fas fa-sign-out-alt"></i>
