@@ -12,8 +12,14 @@ def isMembroAutorizado(self):
     """
     return self.groups.filter(name__in=["Professor", "Aluno"]).exists()
 
-User.add_to_class('isMembroAutorizado', isMembroAutorizado)
+def isMembroAutorizadoOdin(self):
+    """
+    Verifica se o usuário pertence a um dos grupos autorizados para Odin
+    """
+    return self.groups.filter(name__in=["Professor", "Coordenador", "Aluno"]).exists()
 
+User.add_to_class('isMembroAutorizado', isMembroAutorizado)
+User.add_to_class('isMembroAutorizadoOdin', isMembroAutorizadoOdin)
 class Conferencia(models.Model):
     nome = models.CharField(max_length=400)
     sigla = models.CharField(max_length=20,default="")
