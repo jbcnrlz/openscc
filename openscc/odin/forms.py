@@ -105,6 +105,15 @@ class CurriculumMatrixForm(forms.ModelForm):
         self.fields['discipline'].queryset = Discipline.objects.all().order_by('name')
 
 class VestibularCampaignForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        # Removemos qualquer exigência de 'user' se existir na view
+        kwargs.pop('user', None) 
+        super().__init__(*args, **kwargs)
+        
+        # MUDANÇA AQUI: Força o campo 'course' a buscar TODOS os cursos do sistema, em ordem alfabética
+        from .models import Course  # Importe caso não esteja no escopo global
+        self.fields['course'].queryset = Course.objects.all().order_by('name')
     class Meta:
         model = VestibularCampaign
         fields = ['course', 'name', 'start_date', 'end_date', 'vacancies', 'min_inscriptions', 'yield_paid', 'yield_sponsored']

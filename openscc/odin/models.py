@@ -278,6 +278,13 @@ class VestibularCampaign(models.Model):
     yield_sponsored = models.FloatField(default=0.72, verbose_name="Taxa de Presença Esperada (Patrocinados)")
     
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='my_campaigns',
+        null=True, 
+        blank=True
+    )
 
     class Meta:
         verbose_name = "Campanha de Vestibular"
