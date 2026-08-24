@@ -61,7 +61,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['total_courses'] = Course.objects.filter(professor=user).count()
             context['total_disciplines'] = Discipline.objects.count() # Catálogo Global
             context['active_ppcs'] = PPCProposal.objects.filter(course__professor=user, is_active=True).count()
-            context['active_campaigns'] = VestibularCampaign.objects.filter(course__professor=user).count()
+            context['active_campaigns'] = VestibularCampaign.objects.filter(created_by=user).count()
             
             # ==========================================
             # MÉTRICAS DE PESQUISA (Orientação e Ad-hoc)
@@ -268,22 +268,19 @@ class VestibularCampaignListView(ProfessorRequiredMixin, ListView):
     model = VestibularCampaign
     template_name = 'odin/campaign_list.html'
     context_object_name = 'campaigns'
-    
-    def get_queryset(self):
-        # Apenas campanhas dos cursos do professor
-        return VestibularCampaign.objects.filter(course__professor=self.request.user)
 
+    def get_queryset(self):
+        return VestibularCampaign.objects.filter(created_by=self.request.user).order_by('-start_date')
+    
 class VestibularCampaignCreateView(ProfessorRequiredMixin, CreateView):
     model = VestibularCampaign
     form_class = VestibularCampaignForm
     template_name = 'odin/campaign_form.html'
     success_url = reverse_lazy('odin:campaign_list')
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Filtra os cursos para o professor atual
-        form.fields['course'].queryset = Course.objects.filter(professor=self.request.user)
-        return form
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
 
 class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
     """Esta View atua como o Painel de Previsão de Demanda (Yield Dashboard)"""
@@ -326,19 +323,9 @@ class VestibularCampaignUpdateView(ProfessorRequiredMixin, UpdateView):
     form_class = VestibularCampaignForm
     template_name = 'odin/campaign_form.html'
 
-    def get_queryset(self):
-        # SEGURANÇA: Garante que o professor só edite campanhas dos próprios cursos
-        return VestibularCampaign.objects.filter(course__professor=self.request.user)
-
     def get_success_url(self):
         # Após salvar, redireciona de volta para o dashboard daquela campanha
         return reverse_lazy('odin:campaign_dashboard', kwargs={'pk': self.object.id})
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Filtra a combobox de cursos para mostrar apenas os do professor
-        form.fields['course'].queryset = Course.objects.filter(professor=self.request.user)
-        return form
 
 # ==========================================
 # 1. VISÃO DO COORDENADOR (Planejamento)
