@@ -1,0 +1,346 @@
+{% extends 'odin/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Dashboard de Captação - {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho -->
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'odin:campaign_list' %}" class="text-decoration-none">Captação</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ campaign.name }}</li>
+            </ol>
+        </nav>
+        <h3 class="fw-bold text-dark mb-0">{{ campaign.name }}</h3>
+    </div>
+    <div class="text-end">
+        <span class="badge bg-secondary mb-1">Evasão Pagante Estimada: 40%</span><br>
+        <span class="text-muted small d-block mb-2">Meta de Vagas: {{ campaign.vacancies }} | Mínimo Inscritos: {{ campaign.min_inscriptions }}</span>
+        
+        <!-- Botão de Editar Parâmetros -->
+        <a href="{% url 'odin:campaign_update' campaign.id %}" class="btn btn-outline-secondary btn-sm fw-medium">
+            <i class="bi bi-pencil me-1"></i> Editar Parâmetros
+        </a>
+    </div>
+</div>
+
+<!-- KPIs do Motor de Yield Management -->
+<div class="row g-4 mb-4">
+    <!-- Estimativa de Pagantes -->
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-white h-100">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-muted fw-bold text-uppercase mb-3">Projeção Final (Pagantes)</h6>
+                <h1 class="display-4 fw-bolder text-dark mb-0">{{ projections.projecao_final_pagantes }}</h1>
+                <p class="text-muted small mt-2 mb-0">Baseado no ritmo atual ({{ projections.progresso_esperado_pct }}% da curva)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teto Ideal de Patrocínios -->
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-white-50 fw-bold text-uppercase mb-3">Cota Ótima de Patrocínios</h6>
+                <h1 class="display-4 fw-bolder text-white mb-0">{{ projections.s_alvo }}</h1>
+                <p class="text-white-50 small mt-2 mb-0">Para preencher as vagas minimizando custo</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ação do Dia -->
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 {% if projections.liberar_hoje > 0 %}bg-danger text-white{% else %}bg-success text-white{% endif %}">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-white-50 fw-bold text-uppercase mb-3">Ação Recomendada Hoje</h6>
+                <h1 class="display-4 fw-bolder text-white mb-0">
+                    {% if projections.liberar_hoje > 0 %}
+                        +{{ projections.liberar_hoje }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </h1>
+                <p class="text-white-50 small mt-2 mb-0">
+                    {% if projections.liberar_hoje > 0 %}
+                        Patrocínios a liberar imediatamente
+                    {% else %}
+                        Captação orgânica está suprindo a demanda
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico de Acompanhamento (S-Curve) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-graph-up me-2"></i>Curva de Captação vs. Projeção Matemática</h6>
+            </div>
+            
+            <div class="card-body d-flex flex-column justify-content-center align-items-center" style="min-height: 350px;">
+                
+                <!-- CONDIÇÃO 1: Campanha no Futuro -->
+                {% if campaign.elapsed_days == 0 %}
+                    <div class="text-center text-muted opacity-75">
+                        <i class="bi bi-calendar-x" style="font-size: 3rem;"></i>
+                        <h5 class="fw-bold mt-3 text-dark">A campanha ainda não começou</h5>
+                        <p class="mb-0">A data de início está configurada para <strong>{{ campaign.start_date|date:"d/m/Y" }}</strong>.</p>
+                        <p class="small">O gráfico será gerado automaticamente a partir desta data.</p>
+                    </div>
+
+                <!-- CONDIÇÃO 2: Sem registros reais lançados -->
+                {% elif records|length == 0 %}
+                    <div class="text-center text-muted opacity-75">
+                        <i class="bi bi-clipboard-data" style="font-size: 3rem;"></i>
+                        <h5 class="fw-bold mt-3 text-dark">Aguardando o primeiro registro</h5>
+                        <p class="mb-0">Para projetar a Curva S corretamente, o modelo precisa de um ponto de partida.</p>
+                        <p class="small">Insira os pagantes do dia de hoje no formulário abaixo.</p>
+                    </div>
+
+                <!-- CONDIÇÃO 3: Tudo Certo, Renderiza o Gráfico -->
+                {% else %}
+                    <div class="w-100 h-100" style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="yieldChart"></canvas>
+                    </div>
+                {% endif %}
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Histórico e Input de Dados -->
+<div class="row g-4 mb-5">
+    <!-- Coluna Esquerda: Tabela de Histórico -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-table me-2"></i>Registros Diários</h6>
+                <span class="badge bg-light text-dark border">{{ campaign.elapsed_days }} / {{ campaign.total_days }} Dias Cadastrados</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Data</th>
+                                <th class="text-center">Novos Pagantes</th>
+                                <th class="text-center">Patrocínios Liberados</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ record.date|date:"d/m/Y" }}</td>
+                                <td class="text-center text-success fw-bold">+{{ record.new_paid }}</td>
+                                <td class="text-center text-primary fw-bold">+{{ record.sponsored_released }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                                    Nenhum dado registrado ainda.<br>
+                                    Inicie o funil adicionando o dia de hoje no painel ao lado.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            <!-- Rodapé com Totalizadores -->
+                            <tr class="table-light border-top border-2">
+                                <td class="ps-4 fw-bold text-dark">Acumulado</td>
+                                <td class="text-center fw-bolder text-success fs-5">{{ campaign.accumulated_paid }}</td>
+                                <td class="text-center fw-bolder text-primary fs-5">{{ campaign.accumulated_sponsored }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coluna Direita: Formulário de Inserção -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-pencil-square me-2"></i>Atualizar Funil Diário</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'odin:daily_record_create' campaign.id %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ record_form.date.id_for_label }}" class="form-label fw-medium text-muted small">Data do Registro</label>
+                        {{ record_form.date|add_class:"form-control bg-light" }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ record_form.new_paid.id_for_label }}" class="form-label fw-medium text-muted small">Novos Inscritos Pagos (Orgânicos)</label>
+                        {{ record_form.new_paid|add_class:"form-control border-success" }}
+                        <div class="form-text text-success"><i class="bi bi-info-circle me-1"></i>Quantos pagaram os boletos hoje?</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ record_form.sponsored_released.id_for_label }}" class="form-label fw-medium text-muted small">Patrocínios Liberados Hoje</label>
+                        {{ record_form.sponsored_released|add_class:"form-control border-primary" }}
+                        <div class="form-text">Insira apenas os cupons/convites que você distribuiu neste dia.</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-3 hover-lift">
+                        <i class="bi bi-save me-2"></i> Gravar Dia e Recalcular
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- Gestão de Ações em Campo (Coordenador) -->
+<!-- ========================================== -->
+<div class="row mb-5 mt-2">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-geo-alt me-2"></i>Ações e Eventos Planejados</h6>
+                <a href="{% url 'odin:action_create' campaign.id %}" class="btn btn-sm btn-primary fw-medium">
+                    <i class="bi bi-plus-lg me-1"></i> Delegar Nova Ação
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Ação</th>
+                                <th>Data Prevista</th>
+                                <th>Responsável</th>
+                                <th>Status</th>
+                                <th class="text-center pe-4">Conversão (Leads)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for action in campaign.actions.all %}
+                            <tr>
+                                <td class="ps-4 text-dark">
+                                    <div class="fw-bold">{{ action.title }}</div>
+                                    <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ action.location }}</small>
+                                </td>
+                                <td>{{ action.scheduled_date|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if action.responsible %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-dark border"><i class="bi bi-person me-1"></i> Prof. {{ action.responsible.first_name|default:action.responsible.username }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">Não atribuído</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if action.status == 'COMPLETED' %}success{% elif action.status == 'EXECUTING' %}warning{% else %}secondary{% endif %}">
+                                        {{ action.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-center pe-4">
+                                    <span class="fw-bold text-success">{{ action.captured_leads.count }}</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    Nenhuma ação planejada para esta campanha.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts do Gráfico -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const canvasElement = document.getElementById('yieldChart');
+        
+        if (canvasElement) {
+            let chartData;
+            
+            try {
+                // Parse direto e blindado do template usando escapejs do Django
+                const rawData = '{{ campaign.get_chart_data|escapejs }}';
+                chartData = JSON.parse(rawData);
+            } catch (err) {
+                console.error("Erro na leitura do JSON do Django:", err);
+                return;
+            }
+
+            if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+                console.warn("Sem dados para exibir no gráfico.");
+                return;
+            }
+
+            const ctx = canvasElement.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Inscritos Pagos (Real)',
+                            data: chartData.real_pagantes,
+                            borderColor: '#198754', 
+                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#198754'
+                        },
+                        {
+                            label: 'Projeção Esperada (S-Curve)',
+                            data: chartData.projetada,
+                            borderColor: '#adb5bd', 
+                            borderDash: [5, 5], 
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Patrocínios Liberados',
+                            data: chartData.real_patrocinados,
+                            borderColor: '#0d6efd', 
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#0d6efd'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+                        tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.8)', padding: 12 }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#e9ecef' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

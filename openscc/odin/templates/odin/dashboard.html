@@ -3,80 +3,273 @@
 {% block title %}Dashboard - Odin{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="text-secondary"><i class="bi bi-speedometer2 me-2"></i>Visão Geral</h2>
+<style>
+    /* Efeito sutil de elevação nos cards e botões */
+    .hover-lift {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .hover-lift:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
+    }
+    .icon-box {
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-end mb-4 pb-2 border-bottom">
+    <div>
+        <h4 class="text-muted fw-normal mb-0">Bem-vindo(a) de volta,</h4>
+        <h2 class="fw-bold text-dark mb-0">
+            {% if is_aluno %}
+                {{ user.first_name|default:user.username|title }}
+            {% else %}
+                Prof. {{ user.first_name|default:user.username|title }}
+            {% endif %}
+        </h2>
+    </div>
 </div>
 
+<!-- ========================================== -->
+<!-- VISÃO DO ALUNO                             -->
+<!-- ========================================== -->
+{% if is_aluno %}
+
+<h5 class="fw-bold text-dark mb-3"><i class="bi bi-journal-bookmark me-2"></i>Minha Iniciação Científica</h5>
 <div class="row g-4 mb-5">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted fw-bold text-uppercase mb-1">Cursos Cadastrados</h6>
-                        <h3 class="mb-0 text-dark">{{ total_courses }}</h3>
+    
+    <!-- Projetos em Andamento -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-flask fs-3"></i>
                     </div>
-                    <div class="text-primary opacity-50">
-                        <i class="bi bi-mortarboard fs-1"></i>
-                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ my_active_ic|default:"0" }}</h2>
                 </div>
-                <a href="{% url 'course_list' %}" class="text-decoration-none mt-3 d-block text-primary small fw-bold">
-                    Gerenciar Cursos <i class="bi bi-arrow-right"></i>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1">Projetos em Andamento</h6>
+                <hr class="text-muted opacity-25">
+                <a href="{% url 'odin:ic_student_list' %}" class="text-decoration-none d-flex align-items-center justify-content-between text-success fw-medium small">
+                    Acessar meus projetos <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted fw-bold text-uppercase mb-1">Catálogo de Disciplinas</h6>
-                        <h3 class="mb-0 text-dark">{{ total_disciplines }}</h3>
+    <!-- Projetos Pendentes/Em Avaliação -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-hourglass-split fs-3 text-dark"></i>
                     </div>
-                    <div class="text-success opacity-50">
-                        <i class="bi bi-journals fs-1"></i>
-                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ my_pending_ic|default:"0" }}</h2>
                 </div>
-                <a href="{% url 'discipline_list' %}" class="text-decoration-none mt-3 d-block text-success small fw-bold">
-                    Gerenciar Disciplinas <i class="bi bi-arrow-right"></i>
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted fw-bold text-uppercase mb-1">PPCs Vigentes</h6>
-                        <h3 class="mb-0 text-dark">{{ active_ppcs }}</h3>
-                    </div>
-                    <div class="text-warning opacity-50">
-                        <i class="bi bi-file-earmark-text fs-1"></i>
-                    </div>
-                </div>
-                <a href="#" class="text-decoration-none mt-3 d-block text-warning small fw-bold">
-                    Gerenciar Projetos Pedagógicos <i class="bi bi-arrow-right"></i>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1">Projetos em Avaliação</h6>
+                <hr class="text-muted opacity-25">
+                <a href="{% url 'odin:ic_student_list' %}" class="text-decoration-none d-flex align-items-center justify-content-between text-warning text-darken fw-medium small">
+                    Verificar status <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
         </div>
     </div>
 </div>
 
-<h4 class="text-secondary mb-3">Acesso Rápido</h4>
+<div class="row">
+    <div class="col-12 col-md-6">
+        <a href="{% url 'odin:ic_student_create' %}" class="btn btn-primary border shadow-sm w-100 text-start p-3 hover-lift text-white fw-medium d-flex align-items-center rounded-3">
+            <div class="bg-white bg-opacity-25 text-white rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="bi bi-plus-lg fs-5"></i>
+            </div>
+            <div>
+                <span class="d-block">Nova Proposta de IC</span>
+                <small class="text-white-50 fw-normal">Iniciar um novo projeto de pesquisa</small>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- VISÃO DO PROFESSOR / CEPE                  -->
+<!-- ========================================== -->
+{% else %}
+
+<!-- 1. BLOCO DE PESQUISA (Avisos Críticos) -->
+<h5 class="fw-bold text-dark mb-3"><i class="bi bi-bank me-2"></i>Demandas de Pesquisa</h5>
+<div class="row g-4 mb-5">
+    
+    <!-- Orientações Pendentes (Qualquer Professor) -->
+    <div class="{% if is_cepe %}col-md-4{% else %}col-md-6{% endif %}">
+        <div class="card border-0 shadow-sm h-100 hover-lift {% if pending_advising > 0 %}border-start border-4 border-primary{% endif %}">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-primary bg-opacity-10 text-primary">
+                        <i class="bi bi-person-lines-fill fs-3"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ pending_advising|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.8rem;">Orientações Pendentes</h6>
+                <hr class="text-muted opacity-25">
+                <a href="{% url 'odin:ic_advisor_list' %}" class="text-decoration-none d-flex align-items-center justify-content-between text-primary fw-medium small">
+                    Analisar convites <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pareceres Ad-hoc (Qualquer Professor) -->
+    <div class="{% if is_cepe %}col-md-4{% else %}col-md-6{% endif %}">
+        <div class="card border-0 shadow-sm h-100 hover-lift {% if pending_reviews > 0 %}border-start border-4 border-warning{% endif %}">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-clipboard-check fs-3 text-dark"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ pending_reviews|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.8rem;">Meus Pareceres (Ad-hoc)</h6>
+                <hr class="text-muted opacity-25">
+                <a href="{% url 'odin:ic_reviewer_list' %}" class="text-decoration-none d-flex align-items-center justify-content-between text-warning text-darken fw-medium small">
+                    Emitir pareceres <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila da CEPE (Apenas Membros) -->
+    {% if is_cepe %}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 hover-lift {% if cepe_queue > 0 %}border-start border-4 border-danger{% endif %}">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-inbox fs-3"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ cepe_queue|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.8rem;">Fila da CEPE</h6>
+                <hr class="text-muted opacity-25">
+                <a href="{% url 'odin:ic_cepe_list' %}" class="text-decoration-none d-flex align-items-center justify-content-between text-danger fw-medium small">
+                    Designar projetos <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+</div>
+
+<!-- 2. BLOCO DE GESTÃO ACADÊMICA E CAPTAÇÃO -->
+<h5 class="fw-bold text-dark mb-3"><i class="bi bi-mortarboard me-2"></i>Gestão de Cursos e Captação</h5>
+<div class="row g-4 mb-5">
+    
+    <!-- Card Cursos -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-secondary bg-opacity-10 text-secondary">
+                        <i class="bi bi-journal-bookmark fs-3"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ total_courses|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Cursos Sob Gestão</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Disciplinas -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-secondary bg-opacity-10 text-secondary">
+                        <i class="bi bi-journals fs-3"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ total_disciplines|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Disciplinas no Catálogo</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card PPCs -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-secondary bg-opacity-10 text-secondary">
+                        <i class="bi bi-file-earmark-text fs-3 text-dark"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ active_ppcs|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">PPCs Vigentes</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Campanhas de Captação -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-box bg-info bg-opacity-10 text-info">
+                        <i class="bi bi-graph-up-arrow fs-3"></i>
+                    </div>
+                    <h2 class="mb-0 fw-bolder text-dark display-5">{{ active_campaigns|default:"0" }}</h2>
+                </div>
+                <h6 class="text-muted fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Campanhas de Captação</h6>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. ACESSO RÁPIDO (COORDENADOR) -->
+<h5 class="fw-bold text-dark mb-4">Acesso Rápido</h5>
 <div class="row g-3">
-    <div class="col-md-3">
-        <a href="{% url 'course_create' %}" class="btn btn-outline-primary w-100 text-start py-3">
-            <i class="bi bi-plus-circle me-2"></i> Novo Curso
+    <div class="col-12 col-md-4 col-lg-3">
+        <a href="{% url 'odin:course_create' %}" class="btn btn-white border shadow-sm w-100 text-start p-3 hover-lift text-dark fw-medium d-flex align-items-center bg-white rounded-3">
+            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="bi bi-plus-lg fs-5"></i>
+            </div>
+            <div>
+                <span class="d-block">Novo Curso</span>
+                <small class="text-muted fw-normal">Cadastrar nova oferta</small>
+            </div>
         </a>
     </div>
-    <div class="col-md-3">
-        <a href="{% url 'discipline_create' %}" class="btn btn-outline-success w-100 text-start py-3">
-            <i class="bi bi-plus-circle me-2"></i> Nova Disciplina
+    
+    <div class="col-12 col-md-4 col-lg-3">
+        <a href="{% url 'odin:discipline_create' %}" class="btn btn-white border shadow-sm w-100 text-start p-3 hover-lift text-dark fw-medium d-flex align-items-center bg-white rounded-3">
+            <div class="bg-success bg-opacity-10 text-success rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="bi bi-plus-lg fs-5"></i>
+            </div>
+            <div>
+                <span class="d-block">Nova Disciplina</span>
+                <small class="text-muted fw-normal">Adicionar ao catálogo</small>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-12 col-md-4 col-lg-3">
+        <a href="{% url 'odin:campaign_create' %}" class="btn btn-white border shadow-sm w-100 text-start p-3 hover-lift text-dark fw-medium d-flex align-items-center bg-white rounded-3">
+            <div class="bg-info bg-opacity-10 text-info rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="bi bi-bullseye fs-5"></i>
+            </div>
+            <div>
+                <span class="d-block">Nova Campanha</span>
+                <small class="text-muted fw-normal">Configurar vestibular</small>
+            </div>
         </a>
     </div>
 </div>
+
+{% endif %}
 {% endblock %}

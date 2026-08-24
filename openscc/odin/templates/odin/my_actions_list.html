@@ -1,0 +1,56 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Minhas Ações - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-person-workspace me-2"></i>Minhas Ações em Campo</h3>
+        <p class="text-muted mb-0">Gerencie as ações de captação delegadas a você</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for action in actions %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1 rounded-3 fw-semibold">
+                        {{ action.campaign.name }}
+                    </span>
+                    <span class="badge bg-{% if action.status == 'COMPLETED' %}success{% elif action.status == 'EXECUTING' %}warning{% else %}secondary{% endif %}">
+                        {{ action.get_status_display }}
+                    </span>
+                </div>
+                
+                <h5 class="fw-bold text-dark mb-1">{{ action.title }}</h5>
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-calendar3 me-1"></i> {{ action.scheduled_date|date:"d/m/Y" }}<br>
+                    <i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ action.location|default:"Local não definido" }}
+                </p>
+
+                <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
+                    <span><i class="bi bi-people me-1"></i> {{ action.captured_leads.count }} Leads</span>
+                    <span><i class="bi bi-receipt me-1"></i> R$ {{ action.expenses.count }} Gastos</span>
+                </div>
+
+                <hr class="text-muted opacity-25">
+                
+                <a href="{% url 'odin:action_execution' action.id %}" class="btn btn-primary w-100 fw-bold">
+                    Painel de Execução <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5">
+        <div class="text-muted opacity-50 mb-3">
+            <i class="bi bi-emoji-sunglasses" style="font-size: 3rem;"></i>
+        </div>
+        <h5 class="fw-bold text-dark">Nenhuma ação delegada a você</h5>
+        <p class="text-muted">Quando o coordenador te alocar em uma atividade de captação, ela aparecerá aqui.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

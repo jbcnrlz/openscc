@@ -1,0 +1,124 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Meus Projetos de IC - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-journal-bookmark me-2"></i>Iniciação Científica</h3>
+        <p class="text-muted mb-0">Acompanhe seus projetos e submissões</p>
+    </div>
+    <a href="{% url 'odin:ic_student_create' %}" class="btn btn-primary fw-medium shadow-sm hover-lift">
+        <i class="bi bi-plus-lg me-1"></i> Cadastrar Novo Projeto
+    </a>
+</div>
+
+<div class="row g-4">
+    {% for project in projects %}
+    <div class="col-12">
+        <div class="card border-0 shadow-sm hover-lift 
+            {% if project.status == 'CHANGES_REQUESTED' %}border-start border-4 border-warning{% endif %}">
+            
+            <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold text-dark mb-1">{{ project.title }}</h5>
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-person-badge me-1"></i> Orientador(a): Prof. {{ project.advisor.first_name|default:project.advisor.username }}
+                    </p>
+                    
+                    {% if project.status == 'IN_PROGRESS' %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                            <i class="bi bi-check-circle me-1"></i> Em Andamento (Fim: {{ project.end_date|date:"d/m/Y" }})
+                        </span>
+                    {% elif project.status == 'CHANGES_REQUESTED' %}
+                        <!-- Mostra que está rodando, mas com o aviso visual das ressalvas -->
+                        <span class="badge bg-warning text-dark border border-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i> Em Andamento c/ Ressalvas (Fim: {{ project.end_date|date:"d/m/Y" }})
+                        </span>
+                    {% elif project.status == 'REJECTED' %}
+                        <span class="badge bg-danger">Rejeitado</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ project.get_status_display }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="text-end">
+                    
+                    <!-- 1. STATUS: Aceito pelo orientador (Primeiro Envio de Arquivo) -->
+                    {% if project.status == 'ADVISOR_ACCEPTED' %}
+                        <a href="{% url 'odin:ic_student_submit' project.id %}" class="btn btn-success fw-bold pulse-animation">
+                            <i class="bi bi-cloud-upload me-1"></i> Submeter Arquivo Inicial
+                        </a>
+                    
+                    <!-- 2. STATUS: Aprovado com Ressalvas (Em andamento, apenas leitura do parecer) -->
+                    {% elif project.status == 'CHANGES_REQUESTED' %}
+                        <button type="button" class="btn btn-outline-warning text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#parecerModal{{ project.id }}">
+                            <i class="bi bi-eye me-1"></i> Ver Ressalvas da CEPE
+                        </button>
+                    
+                    <!-- 3. STATUS: Rejeitado (Apenas leitura do parecer) -->
+                    {% elif project.status == 'REJECTED' %}
+                        <button type="button" class="btn btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#parecerModal{{ project.id }}">
+                            <i class="bi bi-file-text me-1"></i> Ler Justificativa
+                        </button>
+                    
+                    <!-- 4. STATUS: Aguardando Ações de Terceiros -->
+                    {% elif project.status == 'UNDER_REVIEW' or project.status == 'SUBMITTED_CEPE' %}
+                        <button class="btn btn-outline-secondary" disabled>Em Avaliação pela CEPE</button>
+                    {% elif project.status == 'PENDING_ADVISOR' %}
+                        <button class="btn btn-outline-secondary" disabled>Aguardando Orientador</button>
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal do Parecer Técnico (Aparece se houver ressalvas ou rejeição) -->
+    {% if project.reviewer_feedback or project.cepe_feedback %}
+    <div class="modal fade" id="parecerModal{{ project.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">Avaliações do Projeto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <h6 class="fw-bold mb-4">{{ project.title }}</h6>
+                    
+                    <!-- Feedback CEPE -->
+                    {% if project.cepe_feedback %}
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary mb-2"><i class="bi bi-bank me-2"></i>Decisão Final (CEPE)</h6>
+                        <div class="badge bg-dark mb-2">Responsável: Prof. {{ project.cepe_reviewer.first_name }} {{ project.cepe_reviewer.last_name }}</div>
+                        <div class="p-3 bg-primary bg-opacity-10 rounded border border-primary text-dark" style="white-space: pre-wrap;">{{ project.cepe_feedback }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Feedback Ad-hoc -->
+                    {% if project.reviewer_feedback %}
+                    <div>
+                        <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-search me-2"></i>Parecer Técnico Ad-hoc</h6>
+                        <div class="alert alert-secondary small mb-2 py-2"><i class="bi bi-info-circle me-1"></i> Análise técnica que fundamentou a decisão da CEPE.</div>
+                        <div class="p-3 bg-light rounded border text-dark" style="white-space: pre-wrap;">{{ project.reviewer_feedback }}</div>
+                    </div>
+                    {% endif %}
+
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% empty %}
+    <div class="col-12 text-center py-5">
+        <div class="text-muted opacity-50 mb-3"><i class="bi bi-inbox fs-1"></i></div>
+        <h5 class="fw-bold text-dark">Nenhum projeto cadastrado</h5>
+        <p class="text-muted">Inicie sua jornada científica cadastrando sua primeira proposta.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
