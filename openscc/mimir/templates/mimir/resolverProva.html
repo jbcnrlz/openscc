@@ -2,30 +2,33 @@
 {% load feedback_tags %}
 
 {% block mainContent %}
+<!-- Carregando o SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <div class="container py-4">
     <!-- Cabeçalho da Prova -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+    <div class="card shadow-sm mb-4 border-top border-primary border-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
             <div>
-                <h4 class="mb-0">{{ prova_aluno.prova.titulo }}</h4>
-                <small>{{ prova_aluno.prova.descricao }}</small>
+                <h4 class="mb-1 text-primary fw-bold">{{ prova_aluno.prova.titulo }}</h4>
+                <small class="text-muted">{{ prova_aluno.prova.descricao }}</small>
             </div>
-            <div class="text-end">
-                <div id="timer" class="h5 mb-0">02:00:00</div>
-                <small>Tempo restante</small>
+            <div class="text-end bg-light p-2 rounded border">
+                <div id="timer" class="h5 mb-0 fw-bold text-dark font-monospace">02:00:00</div>
+                <small class="text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Tempo Restante</small>
             </div>
         </div>
-        <div class="card-body">
-            <div class="row">
+        <div class="card-body bg-light">
+            <div class="row align-items-center">
                 <div class="col-md-8">
-                    <p class="mb-2"><strong>Assunto:</strong> {{ prova_aluno.prova.assunto.nome }}</p>
-                    <p class="mb-0"><strong>Status:</strong> 
-                        <span class="badge bg-warning text-dark">Em Andamento</span>
+                    <p class="mb-1 small"><strong class="text-dark">Assunto:</strong> <span class="text-muted">{{ prova_aluno.prova.assunto.nome }}</span></p>
+                    <p class="mb-0 small"><strong class="text-dark">Status:</strong> 
+                        <span class="badge bg-warning text-dark shadow-sm">Em Andamento</span>
                     </p>
                 </div>
                 <div class="col-md-4 text-end">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#finalizarModal">
-                        <i class="fas fa-flag-checkered me-1"></i>Finalizar Prova
+                    <button type="button" class="btn btn-success shadow-sm fw-bold" onclick="confirmarFinalizacao()">
+                        <i class="fas fa-flag-checkered me-1"></i> Entregar Prova
                     </button>
                 </div>
             </div>
@@ -33,20 +36,26 @@
     </div>
 
     <!-- Resumo de Status -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <div class="row text-center">
-                <div class="col-md-4">
-                    <h4 class="text-primary">{{ perguntas|length }}</h4>
-                    <small class="text-muted">Total de Questões</small>
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-body p-0">
+            <div class="row text-center g-0">
+                <div class="col-md-4 border-end">
+                    <div class="p-3">
+                        <h4 class="text-primary fw-bold mb-0">{{ perguntas|length }}</h4>
+                        <small class="text-muted text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total de Questões</small>
+                    </div>
+                </div>
+                <div class="col-md-4 border-end">
+                    <div class="p-3">
+                        <h4 class="text-success fw-bold mb-0" id="contador-respostas-header">0</h4>
+                        <small class="text-muted text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Respondidas</small>
+                    </div>
                 </div>
                 <div class="col-md-4">
-                    <h4 class="text-success" id="contador-respostas-header">0</h4>
-                    <small class="text-muted">Respondidas</small>
-                </div>
-                <div class="col-md-4">
-                    <h4 class="text-warning" id="contador-pendentes-header">{{ perguntas|length }}</h4>
-                    <small class="text-muted">Pendentes</small>
+                    <div class="p-3 bg-warning bg-opacity-10 h-100">
+                        <h4 class="text-warning fw-bold mb-0" id="contador-pendentes-header">{{ perguntas|length }}</h4>
+                        <small class="text-dark text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Pendentes</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -58,54 +67,54 @@
         
         {% for pergunta in perguntas %}
         {% with resposta_existente=respostas_existentes|get_item:pergunta.id %}
-        <div class="card shadow-sm mb-4 questao-item" id="questao-{{ forloop.counter }}">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Questão {{ forloop.counter }}</h5>
-                <span class="badge" id="status-badge-{{ pergunta.id }}">
+        <div class="card shadow-sm mb-4 questao-item border-0" id="questao-{{ forloop.counter }}">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">Questão {{ forloop.counter }}</h5>
+                <span class="badge px-3 py-2 shadow-sm" id="status-badge-{{ pergunta.id }}">
                     {% if resposta_existente and resposta_existente.resposta_texto %}
-                    <i class="fas fa-check text-success"></i> Respondida
+                    <i class="fas fa-check text-success"></i> <span class="text-success">Respondida</span>
                     {% elif resposta_existente and resposta_existente.arquivo_resposta %}
-                    <i class="fas fa-check text-success"></i> Respondida
+                    <i class="fas fa-check text-success"></i> <span class="text-success">Respondida</span>
                     {% else %}
-                    <i class="fas fa-clock text-warning"></i> Pendente
+                    <i class="fas fa-clock text-warning"></i> <span class="text-dark">Pendente</span>
                     {% endif %}
                 </span>
             </div>
-            <div class="card-body">
+            <div class="card-body p-4 bg-light">
                 <!-- Enunciado -->
                 <div class="mb-4">
-                    <div class="enunciado-questao">
+                    <div class="enunciado-questao text-dark" style="font-size: 1.05rem; line-height: 1.6; text-align: justify;">
                         {{ pergunta.pergunta|linebreaks }}
                     </div>
                     
                     <!-- Imagens da questão -->
                     {% for imagem in pergunta.imagens.all %}
-                    <div class="text-center my-3">
+                    <div class="text-center my-4 bg-white p-2 rounded border shadow-sm d-inline-block">
                         <img src="{{ imagem.imagem.url }}" alt="Imagem da questão {{ forloop.parentloop.counter }}" 
-                             class="img-fluid rounded shadow-sm" style="max-height: 300px;">
+                             class="img-fluid rounded" style="max-height: 350px;">
                     </div>
                     {% endfor %}
                 </div>
 
                 <!-- Área de resposta -->
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Sua resposta:</label>
+                <div class="p-4 bg-white rounded border">
+                    <label class="form-label fw-bold text-primary mb-3"><i class="fas fa-pen me-2"></i>Sua resposta:</label>
                     
                     {% if pergunta.tipoDePergunta.descricao|lower == "múltipla escolha" or pergunta.tipoDePergunta.descricao|lower == "multipla escolha" or pergunta.tipoDePergunta.descricao|lower == "multiple choice" %}
                         <!-- Renderização para múltipla escolha -->
                         <div class="alternativas-container" id="alternativas-{{ pergunta.id }}">
                             {% with alternativas=pergunta.pergunta|extrair_alternativas %}
                             {% for letra, texto in alternativas.items %}
-                            <div class="form-check mb-2">
-                                <input class="form-check-input alternativa-radio" 
+                            <div class="form-check custom-radio mb-3 p-3 border rounded hover-bg-light transition-all">
+                                <input class="form-check-input alternativa-radio mt-1 ms-2" 
                                        type="radio" 
                                        name="resposta-{{ pergunta.id }}" 
                                        id="alt-{{ pergunta.id }}-{{ letra }}"
                                        value="{{ letra }}"
                                        data-pergunta-id="{{ pergunta.id }}"
                                        {% if resposta_existente and resposta_existente.resposta_texto == letra %}checked{% endif %}>
-                                <label class="form-check-label" for="alt-{{ pergunta.id }}-{{ letra }}">
-                                    <strong>{{ letra }})</strong> {{ texto }}
+                                <label class="form-check-label w-100 ms-3 cursor-pointer" for="alt-{{ pergunta.id }}-{{ letra }}">
+                                    <strong class="text-primary fs-5">{{ letra }})</strong> <span class="ms-1">{{ texto }}</span>
                                 </label>
                             </div>
                             {% endfor %}
@@ -119,70 +128,69 @@
                             <!-- Arquivo atual (se existir) -->
                             {% if resposta_existente and resposta_existente.arquivo_resposta %}
                             <div class="mb-3">
-                                <div class="alert alert-success">
-                                    <i class="fas fa-file me-2"></i>
-                                    <strong>Arquivo atual:</strong> 
-                                    <a href="{{ resposta_existente.arquivo_resposta.url }}" 
-                                       target="_blank" 
-                                       class="btn btn-sm btn-outline-primary ms-2">
-                                        <i class="fas fa-download me-1"></i>Baixar
-                                    </a>
-                                    <span class="ms-2 text-muted">{{ resposta_existente.arquivo_resposta.name }}</span>
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-danger ms-2" 
-                                            onclick="removerArquivoResposta({{ pergunta.id }})">
-                                        <i class="fas fa-trash me-1"></i>Remover
-                                    </button>
+                                <div class="alert alert-success d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <i class="fas fa-file-alt fa-2x text-success me-3"></i>
+                                        <strong>Arquivo salvo:</strong> 
+                                        <span class="ms-2 text-dark">{{ resposta_existente.arquivo_resposta.name }}</span>
+                                    </div>
+                                    <div>
+                                        <a href="{{ resposta_existente.arquivo_resposta.url }}" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-download me-1"></i>Baixar
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-danger ms-2 shadow-sm" 
+                                                onclick="removerArquivoResposta({{ pergunta.id }})">
+                                            <i class="fas fa-trash me-1"></i>Remover
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             {% endif %}
                             
                             <!-- Área de upload -->
-                            <div class="border rounded p-3 bg-light">
+                            <div class="border border-primary border-opacity-25 rounded p-4 bg-light">
                                 <div class="mb-3">
-                                    <label for="arquivo-{{ pergunta.id }}" class="form-label">
+                                    <label for="arquivo-{{ pergunta.id }}" class="form-label text-dark">
                                         <strong>Enviar arquivo de resposta:</strong>
                                     </label>
                                     <input type="file" 
-                                           class="form-control arquivo-resposta" 
+                                           class="form-control arquivo-resposta border-primary" 
                                            id="arquivo-{{ pergunta.id }}" 
                                            name="arquivo-{{ pergunta.id }}"
                                            data-pergunta-id="{{ pergunta.id }}"
                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
-                                    <div class="form-text">
-                                        Formatos aceitos: PDF, Word, imagens (JPG, PNG), texto. Máx: 10MB.
+                                    <div class="form-text mt-2">
+                                        <i class="fas fa-info-circle text-primary me-1"></i> Formatos aceitos: PDF, Word, imagens (JPG, PNG), texto. Máx: 10MB.
                                     </div>
                                 </div>
                                 
                                 <!-- Preview do arquivo -->
                                 <div id="preview-arquivo-{{ pergunta.id }}" class="mt-3" style="display: none;">
-                                    <h6>Preview do arquivo:</h6>
-                                    <div id="info-arquivo-{{ pergunta.id }}" class="alert alert-secondary"></div>
+                                    <div id="info-arquivo-{{ pergunta.id }}" class="alert alert-secondary small mb-0 border-0"></div>
                                 </div>
                             </div>
                             
                             <!-- Alternativa: resposta em texto (opcional) -->
-                            <div class="mt-3">
-                                <button type="button" 
-                                        class="btn btn-sm btn-outline-secondary" 
-                                        onclick="toggleRespostaTexto({{ pergunta.id }})">
-                                    <i class="fas fa-edit me-1"></i>Prefiro digitar a resposta
+                            <div class="mt-3 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary shadow-sm" onclick="toggleRespostaTexto({{ pergunta.id }})">
+                                    <i class="fas fa-keyboard me-1"></i> Prefiro digitar a resposta
                                 </button>
                             </div>
                             
                             <!-- Campo de texto (inicialmente oculto) -->
                             <div id="textarea-container-{{ pergunta.id }}" class="mt-3" style="display: none;">
-                                <textarea class="form-control resposta-texto" 
+                                <textarea class="form-control resposta-texto custom-textarea" 
                                           id="resposta-{{ pergunta.id }}" 
                                           name="resposta-{{ pergunta.id }}"
-                                          rows="4" 
-                                          placeholder="Digite sua resposta aqui..."
+                                          rows="6" 
+                                          placeholder="Digite sua resposta detalhada aqui..."
                                           data-pergunta-id="{{ pergunta.id }}"></textarea>
-                                <div class="mt-2">
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-secondary" 
-                                            onclick="toggleRespostaTexto({{ pergunta.id }})">
-                                        <i class="fas fa-upload me-1"></i>Voltar para upload de arquivo
+                                <div class="mt-3 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary shadow-sm" onclick="toggleRespostaTexto({{ pergunta.id }})">
+                                        <i class="fas fa-file-upload me-1"></i> Voltar para envio de arquivo
                                     </button>
                                 </div>
                             </div>
@@ -190,27 +198,27 @@
                     
                     {% else %}
                         <!-- Renderização padrão (textarea) para outras perguntas -->
-                        <textarea class="form-control resposta-texto" 
+                        <textarea class="form-control resposta-texto custom-textarea" 
                                   id="resposta-{{ pergunta.id }}" 
                                   name="resposta-{{ pergunta.id }}"
                                   rows="6" 
-                                  placeholder="Digite sua resposta aqui..."
+                                  placeholder="Digite sua resposta detalhada aqui..."
                                   data-pergunta-id="{{ pergunta.id }}">{% if resposta_existente %}{{ resposta_existente.resposta_texto }}{% endif %}</textarea>
                     {% endif %}
                 </div>
 
-                <!-- Status de salvamento -->
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted" id="status-{{ pergunta.id }}">
+                <!-- Status de salvamento da questão -->
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                    <small class="text-muted fw-bold" id="status-{{ pergunta.id }}">
                         {% if resposta_existente and resposta_existente.resposta_texto %}
-                        <i class="fas fa-check text-success"></i> Resposta salva - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
+                        <i class="fas fa-cloud-upload-alt text-success me-1"></i> Resposta salva - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
                         {% elif resposta_existente and resposta_existente.arquivo_resposta %}
-                        <i class="fas fa-check text-success"></i> Arquivo salvo - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
+                        <i class="fas fa-cloud-upload-alt text-success me-1"></i> Arquivo salvo - Última atualização: {{ resposta_existente.atualizado_em|date:"H:i" }}
                         {% else %}
-                        <i class="fas fa-sync text-secondary"></i> Não salvo
+                        <i class="fas fa-exclamation-circle text-warning me-1"></i> <span class="text-dark opacity-50">Resposta não salva no sistema</span>
                         {% endif %}
                     </small>
-                    <small class="text-muted">Questão {{ forloop.counter }} de {{ perguntas|length }}</small>
+                    <small class="text-muted px-2 py-1 bg-white rounded border">Questão {{ forloop.counter }} de {{ perguntas|length }}</small>
                 </div>
             </div>
         </div>
@@ -218,16 +226,17 @@
         {% endfor %}
 
         <!-- Botão de Finalizar fixo no final -->
-        <div class="sticky-bottom py-3 bg-light border-top">
+        <div class="sticky-bottom py-3 bg-white border-top shadow-lg">
             <div class="container">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="text-muted" id="contador-final">
-                            <strong id="contador-respostas-final">0</strong> de {{ perguntas|length }} questões respondidas
+                        <span class="text-dark bg-light px-3 py-2 rounded border" id="contador-final">
+                            <i class="fas fa-clipboard-check text-primary me-2"></i>
+                            <strong id="contador-respostas-final" class="text-primary fs-5">0</strong> de {{ perguntas|length }} questões concluídas
                         </span>
                     </div>
-                    <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#finalizarModal">
-                        <i class="fas fa-flag-checkered me-2"></i>Finalizar Prova
+                    <button type="button" class="btn btn-success btn-lg px-5 shadow fw-bold" onclick="confirmarFinalizacao()">
+                        <i class="fas fa-paper-plane me-2"></i> Entregar Prova
                     </button>
                 </div>
             </div>
@@ -235,65 +244,73 @@
     </form>
 </div>
 
-<!-- Modal de Finalização -->
-<div class="modal fade" id="finalizarModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title">Finalizar Prova</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja finalizar a prova?</p>
-                <p class="text-muted small">Após finalizar, você não poderá mais alterar suas respostas.</p>
-                
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Resumo:</strong>
-                    <div class="mt-2">
-                        <div><strong>Respondidas:</strong> <span id="contador-respostas-modal">0</span> de {{ perguntas|length }} questões</div>
-                        <div><strong>Pendentes:</strong> <span id="contador-pendentes-modal">{{ perguntas|length }}</span> questões</div>
-                    </div>
-                </div>
-
-                <!-- Lista de questões pendentes -->
-                <div class="alert alert-warning" id="alert-pendentes" style="display: none;">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Atenção!</strong> Você possui questões pendentes:
-                    <div id="lista-pendentes" class="mt-2 small"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continuar Prova</button>
-                <button type="button" class="btn btn-success" id="btn-finalizar-confirmado">
-                    <i class="fas fa-flag-checkered me-1"></i>Finalizar Mesmo Assim
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Modal de Alerta de Foco (Anti-Cola) -->
 <div class="modal fade" id="alertaFocoModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-danger">
+        <div class="modal-content border-danger border-4">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Atenção: Saída de Tela Detectada</h5>
+                <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Saída de Tela Detectada</h5>
             </div>
-            <div class="modal-body text-center py-4">
+            <div class="modal-body text-center py-4 bg-light">
                 <i class="fas fa-desktop fa-3x text-danger mb-3"></i>
-                <p class="fs-5">Detectamos que você saiu da aba ou janela da prova.</p>
-                <div class="alert alert-warning mt-3">
-                    <strong>Avisos: <span id="contador-avisos" class="fs-4">0</span> de 3</strong>
+                <p class="fs-5 text-dark fw-bold">Detectamos que você saiu da aba ou minimizou a janela da prova.</p>
+                <div class="alert alert-warning mt-3 border-warning shadow-sm">
+                    <strong>Avisos Ativos: <span id="contador-avisos" class="fs-4 text-danger ms-2">0</span> de 3</strong>
                 </div>
-                <p class="text-muted small mb-0">Por regras de segurança, se você sair da tela da prova 3 vezes, sua avaliação será <strong>finalizada automaticamente</strong>.</p>
+                <p class="text-muted small mb-0">Por regras de segurança institucional, se você sair da tela da prova 3 vezes, sua avaliação será <strong>encerrada e enviada automaticamente</strong>.</p>
             </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">Entendi, retornarei à prova</button>
+            <div class="modal-footer justify-content-center bg-white">
+                <button type="button" class="btn btn-danger px-5 fw-bold shadow-sm" data-bs-dismiss="modal">Entendi, manter o foco na prova</button>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+/* Customizações de UI para a Prova */
+.alternativas-container {
+    background-color: #ffffff;
+    border-radius: 0.375rem;
+}
+.custom-radio {
+    transition: all 0.2s ease-in-out;
+}
+.custom-radio:hover {
+    background-color: #f8f9fa;
+    border-color: #0d6efd !important;
+}
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+.form-check-input {
+    width: 1.25em;
+    height: 1.25em;
+}
+.cursor-pointer {
+    cursor: pointer;
+}
+.custom-textarea {
+    resize: vertical;
+    border: 1px solid #ced4da;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.075);
+}
+.custom-textarea:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.sticky-bottom {
+    position: sticky;
+    bottom: 0;
+    z-index: 1020;
+}
+.transition-all {
+    transition: all 0.3s ease;
+}
+/* Cores dinâmicas para as Badges do SweetAlert */
+.swal-badge-success { background: #d1e7dd; color: #0f5132; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+.swal-badge-warning { background: #fff3cd; color: #664d03; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+</style>
 
 <script>
 // ===== DECLARAÇÃO DE VARIÁVEIS GLOBAIS =====
@@ -305,21 +322,137 @@ let avisosSaida = 0;
 const MAX_AVISOS = 3;
 let provaFinalizadaPorInfracao = false; 
 
-// ===== DECLARAÇÃO DE TODAS AS FUNÇÕES =====
+// FLAG DE SEGURANÇA CONTRA O ALERTA DO NAVEGADOR
+let provaSendoFinalizada = false; 
 
-// Funções de Monitoramento (Anti-Cola)
+// ===== FLUXO DE FINALIZAÇÃO (SWEETALERT2) =====
+
+function confirmarFinalizacao() {
+    atualizarContadores();
+    
+    const total = {{ perguntas|length }};
+    const respondidas = respostasSalvas.size;
+    const pendentes = total - respondidas;
+    
+    let conteudoHtml = '';
+    let icone = 'question';
+    let corBotao = '#198754'; // Verde sucesso
+
+    if (pendentes > 0) {
+        icone = 'warning';
+        corBotao = '#ffc107'; // Amarelo alerta
+        conteudoHtml = `
+            <p class="text-dark">Atenção! Você não respondeu todas as questões.</p>
+            <div class="d-flex justify-content-center gap-3 mt-3 mb-3">
+                <div class="text-center p-2 bg-light rounded border">
+                    <span class="d-block text-muted small text-uppercase">Respondidas</span>
+                    <span class="fs-4 fw-bold text-success">${respondidas}</span>
+                </div>
+                <div class="text-center p-2 bg-warning bg-opacity-10 border border-warning rounded">
+                    <span class="d-block text-dark small text-uppercase fw-bold">Pendentes</span>
+                    <span class="fs-4 fw-bold text-danger">${pendentes}</span>
+                </div>
+            </div>
+            <p class="text-muted small">Suas respostas em branco serão registradas com nota zero.</p>
+        `;
+    } else {
+        conteudoHtml = `
+            <div class="text-center mb-3">
+                <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
+                <p class="text-dark fw-bold">Parabéns! Você respondeu as ${total} questões da avaliação.</p>
+            </div>
+            <p class="text-muted small">Ao confirmar, o gabarito será validado e não será mais possível alterar suas respostas.</p>
+        `;
+    }
+
+    Swal.fire({
+        title: 'Entregar Prova?',
+        html: conteudoHtml,
+        icon: icone,
+        showCancelButton: true,
+        confirmButtonColor: corBotao,
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: pendentes > 0 ? '<i class="fas fa-flag-checkered me-1"></i> Entregar Mesmo Assim' : '<i class="fas fa-paper-plane me-1"></i> Confirmar Entrega',
+        cancelButtonText: 'Voltar para a Prova',
+        reverseButtons: true,
+        backdrop: `rgba(0,0,0,0.6)`
+    }).then((result) => {
+        if (result.isConfirmed) {
+            processarFinalizacaoIntencional();
+        }
+    });
+}
+
+function processarFinalizacaoIntencional() {
+    // 1. Desativa a proteção do navegador para saídas intencionais
+    provaSendoFinalizada = true;
+
+    // 2. Trava a tela com Loading do SweetAlert
+    Swal.fire({
+        title: 'Registrando Avaliação...',
+        html: 'Por favor, aguarde enquanto o sistema criptografa e envia suas respostas. Não feche a página.',
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // 3. Executa o loop de salvamento final e redireciona
+    salvarTodasRespostas().then(() => {
+        window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
+    });
+}
+
+function finalizarProvaAutomaticamente(motivo) {
+    // Desativa a trava do navegador para saídas forçadas
+    provaSendoFinalizada = true;
+    
+    let titulo = '';
+    let texto = '';
+    let icone = '';
+
+    if (motivo === 'tempo') {
+        titulo = 'Tempo Esgotado!';
+        texto = 'O tempo limite da avaliação chegou ao fim. Suas respostas preenchidas estão sendo enviadas automaticamente.';
+        icone = 'info';
+    } else if (motivo === 'infracao') {
+        titulo = 'Regras Violadas';
+        texto = 'Você excedeu o limite máximo de saídas da tela da prova. O sistema está bloqueando o acesso e enviando suas respostas parciais.';
+        icone = 'error';
+    }
+
+    Swal.fire({
+        title: titulo,
+        text: texto,
+        icon: icone,
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Salva o que der e força o encerramento no banco de dados
+    salvarTodasRespostas().then(() => {
+        window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
+    });
+}
+
+
+// ===== FUNÇÕES DE MONITORAMENTO (ANTI-COLA) E TIMER =====
+
 function configurarMonitoramentoTab() {
-    // 1. Detecta quando o aluno troca de aba ou minimiza o navegador
     document.addEventListener('visibilitychange', function() {
-        if (document.hidden && !provaFinalizadaPorInfracao) {
+        if (document.hidden && !provaFinalizadaPorInfracao && !provaSendoFinalizada) {
             registrarInfracao();
         }
     });
 
-    // 2. Detecta quando a janela perde o foco
     window.addEventListener('blur', function() {
         setTimeout(() => {
-            if (!document.hasFocus() && !document.hidden && !provaFinalizadaPorInfracao) {
+            if (!document.hasFocus() && !document.hidden && !provaFinalizadaPorInfracao && !provaSendoFinalizada) {
                 registrarInfracao();
             }
         }, 200);
@@ -327,7 +460,6 @@ function configurarMonitoramentoTab() {
 }
 
 function registrarInfracao() {
-    // Se algum modal já estiver aberto (como o de finalização), ignoramos
     if (document.body.classList.contains('modal-open') && !document.getElementById('alertaFocoModal').classList.contains('show')) {
         return;
     }
@@ -336,14 +468,10 @@ function registrarInfracao() {
     
     if (avisosSaida >= MAX_AVISOS) {
         provaFinalizadaPorInfracao = true;
-        alert('LIMITE EXCEDIDO: Você saiu da tela da prova muitas vezes. A avaliação será finalizada agora.');
-        finalizarProvaAutomaticamente();
+        finalizarProvaAutomaticamente('infracao');
     } else {
-        // Atualiza o contador e exibe o modal
         const contadorElement = document.getElementById('contador-avisos');
-        if (contadorElement) {
-            contadorElement.textContent = avisosSaida;
-        }
+        if (contadorElement) contadorElement.textContent = avisosSaida;
         
         const modalElement = document.getElementById('alertaFocoModal');
         const alertaModal = new bootstrap.Modal(modalElement);
@@ -351,7 +479,6 @@ function registrarInfracao() {
     }
 }
 
-// Timer
 function iniciarTimer() {
     const timerElement = document.getElementById('timer');
     
@@ -360,7 +487,7 @@ function iniciarTimer() {
         
         if (tempoRestante <= 0) {
             clearInterval(timerInterval);
-            finalizarProvaAutomaticamente();
+            finalizarProvaAutomaticamente('tempo');
             return;
         }
         
@@ -370,39 +497,24 @@ function iniciarTimer() {
         
         timerElement.textContent = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
         
-        // Alerta quando faltar 5 minutos
-        if (tempoRestante === 300) {
-            mostrarAlertaTempo('5 minutos');
-        }
-        // Alerta quando faltar 1 minuto
-        else if (tempoRestante === 60) {
-            mostrarAlertaTempo('1 minuto');
-        }
+        if (tempoRestante === 300) { mostrarAlertaTempo('5 minutos'); }
+        else if (tempoRestante === 60) { mostrarAlertaTempo('1 minuto', true); }
     }, 1000);
 }
 
-function mostrarAlertaTempo(tempo) {
-    const alerta = document.createElement('div');
-    alerta.className = 'alert alert-warning alert-dismissible fade show';
-    alerta.innerHTML = `
-        <i class="fas fa-clock me-2"></i>
-        <strong>Atenção!</strong> Faltam ${tempo} para o término da prova.
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.querySelector('.container.py-4').insertBefore(alerta, document.querySelector('.card'));
-}
-
-function finalizarProvaAutomaticamente() {
-    // Salvar todas as respostas antes de finalizar
-    salvarTodasRespostas().then(() => {
-        if (!provaFinalizadaPorInfracao) {
-            alert('Tempo esgotado! A prova será finalizada automaticamente.');
-        }
-        window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
+function mostrarAlertaTempo(tempo, isUrgente=false) {
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: isUrgente ? 'error' : 'warning',
+        title: `Tempo acabando! Faltam apenas ${tempo}.`,
+        showConfirmButton: false,
+        timer: 4000,
+        timerProgressBar: true,
     });
 }
 
-// ===== FUNÇÕES PARA UPLOAD DE ARQUIVO =====
+// ===== FUNÇÕES DE ROTINAS DE RESPOSTAS (MANTIDAS EXATAMENTE IGUAIS) =====
 
 function toggleRespostaTexto(perguntaId) {
     const uploadContainer = document.getElementById(`upload-container-${perguntaId}`);
@@ -420,41 +532,44 @@ function toggleRespostaTexto(perguntaId) {
 }
 
 function removerArquivoResposta(perguntaId) {
-    if (confirm('Tem certeza que deseja remover este arquivo?')) {
-        const statusElement = document.getElementById(`status-${perguntaId}`);
-        statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Removendo...';
-        
-        fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({
-                pergunta_id: perguntaId,
-                resposta_texto: '' 
+    Swal.fire({
+        title: 'Remover Arquivo?',
+        text: 'Você terá que fazer o upload de um novo arquivo.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sim, remover'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const statusElement = document.getElementById(`status-${perguntaId}`);
+            statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Removendo...';
+            
+            fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ pergunta_id: perguntaId, resposta_texto: '' })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                location.reload();
-            } else {
-                throw new Error(data.message || 'Erro ao remover arquivo');
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao remover arquivo:', error);
-            statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao remover';
-        });
-    }
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') { location.reload(); }
+                else { throw new Error(data.message || 'Erro ao remover arquivo'); }
+            })
+            .catch(error => {
+                console.error(error);
+                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao remover';
+            });
+        }
+    });
 }
 
 function uploadArquivoResposta(perguntaId, arquivo) {
     const statusElement = document.getElementById(`status-${perguntaId}`);
     const badgeElement = document.getElementById(`status-badge-${perguntaId}`);
-    
     statusElement.innerHTML = '<i class="fas fa-sync fa-spin text-primary"></i> Enviando arquivo...';
     
     const formData = new FormData();
@@ -475,30 +590,20 @@ function uploadArquivoResposta(perguntaId, arquivo) {
             const agora = new Date(data.salvo_em);
             const hora = agora.getHours().toString().padStart(2, '0');
             const minuto = agora.getMinutes().toString().padStart(2, '0');
-            
             statusElement.innerHTML = `<i class="fas fa-check text-success"></i> Arquivo salvo - ${hora}:${minuto}`;
-            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> Respondida';
-            badgeElement.className = 'badge bg-success';
+            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> <span class="text-success">Respondida</span>';
+            badgeElement.className = 'badge px-3 py-2 shadow-sm bg-success bg-opacity-10 border border-success';
             respostasSalvas.add(perguntaId);
-            
             atualizarContadores();
-            
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-        } else {
-            throw new Error(data.message || 'Erro ao enviar arquivo');
-        }
+            setTimeout(() => { location.reload(); }, 1000);
+        } else { throw new Error(data.message || 'Erro ao enviar arquivo'); }
     })
     .catch(error => {
-        console.error('Erro ao enviar arquivo:', error);
+        console.error(error);
         statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao enviar';
-        
         setTimeout(() => {
             const inputArquivo = document.getElementById(`arquivo-${perguntaId}`);
-            if (inputArquivo.files.length > 0) {
-                uploadArquivoResposta(perguntaId, inputArquivo.files[0]);
-            }
+            if (inputArquivo.files.length > 0) uploadArquivoResposta(perguntaId, inputArquivo.files[0]);
         }, 5000);
     });
 }
@@ -514,37 +619,23 @@ function configurarPreviewArquivo(perguntaId) {
             const fileSize = (file.size / (1024 * 1024)).toFixed(2);
             
             if (file.size > 10 * 1024 * 1024) {
-                alert('Arquivo muito grande. Tamanho máximo: 10MB');
+                Swal.fire({ icon: 'error', title: 'Arquivo muito grande', text: 'Tamanho máximo permitido: 10MB' });
                 this.value = '';
                 previewContainer.style.display = 'none';
                 return;
             }
             
-            const tiposPermitidos = [
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'image/jpeg',
-                'image/jpg',
-                'image/png',
-                'text/plain'
-            ];
+            const tiposPermitidos = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png', 'text/plain'];
             
             if (!tiposPermitidos.includes(file.type)) {
-                alert('Tipo de arquivo não permitido. Use PDF, Word, imagem ou texto.');
+                Swal.fire({ icon: 'error', title: 'Formato inválido', text: 'Use apenas PDF, Word, imagens ou texto.' });
                 this.value = '';
                 previewContainer.style.display = 'none';
                 return;
             }
             
-            infoArquivo.innerHTML = `
-                <i class="fas fa-file me-2"></i>
-                <strong>Nome:</strong> ${file.name}<br>
-                <strong>Tipo:</strong> ${file.type || 'Não identificado'}<br>
-                <strong>Tamanho:</strong> ${fileSize} MB
-            `;
+            infoArquivo.innerHTML = `<i class="fas fa-file-check text-success me-2"></i><strong>${file.name}</strong> (${fileSize} MB) anexado com sucesso.`;
             previewContainer.style.display = 'block';
-            
             uploadArquivoResposta(perguntaId, file);
         } else {
             previewContainer.style.display = 'none';
@@ -556,14 +647,9 @@ function salvarResposta(perguntaId, respostaTexto = null) {
     if (respostaTexto === null) {
         const textarea = document.getElementById(`resposta-${perguntaId}`);
         const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
-        
-        if (radioSelecionado) {
-            respostaTexto = radioSelecionado.value;
-        } else if (textarea) {
-            respostaTexto = textarea.value;
-        } else {
-            respostaTexto = '';
-        }
+        if (radioSelecionado) respostaTexto = radioSelecionado.value;
+        else if (textarea) respostaTexto = textarea.value;
+        else respostaTexto = '';
     }
     
     const statusElement = document.getElementById(`status-${perguntaId}`);
@@ -572,9 +658,9 @@ function salvarResposta(perguntaId, respostaTexto = null) {
     if (!respostaTexto.trim()) {
         if (respostasSalvas.has(perguntaId)) {
             respostasSalvas.delete(perguntaId);
-            badgeElement.innerHTML = '<i class="fas fa-clock text-warning"></i> Pendente';
-            badgeElement.className = 'badge bg-warning';
-            statusElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Não salvo';
+            badgeElement.innerHTML = '<i class="fas fa-clock text-warning"></i> <span class="text-dark">Pendente</span>';
+            badgeElement.className = 'badge px-3 py-2 shadow-sm bg-warning bg-opacity-10 border border-warning';
+            statusElement.innerHTML = '<i class="fas fa-sync text-secondary"></i> Não salvo no sistema';
             atualizarContadores();
         }
         return;
@@ -589,61 +675,34 @@ function salvarResposta(perguntaId, respostaTexto = null) {
             'X-Requested-With': 'XMLHttpRequest',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify({
-            pergunta_id: perguntaId,
-            resposta_texto: respostaTexto
-        })
+        body: JSON.stringify({ pergunta_id: perguntaId, resposta_texto: respostaTexto })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
-        return response.json();
-    })
+    .then(response => { if (!response.ok) throw new Error(`Erro HTTP`); return response.json(); })
     .then(data => {
         if (data.status === 'success') {
             const agora = new Date(data.salvo_em);
-            const hora = agora.getHours().toString().padStart(2, '0');
-            const minuto = agora.getMinutes().toString().padStart(2, '0');
-            
-            statusElement.innerHTML = `<i class="fas fa-check text-success"></i> Resposta salva - ${hora}:${minuto}`;
-            
-            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> Respondida';
-            badgeElement.className = 'badge bg-success';
+            statusElement.innerHTML = `<i class="fas fa-cloud-upload-alt text-success me-1"></i> Resposta salva - ${agora.getHours().toString().padStart(2, '0')}:${agora.getMinutes().toString().padStart(2, '0')}`;
+            badgeElement.innerHTML = '<i class="fas fa-check text-success"></i> <span class="text-success">Respondida</span>';
+            badgeElement.className = 'badge px-3 py-2 shadow-sm bg-success bg-opacity-10 border border-success';
             respostasSalvas.add(perguntaId);
-            
             atualizarContadores();
-        } else {
-            throw new Error(data.message || 'Erro ao salvar resposta');
-        }
+        } else { throw new Error(data.message); }
     })
     .catch(error => {
-        console.error('Erro ao salvar resposta:', error);
-        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro ao salvar';
-        
-        const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
-        const textarea = document.getElementById(`resposta-${perguntaId}`);
-        if ((radioSelecionado && radioSelecionado.value.trim()) || (textarea && textarea.value.trim())) {
-            setTimeout(() => salvarResposta(perguntaId), 5000);
-        }
+        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Erro de Conexão. Tente novamente.';
+        setTimeout(() => salvarResposta(perguntaId), 5000);
     });
 }
 
 function salvarRespostaIndividual(perguntaId) {
     let respostaTexto = '';
-    
     const radioSelecionado = document.querySelector(`input[name="resposta-${perguntaId}"]:checked`);
     const textarea = document.getElementById(`resposta-${perguntaId}`);
     
-    if (radioSelecionado) {
-        respostaTexto = radioSelecionado.value;
-    } else if (textarea) {
-        respostaTexto = textarea.value.trim();
-    }
+    if (radioSelecionado) respostaTexto = radioSelecionado.value;
+    else if (textarea) respostaTexto = textarea.value.trim();
     
-    if (!respostaTexto) {
-        return Promise.resolve({status: 'empty'});
-    }
+    if (!respostaTexto) return Promise.resolve({status: 'empty'});
     
     return fetch("{% url 'mimir:salvarResposta' prova_aluno.id %}", {
         method: 'POST',
@@ -652,45 +711,25 @@ function salvarRespostaIndividual(perguntaId) {
             'X-Requested-With': 'XMLHttpRequest',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify({
-            pergunta_id: perguntaId,
-            resposta_texto: respostaTexto
-        })
+        body: JSON.stringify({ pergunta_id: perguntaId, resposta_texto: respostaTexto })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
-        return response.json();
-    })
+    .then(response => { if (!response.ok) throw new Error(); return response.json(); })
     .then(data => {
-        if (data.status === 'success') {
-            respostasSalvas.add(perguntaId);
-            return data;
-        } else {
-            throw new Error(data.message || 'Erro ao salvar resposta');
-        }
+        if (data.status === 'success') { respostasSalvas.add(perguntaId); return data; }
+        else throw new Error(data.message);
     });
 }
 
 function salvarTodasRespostas() {
     const promises = [];
     const perguntaIds = new Set();
-    
-    {% for pergunta in perguntas %}
-        perguntaIds.add({{ pergunta.id }});
-    {% endfor %}
+    {% for pergunta in perguntas %} perguntaIds.add({{ pergunta.id }}); {% endfor %}
     
     perguntaIds.forEach(perguntaId => {
         promises.push(
-            salvarRespostaIndividual(perguntaId)
-                .catch(error => {
-                    console.error(`Erro ao salvar questão ${perguntaId}:`, error);
-                    return {status: 'error', perguntaId: perguntaId};
-                })
+            salvarRespostaIndividual(perguntaId).catch(error => { return {status: 'error', perguntaId: perguntaId}; })
         );
     });
-    
     return Promise.allSettled(promises);
 }
 
@@ -699,35 +738,30 @@ function atualizarContadores() {
     const respondidas = respostasSalvas.size;
     const pendentes = total - respondidas;
     
-    const contadorRespostasHeader = document.getElementById('contador-respostas-header');
-    const contadorPendentesHeader = document.getElementById('contador-pendentes-header');
-    const contadorRespostasFinal = document.getElementById('contador-respostas-final');
-    const contadorRespostasModal = document.getElementById('contador-respostas-modal');
-    const contadorPendentesModal = document.getElementById('contador-pendentes-modal');
+    const elements = {
+        'contador-respostas-header': respondidas,
+        'contador-pendentes-header': pendentes,
+        'contador-respostas-final': respondidas
+    };
     
-    if (contadorRespostasHeader) contadorRespostasHeader.textContent = respondidas;
-    if (contadorPendentesHeader) contadorPendentesHeader.textContent = pendentes;
-    if (contadorRespostasFinal) contadorRespostasFinal.textContent = respondidas;
-    if (contadorRespostasModal) contadorRespostasModal.textContent = respondidas;
-    if (contadorPendentesModal) contadorPendentesModal.textContent = pendentes;
-    
-    if (contadorPendentesHeader) {
-        contadorPendentesHeader.className = pendentes > 0 ? 'text-warning' : 'text-success';
+    for (const [id, value] of Object.entries(elements)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
     }
-    if (contadorPendentesModal) {
-        contadorPendentesModal.className = pendentes > 0 ? 'text-warning' : 'text-success';
+    
+    const pendentesHeader = document.getElementById('contador-pendentes-header');
+    if (pendentesHeader) {
+        pendentesHeader.className = pendentes > 0 ? 'text-danger fw-bold mb-0' : 'text-success fw-bold mb-0';
     }
 }
 
-// ===== INICIALIZAÇÃO E EVENT LISTENERS =====
+// ===== INICIALIZAÇÃO =====
 
 function inicializarProva() {
+    // Popula Set com respostas pré-existentes vindo do banco
     {% for pergunta in perguntas %}
         {% with resposta_existente=respostas_existentes|get_item:pergunta.id %}
-        {% if resposta_existente and resposta_existente.resposta_texto.strip %}
-        respostasSalvas.add({{ pergunta.id }});
-        {% endif %}
-        {% if resposta_existente and resposta_existente.arquivo_resposta %}
+        {% if resposta_existente and resposta_existente.resposta_texto.strip or resposta_existente and resposta_existente.arquivo_resposta %}
         respostasSalvas.add({{ pergunta.id }});
         {% endif %}
         {% endwith %}
@@ -739,69 +773,23 @@ function inicializarProva() {
     {% endif %}
 
     {% for pergunta in perguntas %}
-        {% if pergunta.aceita_upload_resposta %}
-        configurarPreviewArquivo({{ pergunta.id }});
-        {% endif %}
+        {% if pergunta.aceita_upload_resposta %} configurarPreviewArquivo({{ pergunta.id }}); {% endif %}
     {% endfor %}
 
     atualizarContadores();
     iniciarTimer();
-    
-    // Iniciar o monitoramento de foco (Anti-cola)
     configurarMonitoramentoTab(); 
-
-    const finalizarModal = document.getElementById('finalizarModal');
-    
-    if (finalizarModal) {
-        finalizarModal.addEventListener('show.bs.modal', function() {
-            atualizarContadores();
-            
-            const listaPendentes = document.getElementById('lista-pendentes');
-            const alertPendentes = document.getElementById('alert-pendentes');
-            const total = {{ perguntas|length }};
-            const pendentes = total - respostasSalvas.size;
-            
-            if (pendentes > 0 && listaPendentes && alertPendentes) {
-                let listaHTML = '';
-                {% for pergunta in perguntas %}
-                    if (!respostasSalvas.has({{ pergunta.id }})) {
-                        listaHTML += `<span class="badge bg-warning me-1 mb-1">Questão {{ forloop.counter }}</span>`;
-                    }
-                {% endfor %}
-                listaPendentes.innerHTML = listaHTML;
-                alertPendentes.style.display = 'block';
-            } else if (alertPendentes) {
-                alertPendentes.style.display = 'none';
-            }
-        });
-        
-        const btnFinalizar = document.getElementById('btn-finalizar-confirmado');
-        if (btnFinalizar) {
-            btnFinalizar.addEventListener('click', function() {
-                this.disabled = true;
-                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Finalizando...';
-                
-                salvarTodasRespostas().then(() => {
-                    window.location.href = "{% url 'mimir:finalizarProva' prova_aluno.id %}";
-                });
-            });
-        }
-    }
     
     document.querySelectorAll('.questao-item .card-header').forEach(header => {
         header.style.cursor = 'pointer';
-        header.addEventListener('click', function() {
-            this.parentElement.scrollIntoView({ behavior: 'smooth' });
-        });
+        header.addEventListener('click', function() { this.parentElement.scrollIntoView({ behavior: 'smooth' }); });
     });
 
     document.querySelectorAll('.resposta-texto').forEach(textarea => {
         textarea.addEventListener('keyup', function() {
             const perguntaId = this.dataset.perguntaId;
             clearTimeout(this._timeout);
-            this._timeout = setTimeout(() => {
-                salvarResposta(perguntaId);
-            }, 1000); 
+            this._timeout = setTimeout(() => { salvarResposta(perguntaId); }, 1500); 
         });
     });
 
@@ -812,68 +800,26 @@ function inicializarProva() {
         });
     });
 
+    // Auto-save global a cada 30 segundos
     setInterval(() => {
         document.querySelectorAll('.resposta-texto').forEach(textarea => {
-            if (textarea.value.trim()) {
-                const perguntaId = textarea.dataset.perguntaId;
-                salvarResposta(perguntaId);
-            }
+            if (textarea.value.trim()) { salvarResposta(textarea.dataset.perguntaId); }
         });
     }, 30000); 
 
+    // PROTEÇÃO DO NAVEGADOR
+    // Só é disparada se o aluno fechar a aba/recarregar a página SEM ter clicado em finalizar.
     window.addEventListener('beforeunload', function(e) {
-        // Ignora o aviso se a prova está sendo finalizada por infração
-        if (respostasSalvas.size > 0 && !provaFinalizadaPorInfracao) {
+        if (respostasSalvas.size > 0 && !provaFinalizadaPorInfracao && !provaSendoFinalizada) {
             e.preventDefault();
-            e.returnValue = 'Você tem respostas não salvas. Tem certeza que deseja sair?';
+            e.returnValue = 'Você tem respostas na tela. Fechar a aba sem finalizar a prova pode acarretar em perda de dados. Tem certeza que deseja sair?';
             return e.returnValue;
         }
     });
 }
 
-// ===== INICIAR A APLICAÇÃO QUANDO O DOCUMENTO ESTIVER PRONTO =====
 document.addEventListener('DOMContentLoaded', function() {
     inicializarProva();
 });
 </script>
-
-<style>
-.alternativas-container {
-    background-color: #f8f9fa;
-    border-radius: 0.375rem;
-    padding: 1rem;
-}
-
-.upload-resposta-container {
-    background-color: #f8f9fa;
-    border-radius: 0.375rem;
-    padding: 1rem;
-}
-
-.form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-.form-check-label {
-    cursor: pointer;
-    margin-left: 0.5rem;
-}
-
-.arquivo-resposta:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-}
-
-.preview-arquivo {
-    transition: all 0.3s ease;
-}
-
-.sticky-bottom {
-    position: sticky;
-    bottom: 0;
-    background: white;
-    z-index: 1000;
-}
-</style>
 {% endblock %}

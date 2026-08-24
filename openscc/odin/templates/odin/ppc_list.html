@@ -6,7 +6,7 @@
 <div class="card shadow-sm border-0">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h4 class="mb-0 text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Projetos Pedagógicos (Matrizes)</h4>
-        <a href="{% url 'ppc_create' %}" class="btn btn-primary btn-sm">
+        <a href="{% url 'odin:ppc_create' %}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i> Criar Novo PPC
         </a>
     </div>
@@ -44,11 +44,11 @@
                         
                         <td class="text-end pe-4">
                             {% if ppc.course.professor == request.user %}
-                                <a href="{% url 'ppc_detail' ppc.pk %}" class="btn btn-sm btn-success" title="Montar Grade">
+                                <a href="{% url 'odin:ppc_detail' ppc.pk %}" class="btn btn-sm btn-success" title="Montar Grade">
                                     <i class="bi bi-grid-3x3-gap"></i> Editar Grade
                                 </a>
                             {% else %}
-                                <a href="{% url 'ppc_detail' ppc.pk %}" class="btn btn-sm btn-outline-primary" title="Visualizar Grade">
+                                <a href="{% url 'odin:ppc_detail' ppc.pk %}" class="btn btn-sm btn-outline-primary" title="Visualizar Grade">
                                     <i class="bi bi-eye"></i> Ver Grade
                                 </a>
                             {% endif %}

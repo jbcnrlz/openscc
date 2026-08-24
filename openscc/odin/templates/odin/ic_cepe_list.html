@@ -1,0 +1,150 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Painel CEPE - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-bank me-2"></i>Painel CEPE</h3>
+        <p class="text-muted mb-0">Gestão de pareceristas e julgamento de projetos</p>
+    </div>
+</div>
+
+<ul class="nav nav-pills mb-4" id="cepeTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold px-4" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending" type="button" role="tab">
+            1. Designar Parecerista
+            {% if pending_projects %}<span class="badge bg-white text-primary ms-2">{{ pending_projects.count }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4 position-relative" id="decision-tab" data-bs-toggle="pill" data-bs-target="#decision" type="button" role="tab">
+            2. Julgamento Final
+            {% if ready_for_decision %}<span class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle"></span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4" id="tracking-tab" data-bs-toggle="pill" data-bs-target="#tracking" type="button" role="tab">
+            3. Histórico e Acompanhamento
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="cepeTabsContent">
+    
+    <!-- ABA 1: DESIGNAR -->
+    <div class="tab-pane fade show active" id="pending" role="tabpanel">
+        <!-- Mantém o mesmo código da tabela "Aguardando Designação" que fizemos antes... -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Projeto Submetido</th>
+                            <th>Aluno / Orientador</th>
+                            <th class="text-center">Arquivo</th>
+                            <th class="text-end pe-4">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in pending_projects %}
+                        <tr>
+                            <td class="ps-4 text-dark fw-bold">{{ project.title }}</td>
+                            <td><div class="small"><span class="text-muted">A:</span> {{ project.student.get_full_name }}<br><span class="text-muted">O:</span> Prof. {{ project.advisor.get_full_name }}</div></td>
+                            <td class="text-center">
+                                {% if project.project_file %}<a href="{{ project.project_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf"></i></a>{% else %}-{% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'odin:ic_cepe_assign' project.id %}" class="btn btn-sm btn-dark fw-bold"><i class="bi bi-person-plus me-1"></i> Designar Ad-hoc</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-5 text-muted">A fila de designação está vazia.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 2: JULGAMENTO FINAL (CEPE toma a decisão baseada no texto do ad-hoc) -->
+    <div class="tab-pane fade" id="decision" role="tabpanel">
+        <div class="card border-0 shadow-sm border-top border-4 border-primary">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Projeto</th>
+                            <th>Parecerista Ad-hoc</th>
+                            <th class="text-center">Parecer Emitido</th>
+                            <th class="text-end pe-4">Ação da CEPE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in ready_for_decision %}
+                        <tr>
+                            <td class="ps-4"><div class="text-dark fw-bold">{{ project.title }}</div></td>
+                            <td>Prof. {{ project.reviewer.get_full_name }}</td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#parecerModal{{ project.id }}">
+                                    <i class="bi bi-eye me-1"></i> Ler Recomendação
+                                </button>
+                                
+                                <!-- Modal de Leitura para a CEPE -->
+                                <div class="modal fade text-start" id="parecerModal{{ project.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-light">
+                                                <h5 class="modal-title fw-bold">Análise Ad-hoc</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body p-4 text-dark" style="white-space: pre-wrap;">{{ project.reviewer_feedback }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'odin:ic_cepe_decision' project.id %}" class="btn btn-sm btn-success fw-bold">
+                                    <i class="bi bi-hammer me-1"></i> Deferir/Indeferir
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-5 text-muted">Nenhum projeto aguardando julgamento.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 3: HISTÓRICO -->
+    <div class="tab-pane fade" id="tracking" role="tabpanel">
+        <!-- Mantém o código do Histórico que você já possuía, iterando sobre tracked_projects -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Projeto</th>
+                            <th>Parecerista Ad-hoc</th>
+                            <th>Status Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in tracked_projects %}
+                        <tr>
+                            <td class="ps-4 fw-bold text-dark">{{ project.title }}</td>
+                            <td>{% if project.reviewer %}Prof. {{ project.reviewer.get_full_name }}{% else %}-{% endif %}</td>
+                            <td><span class="badge bg-secondary">{{ project.get_status_display }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center py-5 text-muted">Nenhum histórico disponível.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

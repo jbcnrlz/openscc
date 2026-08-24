@@ -1,111 +1,238 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Odin - Gestão Acadêmica{% endblock %}</title>
+    
+    <!-- Fonte Inter (Google Fonts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <style>
-        /* Ajuste fino para a altura do menu lateral ocupar toda a tela */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f6f9; /* Fundo levemente acinzentado para destacar os cards brancos */
+        }
+        
+        /* Estilização da Sidebar */
         .sidebar {
             min-height: 100vh;
+            background-color: #1e1e2d !important; /* Tom de dark mode mais sofisticado */
+        }
+        .sidebar-brand {
+            letter-spacing: 1px;
         }
         .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            transition: 0.2s;
+            color: #a2a3b7;
+            font-weight: 500;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
         }
-        .nav-link:hover, .nav-link.active {
+        .nav-link:hover, .nav-link[aria-expanded="true"] {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        .nav-link.active {
             color: #fff;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
+            background-color: #0d6efd;
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+        }
+        .nav-link i {
+            width: 24px;
+            text-align: center;
         }
         .submenu-link {
-            font-size: 0.9em;
-            padding-left: 2.5rem !important;
+            font-size: 0.85em;
+            padding-left: 3rem !important;
+            font-weight: 400;
+        }
+        .submenu-link:hover {
+            background-color: transparent;
+            color: #fff;
+            padding-left: 3.2rem !important; /* Efeito de slide no hover */
+        }
+        
+        /* Utilitários Globais */
+        .content-area {
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .card {
+            border-radius: 12px;
+        }
+        .shadow-sm {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
         }
     </style>
 </head>
-<body class="bg-light">
+<body>
 
     <div class="container-fluid">
         <div class="row flex-nowrap">
             
-            <div class="col-auto col-md-3 col-xl-2 px-sm-2 px-0 bg-dark sidebar shadow">
-                <div class="d-flex flex-column align-items-center align-items-sm-start px-3 pt-4 text-white">
+            <!-- Menu Lateral -->
+            <div class="col-auto col-md-3 col-xl-2 px-3 bg-dark sidebar shadow">
+                <div class="d-flex flex-column align-items-center align-items-sm-start pt-4 text-white h-100">
                     
-                    <a href="{% url 'dashboard' %}" class="d-flex align-items-center pb-3 mb-md-0 me-md-auto text-white text-decoration-none border-bottom border-secondary w-100">
-                        <i class="bi bi-shield-shaded fs-3 me-2 text-primary"></i>
-                        <span class="fs-4 d-none d-sm-inline fw-bold">Odin</span>
+                    <!-- Logo / Brand -->
+                    <a href="{% url 'odin:dashboard' %}" class="d-flex align-items-center pb-4 mb-3 mt-2 text-white text-decoration-none w-100 sidebar-brand justify-content-center justify-content-sm-start">
+                        <!-- Imagem redimensionada, sem a caixinha restritiva, muito mais limpa e visível -->
+                        <img src="{% static 'media/images/odin_logo_head.png' %}" alt="Logo Odin" class="img-fluid me-0 me-sm-3" style="max-height: 48px; object-fit: contain;">
+                        
+                        <!-- Nome do sistema com tipografia mais elegante -->
+                        <span class="fs-3 d-none d-sm-inline fw-bolder" style="letter-spacing: -0.5px;">Odin</span>
                     </a>
                     
-                    <ul class="nav flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start w-100 mt-3" id="menu">
+                    <!-- Navegação -->
+                    <ul class="nav flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start w-100" id="menu">
                         
-                        <li class="nav-item w-100 mb-1">
-                            <a href="{% url 'dashboard' %}" class="nav-link px-3 align-middle">
-                                <i class="fs-5 bi bi-speedometer2 me-2"></i> <span class="d-none d-sm-inline">Painel Geral</span>
+                        <li class="nav-item w-100 mb-2">
+                            <a href="{% url 'odin:dashboard' %}" class="nav-link active px-3 py-2 align-middle">
+                                <i class="bi bi-grid-1x2-fill me-2"></i> 
+                                <span class="d-none d-sm-inline">Painel Geral</span>
                             </a>
                         </li>
                         
-                        <li class="nav-item w-100 mb-1">
-                            <a href="#submenuAcademico" data-bs-toggle="collapse" class="nav-link px-3 align-middle">
-                                <i class="fs-5 bi bi-mortarboard me-2"></i> 
-                                <span class="d-none d-sm-inline">Acadêmico</span>
-                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.8em; float: right; margin-top: 5px;"></i>
+                        <!-- ========================================== -->
+                        <!-- VISÃO EXCLUSIVA DE PROFESSORES             -->
+                        <!-- ========================================== -->
+                        {% if not request.user.isAluno %}
+                        
+                        <!-- Seção: Acadêmico -->
+                        <li class="nav-item w-100 mb-1 mt-2">
+                            <small class="d-none d-sm-inline text-uppercase text-muted fw-bold ms-3" style="font-size: 0.7rem;">Gestão Acadêmica</small>
+                            <a href="#submenuAcademico" data-bs-toggle="collapse" class="nav-link px-3 py-2 align-middle mt-1">
+                                <i class="bi bi-mortarboard me-2"></i> 
+                                <span class="d-none d-sm-inline">Cursos & PPCs</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.75em; float: right; margin-top: 6px;"></i>
                             </a>
-                            <ul class="collapse show nav flex-column ms-1 w-100" id="submenuAcademico" data-bs-parent="#menu">
+                            <ul class="collapse nav flex-column w-100" id="submenuAcademico" data-bs-parent="#menu">
                                 <li class="w-100">
-                                    <a href="{% url 'course_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Meus Cursos</span></a>
+                                    <a href="{% url 'odin:course_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Meus Cursos</span></a>
                                 </li>
                                 <li class="w-100">
-                                    <a href="{% url 'discipline_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Catálogo de Disciplinas</span></a>
+                                    <a href="{% url 'odin:discipline_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Catálogo de Disciplinas</span></a>
                                 </li>
                                 <li class="w-100">
-                                    <a href="{% url 'ppc_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Projetos Pedagógicos</span></a>
+                                    <a href="{% url 'odin:ppc_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Projetos Pedagógicos</span></a>
                                 </li>
                             </ul>
                         </li>
 
-<li class="nav-item w-100 mb-1">
-                            <a href="#submenuConfig" data-bs-toggle="collapse" class="nav-link px-3 align-middle">
-                                <i class="fs-5 bi bi-gear me-2"></i> 
-                                <span class="d-none d-sm-inline">Configurações</span>
-                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.8em; float: right; margin-top: 5px;"></i>
+                        <!-- Seção: Captação -->
+                        <li class="nav-item w-100 mb-1 mt-2">
+                            <small class="d-none d-sm-inline text-uppercase text-muted fw-bold ms-3" style="font-size: 0.7rem;">Captação</small>
+                            <a href="#submenuCaptacao" data-bs-toggle="collapse" class="nav-link px-3 py-2 align-middle mt-1">
+                                <i class="bi bi-graph-up-arrow me-2"></i> 
+                                <span class="d-none d-sm-inline">Vestibular</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.75em; float: right; margin-top: 6px;"></i>
                             </a>
-                            <ul class="collapse nav flex-column ms-1 w-100" id="submenuConfig" data-bs-parent="#menu">
+                            <ul class="collapse nav flex-column w-100" id="submenuCaptacao" data-bs-parent="#menu">
                                 <li class="w-100">
-                                    <a href="{% url 'axis_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Eixos Tecnológicos</span></a>
+                                    <a href="{% url 'odin:campaign_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Yield Management</span></a>
                                 </li>
                                 <li class="w-100">
-                                    <a href="{% url 'modality_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Modalidades</span></a>
+                                    <a href="{% url 'odin:my_actions_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Minhas Ações (Campo)</span></a>
                                 </li>
                                 <li class="w-100">
-                                    <a href="{% url 'formative_axis_list' %}" class="nav-link submenu-link px-0"> <span class="d-none d-sm-inline">Eixos Formativos</span></a>
+                                    <a href="{% url 'odin:lead_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Base Central (Leads)</span></a>
                                 </li>
                             </ul>
                         </li>
+                        
+                        {% endif %} <!-- Fim Visão Professor -->
+
+                        <!-- ========================================== -->
+                        <!-- SEÇÃO COMPARTILHADA: PESQUISA (IC)         -->
+                        <!-- ========================================== -->
+                        <li class="nav-item w-100 mb-1 mt-2">
+                            <small class="d-none d-sm-inline text-uppercase text-muted fw-bold ms-3" style="font-size: 0.7rem;">Pesquisa</small>
+                            <a href="#submenuIC" data-bs-toggle="collapse" class="nav-link px-3 py-2 align-middle mt-1">
+                                <i class="bi bi-flask me-2"></i> 
+                                <span class="d-none d-sm-inline">Inic. Científica</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.75em; float: right; margin-top: 6px;"></i>
+                            </a>
+                            <ul class="collapse nav flex-column w-100" id="submenuIC" data-bs-parent="#menu">
+                                
+                                {% if request.user.isAluno %}
+                                    <li class="w-100">
+                                        <a href="{% url 'odin:ic_student_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Meus Projetos</span></a>
+                                    </li>
+                                {% else %}
+                                    <li class="w-100">
+                                        <a href="{% url 'odin:ic_advisor_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Orientações</span></a>
+                                    </li>
+                                    <li class="w-100">
+                                        <a href="{% url 'odin:ic_reviewer_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Meus Pareceres</span></a>
+                                    </li>
+                                    {% if request.user.isMembroCEPE %}
+                                        <li class="w-100">
+                                            <a href="{% url 'odin:ic_cepe_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Painel CEPE</span></a>
+                                        </li>
+                                    {% endif %}
+                                {% endif %}
+                                
+                            </ul>
+                        </li>
+
+                        <!-- ========================================== -->
+                        <!-- CONFIGURAÇÕES (APENAS PROFESSORES)         -->
+                        <!-- ========================================== -->
+                        {% if not request.user.isAluno %}
+                        <li class="nav-item w-100 mb-1 mt-2">
+                            <small class="d-none d-sm-inline text-uppercase text-muted fw-bold ms-3" style="font-size: 0.7rem;">Parâmetros</small>
+                            <a href="#submenuConfig" data-bs-toggle="collapse" class="nav-link px-3 py-2 align-middle mt-1">
+                                <i class="bi bi-sliders me-2"></i> 
+                                <span class="d-none d-sm-inline">Configurações</span>
+                                <i class="bi bi-chevron-down ms-auto d-none d-sm-inline" style="font-size: 0.75em; float: right; margin-top: 6px;"></i>
+                            </a>
+                            <ul class="collapse nav flex-column w-100" id="submenuConfig" data-bs-parent="#menu">
+                                <li class="w-100">
+                                    <a href="{% url 'odin:axis_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Eixos Tecnológicos</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'odin:modality_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Modalidades</span></a>
+                                </li>
+                                <li class="w-100">
+                                    <a href="{% url 'odin:formative_axis_list' %}" class="nav-link submenu-link px-0 py-2"> <span class="d-none d-sm-inline">Eixos Formativos</span></a>
+                                </li>
+                            </ul>
+                        </li>
+                        {% endif %}
                     </ul>
                     
-                    <hr class="border-secondary w-100">
+                    <hr class="border-secondary w-100 mt-auto">
                     
-                    <div class="dropdown pb-4 w-100 text-center text-sm-start">
-                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle px-2" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle fs-4 text-secondary me-2"></i>
-                            <span class="d-none d-sm-inline small">
-                                Prof. {{ user.username|title }}
+                    <!-- User Profile -->
+                    <div class="dropdown pb-4 w-100">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle px-2 py-2 rounded" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false" style="background: rgba(255,255,255,0.05);">
+                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <span class="d-none d-sm-inline text-truncate w-75 fw-medium">
+                                {{ user.first_name|default:user.username|title }}
                             </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser">
-                            <li><a class="dropdown-item" href="#">Meu Perfil</a></li>
+                            <li><a class="dropdown-item py-2" href="#"><i class="bi bi-person me-2"></i>Meu Perfil</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#">Sair do Sistema</a></li>
+                            <!-- Usando account_logout caso você esteja usando django-allauth, senão mantenha sua URL original -->
+                            <li><a class="dropdown-item py-2 text-danger" href="{% url 'submission:logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Sair do Sistema</a></li>
                         </ul>
                     </div>
                 </div>
             </div>
             
-            <div class="col py-4 px-4 h-100" style="overflow-y: auto;">
+            <!-- Conteúdo Principal -->
+            <div class="col py-4 px-4 px-md-5 content-area">
                 {% block content %}
                 {% endblock %}
             </div>

@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 
+app_name = 'odin'
+
 urlpatterns = [
     # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),
@@ -38,4 +40,52 @@ urlpatterns = [
 
     path('configuracoes/eixos-formativos/', views.FormativeAxisListView.as_view(), name='formative_axis_list'),
     path('configuracoes/eixos-formativos/novo/', views.FormativeAxisCreateView.as_view(), name='formative_axis_create'),
+    path('vestibular/', views.VestibularCampaignListView.as_view(), name='campaign_list'),
+    path('vestibular/nova/', views.VestibularCampaignCreateView.as_view(), name='campaign_create'),
+    path('vestibular/<int:pk>/', views.VestibularCampaignDetailView.as_view(), name='campaign_dashboard'),
+    path('vestibular/<int:campaign_id>/registro/', views.DailyRecordCreateView.as_view(), name='daily_record_create'),
+
+    # Adicione esta linha junto das outras rotas de vestibular:
+    path('vestibular/<int:pk>/editar/', views.VestibularCampaignUpdateView.as_view(), name='campaign_update'),
+
+# ... suas rotas anteriores ...
+
+    # --- Visão do Coordenador: Criar Ação e Delegar ---
+    path('vestibular/<int:campaign_id>/acao/nova/', views.CampaignActionCreateView.as_view(), name='action_create'),
+
+    # --- Visão do Professor: Minhas Ações ---
+    path('minhas-acoes/', views.MyActionsListView.as_view(), name='my_actions_list'),
+    path('acao/<int:pk>/execucao/', views.ActionExecutionDetailView.as_view(), name='action_execution'),
+    
+    # --- Endpoints de Processamento (Forms da Execução) ---
+    path('acao/<int:action_id>/despesa/', views.ActionExpenseCreateView.as_view(), name='action_expense_create'),
+    path('acao/<int:action_id>/foto/', views.ActionPhotoCreateView.as_view(), name='action_photo_create'),
+    path('acao/<int:action_id>/lead/', views.CampaignLeadCreateView.as_view(), name='action_lead_create'),
+    # --- Base Central de Leads ---
+    path('leads/', views.CampaignLeadListView.as_view(), name='lead_list'),
+    path('leads/exportar/', views.ExportLeadsCSVView.as_view(), name='lead_export_csv'),
+    # ==========================================
+    # MÓDULO DE INICIAÇÃO CIENTÍFICA (IC)
+    # ==========================================
+
+    # --- 1. Visão do Aluno ---
+    path('ic/meus-projetos/', views.StudentICListView.as_view(), name='ic_student_list'),
+    path('ic/novo/', views.StudentICCreateView.as_view(), name='ic_student_create'),
+    path('ic/<int:pk>/submeter/', views.StudentICSubmitView.as_view(), name='ic_student_submit'),
+    # (Futuro) path('ic/<int:pk>/relatorio/', views.StudentICReportView.as_view(), name='ic_student_report'),
+
+    # --- 2. Visão do Orientador ---
+    path('ic/orientacoes-pendentes/', views.AdvisorPendingListView.as_view(), name='ic_advisor_list'),
+    path('ic/<int:pk>/aceitar/', views.AdvisorAcceptView.as_view(), name='ic_advisor_accept'),
+    # --- 3. Visão da CEPE (Comitê) ---
+    path('ic/cepe/painel/', views.CEPEListView.as_view(), name='ic_cepe_list'),
+    path('ic/cepe/<int:pk>/designar/', views.CEPEAssignReviewerView.as_view(), name='ic_cepe_assign'),
+    # --- 4. Visão do Parecerista Ad-hoc ---
+    path('ic/pareceres-pendentes/', views.ReviewerPendingListView.as_view(), name='ic_reviewer_list'),
+    path('ic/<int:pk>/avaliar/', views.ReviewerEvaluateView.as_view(), name='ic_reviewer_evaluate'),
+    # --- 3. Visão da CEPE (Comitê) ---
+    path('ic/cepe/painel/', views.CEPEListView.as_view(), name='ic_cepe_list'),
+    path('ic/cepe/<int:pk>/designar/', views.CEPEAssignReviewerView.as_view(), name='ic_cepe_assign'),
+    path('ic/cepe/<int:pk>/alterar-parecerista/', views.CEPEChangeReviewerView.as_view(), name='ic_cepe_change_reviewer'), # <--- NOVA ROTA
+    path('ic/cepe/<int:pk>/julgar/', views.CEPEDecisionView.as_view(), name='ic_cepe_decision'),
 ]

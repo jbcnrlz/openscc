@@ -1,0 +1,89 @@
+{% extends 'odin/base.html' %}
+
+{% block title %}Base Central de Leads - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-funnel me-2"></i>Base Central de Leads</h3>
+        <p class="text-muted mb-0">Consolidação de todos os interessados gerados pelas ações de captação</p>
+    </div>
+    
+    <!-- Botão de Exportação -->
+    <a href="{% url 'odin:lead_export_csv' %}" class="btn btn-success d-flex align-items-center fw-medium px-4 py-2 hover-lift shadow-sm">
+        <i class="bi bi-file-earmark-excel fs-5 me-2"></i> Exportar para Excel
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-3">Nome / Contato</th>
+                                <th>Origem da Captação</th>
+                                <th>Curso de Interesse</th>
+                                <th>Data de Cadastro</th>
+                                <th class="text-center pe-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lead in leads %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">{{ lead.name }}</div>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-telephone me-1"></i>{{ lead.phone }} 
+                                        {% if lead.email %}<span class="ms-2"><i class="bi bi-envelope me-1"></i>{{ lead.email }}</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-medium text-dark">{{ lead.source_action.title|default:"Orgânico / Link Direto" }}</div>
+                                    <div class="small text-muted">{{ lead.campaign.name }}</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border px-2 py-1">
+                                        {{ lead.interested_course.name|default:"Não informado" }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ lead.created_at|date:"d/m/Y \à\s H:i" }}
+                                </td>
+                                <td class="text-center pe-4">
+                                    {% if lead.converted_to_paid %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="bi bi-check-circle me-1"></i>Matriculado</span>
+                                    {% elif lead.contacted %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning"><i class="bi bi-telephone-outbound me-1"></i>Contatado</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-hourglass-split me-1"></i>Aguardando</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="text-muted opacity-50 mb-3">
+                                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="fw-bold text-dark">Sua base de leads está vazia</h5>
+                                    <p class="text-muted">Os interessados começarão a aparecer aqui assim que os professores cadastrarem nas ações.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            {% if leads %}
+            <div class="card-footer bg-white py-3 border-top">
+                <span class="text-muted small fw-medium">Total de <strong>{{ leads.count }}</strong> interessado(s) na base.</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

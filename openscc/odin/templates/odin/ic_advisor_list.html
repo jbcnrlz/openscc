@@ -1,0 +1,121 @@
+{% extends 'odin/base.html' %}
+{% block title %}Orientações - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-person-lines-fill me-2"></i>Minhas Orientações</h3>
+        <p class="text-muted mb-0">Gerencie convites de alunos e acompanhe projetos vigentes</p>
+    </div>
+</div>
+
+<ul class="nav nav-pills mb-4" id="advisorTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold px-4" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending" type="button">
+            Convites Pendentes
+            {% if pending_projects %}<span class="badge bg-white text-primary ms-2">{{ pending_projects.count }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4" id="tracking-tab" data-bs-toggle="pill" data-bs-target="#tracking" type="button">
+            Meus Orientandos
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- ABA 1: CONVITES -->
+    <div class="tab-pane fade show active" id="pending">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th class="ps-4">Projeto</th><th>Aluno</th><th class="text-end pe-4">Ação</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for project in pending_projects %}
+                        <tr>
+                            <td class="ps-4 fw-medium text-dark">{{ project.title }}</td>
+                            <td>{{ project.student.get_full_name }}</td>
+                            <td class="text-end pe-4">
+                                <form method="post" action="{% url 'odin:ic_advisor_accept' project.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-primary fw-bold"><i class="bi bi-check2-circle me-1"></i> Aceitar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center py-5 text-muted">Nenhum convite pendente.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 2: ACOMPANHAMENTO -->
+    <div class="tab-pane fade" id="tracking">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th class="ps-4">Projeto e Aluno</th><th>Status Atual</th><th class="text-end pe-4">Pareceres</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for project in tracked_projects %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="fw-bold text-dark">{{ project.title }}</div>
+                                <div class="small text-muted">{{ project.student.get_full_name }}</div>
+                            </td>
+                            <td><span class="badge bg-secondary">{{ project.get_status_display }}</span></td>
+                            <td class="text-end pe-4">
+                                {% if project.reviewer_feedback or project.cepe_feedback %}
+                                <button type="button" class="btn btn-sm btn-outline-info fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#parecerModal{{ project.id }}">
+                                    <i class="bi bi-eye me-1"></i> Ler Feedbacks
+                                </button>
+                                
+                                <!-- Modal de Pareceres para o Orientador -->
+                                <div class="modal fade text-start" id="parecerModal{{ project.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-light">
+                                                <h5 class="modal-title fw-bold">Avaliações do Projeto</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <!-- Feedback CEPE -->
+                                                {% if project.cepe_feedback %}
+                                                <div class="mb-4">
+                                                    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-bank me-2"></i>Decisão da CEPE</h6>
+                                                    <div class="badge bg-dark mb-2">Por: Prof. {{ project.cepe_reviewer.first_name }} {{ project.cepe_reviewer.last_name }}</div>
+                                                    <div class="p-3 bg-light rounded border" style="white-space: pre-wrap;">{{ project.cepe_feedback }}</div>
+                                                </div>
+                                                {% endif %}
+                                                
+                                                <!-- Feedback Ad-hoc -->
+                                                {% if project.reviewer_feedback %}
+                                                <div>
+                                                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-person-badge me-2"></i>Parecer Técnico Ad-hoc</h6>
+                                                    <div class="p-3 bg-light rounded border opacity-75" style="white-space: pre-wrap;">{{ project.reviewer_feedback }}</div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center py-5 text-muted">Você ainda não assumiu nenhuma orientação.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

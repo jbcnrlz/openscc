@@ -1,0 +1,226 @@
+{% extends 'odin/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Execução: {{ action.title }}{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho da Ação -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <span class="badge bg-primary mb-2">{{ action.campaign.name }}</span>
+                <h3 class="fw-bold text-dark mb-1">{{ action.title }}</h3>
+                <p class="text-muted mb-0"><i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ action.location|default:"Local não informado" }}</p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-{% if action.status == 'COMPLETED' %}success{% elif action.status == 'EXECUTING' %}warning{% else %}secondary{% endif %} fs-6 mb-2">
+                    {{ action.get_status_display }}
+                </span>
+                <p class="text-muted small mb-0"><i class="bi bi-calendar3 me-1"></i> {{ action.scheduled_date|date:"d/m/Y" }}</p>
+            </div>
+        </div>
+        {% if action.description %}
+            <hr class="text-muted opacity-25">
+            <p class="text-muted small mb-0">{{ action.description }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Sistema de Abas (Tabs) -->
+<ul class="nav nav-pills mb-4" id="actionTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold px-4" id="leads-tab" data-bs-toggle="pill" data-bs-target="#leads" type="button" role="tab"><i class="bi bi-people me-2"></i>Interessados (Leads)</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4" id="expenses-tab" data-bs-toggle="pill" data-bs-target="#expenses" type="button" role="tab"><i class="bi bi-receipt me-2"></i>Prestação de Contas</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-4" id="photos-tab" data-bs-toggle="pill" data-bs-target="#photos" type="button" role="tab"><i class="bi bi-camera me-2"></i>Galeria de Fotos</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="actionTabsContent">
+    
+    <!-- ========================================== -->
+    <!-- ABA 1: CAPTAÇÃO DE LEADS -->
+    <!-- ========================================== -->
+    <div class="tab-pane fade show active" id="leads" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold mb-0 text-dark">Cadastrar Interessado</h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'odin:action_lead_create' action.id %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">Nome Completo</label>
+                                {{ lead_form.name|add_class:"form-control" }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">Celular / WhatsApp</label>
+                                {{ lead_form.phone|add_class:"form-control"|attr:"placeholder:(11) 99999-9999" }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">E-mail (Opcional)</label>
+                                {{ lead_form.email|add_class:"form-control" }}
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label small fw-medium">Curso de Interesse</label>
+                                {{ lead_form.interested_course|add_class:"form-select" }}
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-plus-lg me-2"></i>Salvar Lead</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Nome</th>
+                                    <th>Contato</th>
+                                    <th>Curso</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in action.captured_leads.all %}
+                                <tr>
+                                    <td class="ps-4 fw-medium text-dark">{{ lead.name }}</td>
+                                    <td>{{ lead.phone }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ lead.interested_course.name|default:"Não informado" }}</span></td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center py-4 text-muted">Nenhum interessado cadastrado nesta ação.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 2: PRESTAÇÃO DE CONTAS -->
+    <!-- ========================================== -->
+    <div class="tab-pane fade" id="expenses" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold mb-0 text-dark">Lançar Despesa</h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- IMPORTANTE: enctype="multipart/form-data" para upload de arquivos -->
+                        <form method="post" action="{% url 'odin:action_expense_create' action.id %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">Descrição do Gasto</label>
+                                {{ expense_form.description|add_class:"form-control" }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">Valor (R$)</label>
+                                {{ expense_form.amount|add_class:"form-control"|attr:"step:0.01" }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium">Data do Gasto</label>
+                                {{ expense_form.date_incurred|add_class:"form-control bg-light" }}
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label small fw-medium">Comprovante (Imagem ou PDF)</label>
+                                {{ expense_form.receipt_file|add_class:"form-control" }}
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 fw-bold text-dark"><i class="bi bi-receipt me-2"></i>Gravar Despesa</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Descrição</th>
+                                    <th>Data</th>
+                                    <th class="text-end">Valor (R$)</th>
+                                    <th class="text-center pe-4">Anexo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in action.expenses.all %}
+                                <tr>
+                                    <td class="ps-4 fw-medium text-dark">{{ expense.description }}</td>
+                                    <td>{{ expense.date_incurred|date:"d/m/Y" }}</td>
+                                    <td class="text-end text-danger fw-bold">R$ {{ expense.amount }}</td>
+                                    <td class="text-center pe-4">
+                                        {% if expense.receipt_file %}
+                                            <a href="{{ expense.receipt_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip"></i></a>
+                                        {% else %}
+                                            <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center py-4 text-muted">Nenhum gasto registrado.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 3: FOTOS DA AÇÃO -->
+    <!-- ========================================== -->
+    <div class="tab-pane fade" id="photos" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <form method="post" action="{% url 'odin:action_photo_create' action.id %}" enctype="multipart/form-data" class="row align-items-end g-3">
+                            {% csrf_token %}
+                            <div class="col-md-5">
+                                <label class="form-label small fw-medium">Arquivo da Imagem</label>
+                                {{ photo_form.image|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small fw-medium">Legenda (Opcional)</label>
+                                {{ photo_form.caption|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-success w-100 fw-bold"><i class="bi bi-upload me-2"></i>Enviar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Galeria -->
+            {% for photo in action.photos.all %}
+            <div class="col-md-4 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <img src="{{ photo.image.url }}" class="card-img-top object-fit-cover" style="height: 200px;" alt="Foto da ação">
+                    {% if photo.caption %}
+                        <div class="card-footer bg-white border-0 text-muted small text-center">{{ photo.caption }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="bi bi-images fs-2 d-block mb-2 opacity-50"></i>
+                Nenhuma foto enviada ainda.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
