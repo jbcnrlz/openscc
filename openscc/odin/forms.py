@@ -109,8 +109,38 @@ class VestibularCampaignForm(forms.ModelForm):
         model = VestibularCampaign
         fields = ['course', 'name', 'start_date', 'end_date', 'vacancies', 'min_inscriptions', 'yield_paid', 'yield_sponsored']
         widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'course': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da Campanha'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'vacancies': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'min_inscriptions': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'yield_paid': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'yield_sponsored': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        }
+
+# 1. TRADUÇÃO DOS RÓTULOS (LABELS)
+        labels = {
+            'course': 'Curso Referência',
+            'name': 'Nome da Campanha',
+            'start_date': 'Data de Início',
+            'end_date': 'Data de Encerramento',
+            'vacancies': 'Vagas Ofertadas',
+            'min_inscriptions': 'Meta de Inscritos',
+            'yield_paid': 'Custo Planejado (Lead Pago)',
+            'yield_sponsored': 'Verba de Patrocínio',
+        }
+        
+        # 2. COMPONENTES VISUAIS (WIDGETS)
+        widgets = {
+            'course': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Vestibular de Inverno 2026'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'vacancies': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'min_inscriptions': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'yield_paid': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'yield_sponsored': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
 
 class CampaignDailyRecordForm(forms.ModelForm):
