@@ -276,7 +276,7 @@ class VestibularCampaignListView(ProfessorRequiredMixin, ListView):
 class VestibularCampaignCreateView(ProfessorRequiredMixin, CreateView):
     model = VestibularCampaign
     form_class = VestibularCampaignForm
-    template_name = 'odin/generic_form.html'
+    template_name = 'odin/campaign_form.html'
     success_url = reverse_lazy('odin:campaign_list')
 
     def get_form(self, form_class=None):
@@ -324,7 +324,7 @@ class DailyRecordCreateView(ProfessorRequiredMixin, CreateView):
 class VestibularCampaignUpdateView(ProfessorRequiredMixin, UpdateView):
     model = VestibularCampaign
     form_class = VestibularCampaignForm
-    template_name = 'odin/generic_form.html'
+    template_name = 'odin/campaign_form.html'
 
     def get_queryset(self):
         # SEGURANÇA: Garante que o professor só edite campanhas dos próprios cursos

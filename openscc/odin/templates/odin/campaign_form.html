@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if form.instance.pk %}Editar Campanha{% else %}Nova Campanha de Captação{% endif %} - Odin
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0">
+            <i class="bi bi-bullseye text-info me-2"></i>
+            {% if form.instance.pk %}Editar Campanha: {{ form.instance.name }}{% else %}Configurar Nova Campanha{% endif %}
+        </h3>
+        <p class="text-muted mb-0">Configure os parâmetros do vestibular e as metas de captação (Yield Management).</p>
+    </div>
+    <a href="{% url 'odin:campaign_list' %}" class="btn btn-outline-secondary fw-medium shadow-sm">
+        <i class="bi bi-arrow-left me-1"></i> Voltar para Lista
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            
+            <!-- Mostra erros gerais do formulário, se houver -->
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <!-- SEÇÃO 1: INFORMAÇÕES BÁSICAS -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0" style="letter-spacing: 0.5px;">1. Identificação da Campanha</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.course.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-mortarboard text-muted"></i></span>
+                                {{ form.course }}
+                            </div>
+                            {% if form.course.errors %}<div class="text-danger small mt-1">{{ form.course.errors|striptags }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.name.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-tag text-muted"></i></span>
+                                {{ form.name }}
+                            </div>
+                            <div class="form-text small">Ex: Vestibular de Inverno 2026</div>
+                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 2: CRONOGRAMA -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0" style="letter-spacing: 0.5px;">2. Cronograma de Abertura</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.start_date.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-event text-success"></i></span>
+                                {{ form.start_date }}
+                            </div>
+                            {% if form.start_date.errors %}<div class="text-danger small mt-1">{{ form.start_date.errors|striptags }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.end_date.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-x text-danger"></i></span>
+                                {{ form.end_date }}
+                            </div>
+                            {% if form.end_date.errors %}<div class="text-danger small mt-1">{{ form.end_date.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 3: METAS E YIELD MANAGEMENT -->
+            <div class="card border-0 shadow-sm mb-5 border-top border-4 border-info">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-info mb-0" style="letter-spacing: 0.5px;">3. Metas e Yield Management</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.vacancies.label }} (Total de Vagas)</label>
+                            {{ form.vacancies }}
+                            {% if form.vacancies.errors %}<div class="text-danger small mt-1">{{ form.vacancies.errors|striptags }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.min_inscriptions.label }} (Inscritos Esperados)</label>
+                            {{ form.min_inscriptions }}
+                            {% if form.min_inscriptions.errors %}<div class="text-danger small mt-1">{{ form.min_inscriptions.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr class="text-muted opacity-25 mb-4">
+                    
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.yield_paid.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-currency-dollar text-success"></i></span>
+                                {{ form.yield_paid }}
+                            </div>
+                            <div class="form-text small">Custo máximo planejado por Lead pago.</div>
+                            {% if form.yield_paid.errors %}<div class="text-danger small mt-1">{{ form.yield_paid.errors|striptags }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.yield_sponsored.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-megaphone text-warning"></i></span>
+                                {{ form.yield_sponsored }}
+                            </div>
+                            <div class="form-text small">Verba de patrocínio destinada.</div>
+                            {% if form.yield_sponsored.errors %}<div class="text-danger small mt-1">{{ form.yield_sponsored.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BARRA DE AÇÕES FIXA -->
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="{% url 'odin:campaign_list' %}" class="btn btn-light px-4 py-2 fw-bold text-secondary border shadow-sm">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-5 py-2 fw-bold shadow-sm">
+                    <i class="bi bi-save me-2"></i> {% if form.instance.pk %}Salvar Alterações{% else %}Criar Campanha{% endif %}
+                </button>
+            </div>
+            
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Remove a borda esquerda dos inputs que usam ícones para o visual 'conectado' */
+    .input-group-text { border-right: none; }
+    .input-group .form-control, .input-group .form-select { border-left: none; padding-left: 0; }
+    .input-group .form-control:focus, .input-group .form-select:focus { 
+        border-color: #dee2e6; 
+        box-shadow: none; 
+    }
+    .input-group:focus-within {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        border-radius: 0.375rem;
+    }
+    .input-group:focus-within .input-group-text, .input-group:focus-within .form-control, .input-group:focus-within .form-select {
+        border-color: #86b7fe;
+    }
+</style>
+{% endblock %}
