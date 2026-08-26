@@ -1,4 +1,4 @@
-import csv
+import csv, datetime
 from django.http import HttpResponse
 from django.views import View
 from django.urls import reverse_lazy
@@ -8,6 +8,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .models import *
 from .forms import *
 from django.shortcuts import redirect
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
 
 class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """Garante que o usuário logado seja um Aluno"""
@@ -500,23 +503,37 @@ class StudentICCreateView(StudentRequiredMixin, CreateView):
     """PASSO 1: Aluno cria o projeto e escolhe orientador"""
     model = ScientificProject
     form_class = ICProjectCreateForm
-    template_name = 'odin/generic_form.html'
+    template_name = 'odin/ic_student_create_form.html' # <--- NOVO TEMPLATE DEDICADO
     success_url = reverse_lazy('odin:ic_student_list')
 
     def form_valid(self, form):
         form.instance.student = self.request.user
-        form.instance.status = 'PENDING_ADVISOR' # Altera o status automaticamente
-        return super().form_valid(form)
+        form.instance.status = 'PENDING_ADVISOR'
+        response = super().form_valid(form)
+        
+        # GATILHO DE E-MAIL (mantido): Avisa o Orientador
+        send_mail(
+            subject='Odin: Novo Convite de Orientação de IC',
+            message=f"Olá Prof. {form.instance.advisor.first_name},\n\nO aluno {self.request.user.get_full_name()} convidou você para orientar o projeto '{form.instance.title}'.\n\nAcesse o painel para aceitar ou recusar.\n\nEquipe CEPE",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[form.instance.advisor.email],
+            fail_silently=True,
+        )
+        return response
 
 class StudentICSubmitView(StudentRequiredMixin, UpdateView):
     """PASSO 3: Aluno faz upload do projeto (Apenas envio inicial)"""
     model = ScientificProject
     form_class = ICProjectSubmitForm
-    template_name = 'odin/generic_form.html'
+    template_name = 'odin/ic_student_submit_form.html' # <--- NOVO TEMPLATE
     success_url = reverse_lazy('odin:ic_student_list')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['step'] = 2  # Indica para o HTML que é o passo 2
+        return context
+
     def get_queryset(self):
-        # Permite submeter apenas após o aceite do orientador
         return ScientificProject.objects.filter(
             student=self.request.user, 
             status='ADVISOR_ACCEPTED'
@@ -525,23 +542,22 @@ class StudentICSubmitView(StudentRequiredMixin, UpdateView):
     def form_valid(self, form):
         form.instance.status = 'SUBMITTED_CEPE'
         return super().form_valid(form)
-# --- VISÃO DO ORIENTADOR E PARECERISTA ---
-
-class AdvisorPendingListView(ProfessorRequiredMixin, ListView):
-    """Orientador visualiza pedidos pendentes"""
-    model = ScientificProject
-    template_name = 'odin/ic_advisor_list.html'
-    context_object_name = 'projects'
-
-    def get_queryset(self):
-        return ScientificProject.objects.filter(advisor=self.request.user, status='PENDING_ADVISOR')
 
 class AdvisorAcceptView(ProfessorRequiredMixin, View):
-    """PASSO 2: Orientador clica em Aceitar"""
     def post(self, request, pk):
         project = get_object_or_404(ScientificProject, pk=pk, advisor=request.user, status='PENDING_ADVISOR')
         project.status = 'ADVISOR_ACCEPTED'
         project.save()
+        
+        # GATILHO DE E-MAIL: Avisa o Aluno
+        send_mail(
+            subject='Odin: Convite de Orientação Aceito!',
+            message=f"Olá {project.student.first_name},\n\nÓtima notícia! O Prof. {request.user.get_full_name()} aceitou o convite para orientar o seu projeto '{project.title}'.\n\nAgora você já pode acessar o sistema Odin e realizar o upload (envio) da sua proposta em PDF para avaliação da CEPE.\n\nAtenciosamente,\nEquipe CEPE",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[project.student.email],
+            fail_silently=True,
+        )
+        
         return redirect('odin:ic_advisor_list')
 
 class ReviewerPendingListView(ProfessorRequiredMixin, ListView):
@@ -577,14 +593,29 @@ class CEPEDecisionView(ProfessorRequiredMixin, UpdateView):
         return ScientificProject.objects.filter(status='REVIEWED')
 
     def form_valid(self, form):
-        # MUDANÇA: Grava automaticamente quem é o membro da CEPE julgando
         form.instance.cepe_reviewer = self.request.user
 
         if form.instance.status in ['IN_PROGRESS', 'CHANGES_REQUESTED']:
-            form.instance.start_date = timezone.now().date()
-            form.instance.end_date = form.instance.start_date + datetime.timedelta(days=365)
-        return super().form_valid(form)
-
+            start = form.cleaned_data.get('start_date')
+            form.instance.start_date = start
+            if start:
+                form.instance.end_date = start + datetime.timedelta(days=365)
+        else:
+            form.instance.start_date = None
+            form.instance.end_date = None
+            
+        response = super().form_valid(form)
+        
+        # GATILHO DE E-MAIL: Avisa a dupla (Aluno e Orientador)
+        status_nome = form.instance.get_status_display()
+        send_mail(
+            subject=f"Odin: Resultado CEPE - {status_nome}",
+            message=f"Olá,\n\nA CEPE finalizou o julgamento do projeto '{form.instance.title}'.\n\nResultado Final: {status_nome}.\n\nAcesse o sistema Odin para ler os comentários detalhados e verificar os próximos passos da sua pesquisa.\n\nAtenciosamente,\nComitê de Pesquisa",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[form.instance.student.email, form.instance.advisor.email],
+            fail_silently=True,
+        )
+        return response
     # --- VISÃO DA CEPE (Comitê) ---
 class CEPEListView(ProfessorRequiredMixin, ListView):
     """Painel completo da CEPE"""
@@ -609,7 +640,6 @@ class CEPEListView(ProfessorRequiredMixin, ListView):
         return context
         
 class CEPEAssignReviewerView(ProfessorRequiredMixin, UpdateView):
-    """PASSO 4: CEPE designa quem será o ad-hoc"""
     model = ScientificProject
     form_class = CEPEAssignReviewerForm
     template_name = 'odin/generic_form.html'
@@ -619,8 +649,18 @@ class CEPEAssignReviewerView(ProfessorRequiredMixin, UpdateView):
         return ScientificProject.objects.filter(status='SUBMITTED_CEPE')
 
     def form_valid(self, form):
-        form.instance.status = 'UNDER_REVIEW' # Dispara para o parecerista
-        return super().form_valid(form)
+        form.instance.status = 'UNDER_REVIEW'
+        response = super().form_valid(form)
+        
+        # GATILHO DE E-MAIL: Avisa o Parecerista
+        send_mail(
+            subject='Odin: Designação de Parecer Ad-hoc',
+            message=f"Olá Prof. {form.instance.reviewer.first_name},\n\nA CEPE designou você como parecerista técnico ad-hoc para o projeto de Iniciação Científica '{form.instance.title}'.\n\nPor favor, acesse a aba 'Meus Pareceres' no sistema Odin para baixar a proposta e emitir sua avaliação técnica.\n\nAtenciosamente,\nComitê de Pesquisa",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[form.instance.reviewer.email],
+            fail_silently=True,
+        )
+        return response
 
 class CEPEChangeReviewerView(ProfessorRequiredMixin, UpdateView):
     """CEPE troca o parecerista de um projeto que já está em avaliação"""
@@ -661,3 +701,36 @@ class AdvisorICListView(ProfessorRequiredMixin, ListView):
             advisor=self.request.user
         ).exclude(status='PENDING_ADVISOR').order_by('-id')
         return context
+
+class ReviewerRefuseView(ProfessorRequiredMixin, View):
+    """Parecerista recusa o convite e o projeto volta para a fila da CEPE"""
+    
+    def post(self, request, pk, *args, **kwargs):
+        # Garante que o projeto pertence ao usuário logado e está aguardando avaliação
+        project = get_object_or_404(
+            ScientificProject, 
+            pk=pk, 
+            reviewer=request.user, 
+            status='UNDER_REVIEW'
+        )
+        
+        # Remove o parecerista atual e volta o status para a CEPE
+        project.reviewer = None
+        project.status = 'SUBMITTED_CEPE'
+        project.save()
+        
+        messages.success(request, f"Você recusou a avaliação do projeto '{project.title}'. Ele foi devolvido à fila da CEPE.")
+        return redirect('odin:ic_reviewer_list')
+
+class ReviewerICListView(ProfessorRequiredMixin, ListView):
+    """Painel onde o professor visualiza os projetos designados a ele para parecer ad-hoc"""
+    model = ScientificProject
+    template_name = 'odin/ic_reviewer_list.html'
+    context_object_name = 'projects'
+
+    def get_queryset(self):
+        # Traz apenas os projetos que estão na mesa deste professor para avaliar
+        return ScientificProject.objects.filter(
+            reviewer=self.request.user, 
+            status='UNDER_REVIEW'
+        ).order_by('-id')

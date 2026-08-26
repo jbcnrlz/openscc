@@ -956,3 +956,34 @@ def emitirCertificadoAtividade(request, idAtv):
     else:
         messages.error(request, "Não foi possível emitir o certificado. Verifique com a organização se o layout do evento já foi configurado.")
         return redirect('submission:profile')
+
+@login_required
+def solicitar_papel(request, papel):
+    # Verifica se o papel solicitado é válido
+    papeis_validos = ['Professor', 'Aluno', 'Coordenador']
+    if papel not in papeis_validos:
+        messages.error(request, "Papel inválido.")
+        return redirect(request.META.get('HTTP_REFERER', 'submission:confList'))
+
+    # Verifica se o usuário JÁ está nesse grupo (já é Professor/Aluno)
+    if request.user.groups.filter(name=papel).exists():
+        messages.info(request, f"Você já possui o acesso como {papel}.")
+        return redirect(request.META.get('HTTP_REFERER', 'submission:confList'))
+
+    # Tenta criar a solicitação
+    solicitacao_pendente = SolicitacaoAcesso.objects.filter(
+        usuario=request.user, 
+        papel_solicitado=papel, 
+        resolvido=False
+    ).exists()
+
+    if solicitacao_pendente:
+        messages.warning(request, f"Você já tem uma solicitação pendente para ser {papel}. Aguarde a liberação.")
+    else:
+        SolicitacaoAcesso.objects.create(
+            usuario=request.user,
+            papel_solicitado=papel
+        )
+        messages.success(request, f"Sua solicitação para acesso como {papel} foi enviada à administração.")
+
+    return redirect(request.META.get('HTTP_REFERER', 'submission:confList'))

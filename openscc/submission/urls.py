@@ -41,6 +41,7 @@ urlpatterns = [
      path('certificado/<uuid:codigo>/pdf/', views.gerarPdfCertificado, name='gerarPdfCertificado'),
      path('validar-certificado/<uuid:codigo_validacao>/', views.validarCertificado, name='validarCertificado'),
      path('atividade/<int:idAtv>/emitir-certificado/', views.emitirCertificadoAtividade, name='emitirCertificadoAtividade'),
+     path('solicitar-acesso/<str:papel>/', views.solicitar_papel, name='solicitar_papel'),
      #path('certificado/emitir/<int:atividade_id>/', views.emitirCertificado, name='emitirCertificado'),
      #path('certificado/<uuid:codigo_validacao>/pdf/', views.gerarPdfCertificado, name='gerarPdfCertificado'),
      #path('admin/certificados/relatorio/', views.relatorioCertificados, name='relatorioCertificados'),

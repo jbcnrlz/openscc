@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Group
 from django.http import HttpResponseRedirect, HttpResponse # <-- 1. Adicionado HttpResponse
 from django.contrib import admin, messages
 from .models import *
@@ -542,3 +543,29 @@ class CertificadoAdmin(admin.ModelAdmin):
         )
     acoes.short_description = 'Ações'
 """
+@admin.action(description='Aprovar solicitações e conceder papéis')
+def aprovar_solicitacoes_acesso(modeladmin, request, queryset):
+    """
+    Aprova as solicitações selecionadas e adiciona o usuário ao Grupo do Django.
+    """
+    pendentes = queryset.filter(resolvido=False)
+    
+    for solicitacao in pendentes:
+        # Busca ou cria o Grupo (ex: "Professor" ou "Aluno")
+        grupo, created = Group.objects.get_or_create(name=solicitacao.papel_solicitado)
+        
+        # Adiciona o usuário ao grupo
+        solicitacao.usuario.groups.add(grupo)
+        
+        # Marca a solicitação como resolvida
+        solicitacao.resolvido = True
+        solicitacao.save()
+        
+    messages.success(request, f"{pendentes.count()} solicitações aprovadas com sucesso. Acessos liberados!")
+
+@admin.register(SolicitacaoAcesso)
+class SolicitacaoAcessoAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'papel_solicitado', 'data_solicitacao', 'resolvido')
+    list_filter = ('resolvido', 'papel_solicitado')
+    search_fields = ('usuario__username', 'usuario__first_name')
+    actions = [aprovar_solicitacoes_acesso]

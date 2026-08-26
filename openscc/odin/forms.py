@@ -199,13 +199,31 @@ class ICProjectCreateForm(forms.ModelForm):
         model = ScientificProject
         fields = ['title', 'advisor']
         
+        labels = {
+            'title': 'Título da Pesquisa',
+            'advisor': 'Professor Orientador'
+        }
+        
+        # É ISSO AQUI QUE FAZ O CAMPO ESTICAR NA TELA
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Ex: Análise de Redes Neurais aplicadas a...'
+            }),
+            'advisor': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+        }
+        
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtra a lista para mostrar APENAS usuários do grupo "Professor"
         self.fields['advisor'].queryset = User.objects.filter(
             groups__name="Professor", 
             is_active=True
         ).order_by('first_name')
+
+        # 2. MUDANÇA AQUI: Troca o 'username' pelo Nome Completo na lista
+        self.fields['advisor'].label_from_instance = lambda obj: f"Prof. {obj.get_full_name()}" if obj.get_full_name() else f"Prof. {obj.username}"
 
 # 2. Formulário do Aluno (Fase 2: Submissão do Arquivo)
 class ICProjectSubmitForm(forms.ModelForm):
@@ -248,13 +266,21 @@ class ReviewerEvaluationForm(forms.ModelForm):
 class CEPEDecisionForm(forms.ModelForm):
     class Meta:
         model = ScientificProject
-        fields = ['status', 'cepe_feedback']
+        fields = ['status', 'start_date', 'cepe_feedback']
+        
+        labels = {
+            'status': 'Veredito Final',
+            'start_date': 'Data de Início da Vigência',
+            'cepe_feedback': 'Observações / Justificativa',
+        }
+        
         widgets = {
             'status': forms.Select(attrs={'class': 'form-select fw-bold border-primary mb-3'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control mb-3', 'type': 'date'}),
             'cepe_feedback': forms.Textarea(attrs={
                 'class': 'form-control', 
                 'rows': 4, 
-                'placeholder': 'Justificativa ou observações finais da CEPE (Opcional caso deferido, obrigatório caso indeferido)...'
+                'placeholder': 'Justificativa ou observações finais da CEPE (Obrigatório caso indeferido)...'
             }),
         }
         
@@ -266,6 +292,22 @@ class CEPEDecisionForm(forms.ModelForm):
             ('CHANGES_REQUESTED', 'Deferido com Ressalvas'),
             ('REJECTED', 'Indeferido (Rejeitado)'),
         ]
+        
+        # A data de início não é estritamente obrigatória no banco, 
+        # nós vamos controlá-la via regra de negócio no clean()
+        self.fields['start_date'].required = False 
+
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        start_date = cleaned_data.get('start_date')
+
+        # Regra: Se a CEPE aprovar, ela é obrigada a informar quando começa
+        if status in ['IN_PROGRESS', 'CHANGES_REQUESTED']:
+            if not start_date:
+                self.add_error('start_date', 'Você deve definir a data de início para projetos deferidos.')
+                
+        return cleaned_data
 
 class ICFinalReportForm(forms.ModelForm):
     class Meta:
