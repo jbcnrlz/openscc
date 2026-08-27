@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Submeter Arquivo - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-cloud-arrow-up text-success me-2"></i> Submissão de Proposta</h3>
+        <p class="text-muted mb-0">Envie o documento final da sua pesquisa para avaliação.</p>
+    </div>
+    <a href="{% url 'odin:ic_student_list' %}" class="btn btn-outline-secondary fw-medium shadow-sm">
+        <i class="bi bi-arrow-left me-1"></i> Cancelar
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-8">
+        
+        <div class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 shadow-sm mb-4">
+            <h6 class="fw-bold text-success mb-1"><i class="bi bi-check-circle-fill me-2"></i>Orientador Confirmado!</h6>
+            <p class="small mb-0 ms-4">O Prof. <strong>{{ object.advisor.first_name }} {{ object.advisor.last_name }}</strong> aceitou orientar seu projeto. Por favor, anexe o arquivo PDF da proposta abaixo para encaminhamento à CEPE.</p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-0">
+                    <!-- Cabeçalho do Card com Resumo do Projeto -->
+                    <div class="bg-light p-4 border-bottom rounded-top">
+                        <span class="badge bg-primary mb-2">Projeto de Pesquisa</span>
+                        <h5 class="fw-bold text-dark mb-0">{{ object.title }}</h5>
+                    </div>
+
+                    <div class="p-5">
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <!-- ÁREA DE UPLOAD MODERNA -->
+                        <div class="upload-container position-relative">
+                            <div class="upload-area p-5 text-center border rounded-4 bg-light" id="dropzone">
+                                
+                                <!-- O input invisível que cobre toda a área -->
+                                {{ form.project_file }}
+                                
+                                <!-- Elementos Visuais -->
+                                <div class="upload-icon mb-3">
+                                    <i class="bi bi-file-earmark-pdf-fill text-danger" style="font-size: 3rem;"></i>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-1" id="file-name-display">Clique aqui para selecionar o arquivo</h5>
+                                <p class="text-muted small mb-0">Ou arraste e solte o seu PDF aqui. Tamanho máximo recomendado: 10MB.</p>
+                                
+                                <!-- Erros do campo -->
+                                {% if form.project_file.errors %}
+                                    <div class="text-danger small mt-3 fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>{{ form.project_file.errors|striptags }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- BARRA DE AÇÕES FIXA -->
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="{% url 'odin:ic_student_list' %}" class="btn btn-light px-4 py-2 fw-bold text-secondary border shadow-sm">Voltar</a>
+                <button type="submit" class="btn btn-success px-5 py-2 fw-bold shadow-sm">
+                    <i class="bi bi-send-fill me-2"></i> Enviar para a CEPE
+                </button>
+            </div>
+            
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Estilização da Dropzone */
+    .upload-area {
+        border: 2px dashed #0d6efd !important;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .upload-area:hover, .upload-area.dragover {
+        background-color: #e9ecef !important;
+        border-color: #0a58ca !important;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
+    }
+
+    /* Esconde a feiura do input file, mas o mantém clicável sobre toda a div */
+    .upload-area input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 10;
+    }
+</style>
+
+<script>
+    // Script simples para capturar o nome do arquivo e atualizar o texto na tela
+    document.addEventListener("DOMContentLoaded", function() {
+        const fileInput = document.querySelector('.upload-area input[type="file"]');
+        const display = document.getElementById('file-name-display');
+        const dropzone = document.getElementById('dropzone');
+
+        fileInput.addEventListener('change', function(e) {
+            if (this.files && this.files.length > 0) {
+                // Pega o nome do arquivo selecionado
+                let fileName = this.files[0].name;
+                display.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-2"></i> ${fileName} selecionado!</span>`;
+                dropzone.style.borderColor = '#198754'; // Fica verde
+                dropzone.style.backgroundColor = '#f8fff9';
+            }
+        });
+
+        // Efeitos visuais ao arrastar (Drag and Drop UI)
+        fileInput.addEventListener('dragenter', () => dropzone.classList.add('dragover'));
+        fileInput.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        fileInput.addEventListener('drop', () => dropzone.classList.remove('dragover'));
+    });
+</script>
+{% endblock %}

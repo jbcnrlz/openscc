@@ -75,7 +75,7 @@ urlpatterns = [
     # (Futuro) path('ic/<int:pk>/relatorio/', views.StudentICReportView.as_view(), name='ic_student_report'),
 
     # --- 2. Visão do Orientador ---
-    path('ic/orientacoes-pendentes/', views.AdvisorPendingListView.as_view(), name='ic_advisor_list'),
+    path('ic/orientacoes-pendentes/', views.AdvisorICListView.as_view(), name='ic_advisor_list'),
     path('ic/<int:pk>/aceitar/', views.AdvisorAcceptView.as_view(), name='ic_advisor_accept'),
     # --- 3. Visão da CEPE (Comitê) ---
     path('ic/cepe/painel/', views.CEPEListView.as_view(), name='ic_cepe_list'),
@@ -88,4 +88,9 @@ urlpatterns = [
     path('ic/cepe/<int:pk>/designar/', views.CEPEAssignReviewerView.as_view(), name='ic_cepe_assign'),
     path('ic/cepe/<int:pk>/alterar-parecerista/', views.CEPEChangeReviewerView.as_view(), name='ic_cepe_change_reviewer'), # <--- NOVA ROTA
     path('ic/cepe/<int:pk>/julgar/', views.CEPEDecisionView.as_view(), name='ic_cepe_decision'),
+
+    # --- 4. Visão do Parecerista Ad-hoc ---
+    path('ic/parecerista/painel/', views.ReviewerICListView.as_view(), name='ic_reviewer_list'),
+    path('ic/parecerista/<int:pk>/avaliar/', views.ReviewerEvaluateView.as_view(), name='ic_reviewer_evaluate'),
+    path('ic/parecerista/<int:pk>/recusar/', views.ReviewerRefuseView.as_view(), name='ic_reviewer_refuse'), # <--- NOVA ROTA AQUI
 ]

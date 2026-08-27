@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block title %}Iniciar Projeto de IC - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-rocket-takeoff text-primary me-2"></i> Iniciar Projeto de Pesquisa</h3>
+        <p class="text-muted mb-0">Cadastre o título da sua pesquisa e convide um professor orientador.</p>
+    </div>
+    <a href="{% url 'odin:ic_student_list' %}" class="btn btn-outline-secondary fw-medium shadow-sm">
+        <i class="bi bi-arrow-left me-1"></i> Voltar para Meus Projetos
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-8">
+        
+        <!-- Alerta Orientativo -->
+        <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 shadow-sm mb-4 d-flex align-items-start">
+            <i class="bi bi-info-circle-fill fs-4 text-primary me-3 mt-1"></i>
+            <div>
+                <h6 class="fw-bold text-primary mb-1">Passo 1: Identificação e Orientação</h6>
+                <p class="small mb-0 text-dark">Defina um título provisório para a sua pesquisa e selecione o professor que aceitou lhe orientar. <strong>Importante:</strong> Recomendamos que você converse com o professor pessoalmente antes de enviar este convite formal pelo sistema.</p>
+            </div>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4 p-md-5">
+                    
+                    <!-- Campo 1: Título do Projeto (Destacado) -->
+                    <div class="mb-5">
+                        <label for="{{ form.title.id_for_label }}" class="form-label fw-bold text-dark fs-5 mb-3">
+                            Qual será o título da sua pesquisa?
+                        </label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-white border-end-0 px-4"><i class="bi bi-fonts text-muted"></i></span>
+                            {{ form.title }}
+                        </div>
+                        <div class="form-text mt-2 text-muted"><i class="bi bi-lightbulb me-1"></i> Você poderá alterar o título depois, junto com seu orientador.</div>
+                        {% if form.title.errors %}
+                            <div class="text-danger small mt-2 fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>{{ form.title.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <hr class="text-muted opacity-25 mb-5">
+
+                    <!-- Campo 2: Orientador (Em formato de card interno) -->
+                    <div class="bg-light p-4 rounded-4 border">
+                        <label for="{{ form.advisor.id_for_label }}" class="form-label fw-bold text-dark mb-3">
+                            <i class="bi bi-person-badge text-primary me-2"></i> Quem será o seu Professor Orientador?
+                        </label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            {{ form.advisor }}
+                        </div>
+                        <div class="form-text mt-2 text-muted">Apenas professores ativos e habilitados pela CEPE aparecem nesta lista.</div>
+                        {% if form.advisor.errors %}
+                            <div class="text-danger small mt-2 fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>{{ form.advisor.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- BARRA DE AÇÕES FIXA -->
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="{% url 'odin:ic_student_list' %}" class="btn btn-light px-4 py-2 fw-bold text-secondary border shadow-sm hover-lift">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-5 py-2 fw-bold shadow-sm hover-lift">
+                    <i class="bi bi-envelope-paper me-2"></i> Enviar Convite ao Orientador
+                </button>
+            </div>
+            
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Estilos para deixar os inputs mais elegantes e "conectados" com os ícones */
+    .input-group-text { border-right: none; }
+    .input-group .form-control, .input-group .form-select { 
+        border-left: none; 
+        padding-left: 0; 
+    }
+    .input-group .form-control:focus, .input-group .form-select:focus { 
+        border-color: #dee2e6; 
+        box-shadow: none; 
+        background-color: transparent;
+    }
+    
+    /* Efeito de foco global no input-group */
+    .input-group:focus-within {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+        border-radius: 0.5rem;
+    }
+    .input-group:focus-within .input-group-text, 
+    .input-group:focus-within .form-control, 
+    .input-group:focus-within .form-select {
+        border-color: #86b7fe;
+    }
+
+    /* Ajuste para o tamanho Large (Título) */
+    .input-group-lg:focus-within {
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}

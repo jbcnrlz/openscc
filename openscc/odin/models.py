@@ -266,8 +266,13 @@ class VestibularCampaign(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='campaigns')
     name = models.CharField(max_length=150, verbose_name="Nome da Campanha (Ex: Vestibular 2026/1)")
     
-    start_date = models.DateField(verbose_name="Data de Início das Inscrições")
-    end_date = models.DateField(verbose_name="Data de Encerramento")
+    # 1. Período da Campanha (Captação)
+    start_date = models.DateField(verbose_name="Início da Captação")
+    end_date = models.DateField(verbose_name="Fim da Campanha")
+    
+    # 2. Período Oficial de Inscrições (NOVO)
+    inscription_start_date = models.DateField(null=True, blank=True, verbose_name="Início das Inscrições")
+    inscription_end_date = models.DateField(null=True, blank=True, verbose_name="Fim das Inscrições")
     
     # Restrições do Modelo de Otimização
     vacancies = models.PositiveIntegerField(verbose_name="Vagas Disponíveis")
@@ -284,6 +289,13 @@ class VestibularCampaign(models.Model):
         related_name='my_campaigns',
         null=True, 
         blank=True
+    )
+
+    collaborators = models.ManyToManyField(
+        User,
+        related_name='collaborating_campaigns',
+        blank=True,
+        verbose_name="Colaboradores"
     )
 
     class Meta:
