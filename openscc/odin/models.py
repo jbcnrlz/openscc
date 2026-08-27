@@ -455,7 +455,18 @@ class CampaignAction(models.Model):
         ('CANCELLED', 'Cancelada'),
     ]
 
-    campaign = models.ForeignKey(VestibularCampaign, on_delete=models.CASCADE, related_name='actions')
+    campaign = models.ForeignKey(
+        VestibularCampaign, 
+        on_delete=models.CASCADE, 
+        related_name='actions',
+        null=True,   # <--- Adicionado
+        blank=True   # <--- Adicionado
+    )
+
+    is_global = models.BooleanField(
+        default=False,
+        verbose_name="Ação Global (Válida para todas as campanhas)"
+    )
     
     title = models.CharField(max_length=200, verbose_name="Título da Ação (Ex: Feira na Escola Estadual)")
     description = models.TextField(verbose_name="Descrição e Objetivos", blank=True)
@@ -503,7 +514,13 @@ class ActionPhoto(models.Model):
 
 class CampaignLead(models.Model):
     """Base Central de Interessados (Pré-inscrição)"""
-    campaign = models.ForeignKey(VestibularCampaign, on_delete=models.CASCADE, related_name='leads')
+    campaign = models.ForeignKey(
+        VestibularCampaign, 
+        on_delete=models.CASCADE, 
+        related_name='leads',
+        null=True,   # <--- Adicionado
+        blank=True   # <--- Adicionado
+    )
     
     # Rastreabilidade: de onde essa pessoa veio?
     source_action = models.ForeignKey(CampaignAction, on_delete=models.SET_NULL, null=True, blank=True, related_name='captured_leads', verbose_name="Ação de Origem")

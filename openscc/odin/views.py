@@ -301,6 +301,10 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        context['all_actions'] = CampaignAction.objects.filter(
+            Q(campaign=self.object) | Q(is_global=True)
+        ).order_by('scheduled_date')
         
         # Injeta o motor matemático na view
         context['projections'] = self.object.get_yield_projections()
@@ -346,9 +350,14 @@ class CampaignActionCreateView(ProfessorRequiredMixin, CreateView):
     template_name = 'odin/generic_form.html'
     
     def form_valid(self, form):
-        # Vincula a ação à campanha atual da URL
-        campaign = get_object_or_404(VestibularCampaign, id=self.kwargs.get('campaign_id'))
-        form.instance.campaign = campaign
+        # Se marcou como global, deixa a campanha vazia
+        if form.cleaned_data.get('is_global'):
+            form.instance.campaign = None
+        else:
+            # Se não, vincula à campanha da URL normalmente
+            campaign = get_object_or_404(VestibularCampaign, id=self.kwargs.get('campaign_id'))
+            form.instance.campaign = campaign
+            
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -412,7 +421,17 @@ class CampaignLeadCreateView(ProfessorRequiredMixin, CreateView):
     def form_valid(self, form):
         action = get_object_or_404(CampaignAction, id=self.kwargs.get('action_id'), responsible=self.request.user)
         form.instance.source_action = action
-        form.instance.campaign = action.campaign # O lead pertence à campanha matriz
+        
+        if action.is_global:
+            # ROTEAMENTO INTELIGENTE: Busca a campanha ativa mais recente do curso que o aluno escolheu
+            if form.instance.interested_course:
+                active_campaign = VestibularCampaign.objects.filter(
+                    course=form.instance.interested_course
+                ).order_by('-start_date').first()
+                form.instance.campaign = active_campaign
+        else:
+            form.instance.campaign = action.campaign
+            
         return super().form_valid(form)
 
     def get_success_url(self):
