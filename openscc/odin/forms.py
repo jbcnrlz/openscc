@@ -105,53 +105,74 @@ class CurriculumMatrixForm(forms.ModelForm):
         self.fields['discipline'].queryset = Discipline.objects.all().order_by('name')
 
 class VestibularCampaignForm(forms.ModelForm):
-
-    def __init__(self, *args, **kwargs):
-        # Removemos qualquer exigência de 'user' se existir na view
-        kwargs.pop('user', None) 
-        super().__init__(*args, **kwargs)
-        
-        # MUDANÇA AQUI: Força o campo 'course' a buscar TODOS os cursos do sistema, em ordem alfabética
-        from .models import Course  # Importe caso não esteja no escopo global
-        self.fields['course'].queryset = Course.objects.all().order_by('name')
     class Meta:
         model = VestibularCampaign
-        fields = ['course', 'name', 'start_date', 'end_date', 'vacancies', 'min_inscriptions', 'yield_paid', 'yield_sponsored']
-        widgets = {
-            'course': forms.Select(attrs={'class': 'form-select'}),
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da Campanha'}),
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'vacancies': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-            'min_inscriptions': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-            'yield_paid': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'yield_sponsored': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-        }
-
-# 1. TRADUÇÃO DOS RÓTULOS (LABELS)
+        fields = [
+            'course', 'name', 'collaborators',
+            'start_date', 'end_date', 
+            'inscription_start_date', 'inscription_end_date', 
+            'vacancies', 'min_inscriptions', 'yield_paid', 'yield_sponsored'
+        ]
+        
         labels = {
             'course': 'Curso Referência',
             'name': 'Nome da Campanha',
-            'start_date': 'Data de Início',
-            'end_date': 'Data de Encerramento',
+            'start_date': 'Início da Captação (Aquecimento)',
+            'end_date': 'Encerramento Total da Campanha',
+            'inscription_start_date': 'Abertura das Inscrições Oficiais',
+            'inscription_end_date': 'Encerramento das Inscrições Oficiais',
             'vacancies': 'Vagas Ofertadas',
             'min_inscriptions': 'Meta de Inscritos',
             'yield_paid': 'Custo Planejado (Lead Pago)',
             'yield_sponsored': 'Verba de Patrocínio',
+            'collaborators': 'Equipe de Colaboradores (Segure CTRL para selecionar vários)',
         }
         
-        # 2. COMPONENTES VISUAIS (WIDGETS)
         widgets = {
             'course': forms.Select(attrs={'class': 'form-select'}),
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Vestibular de Inverno 2026'}),
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'start_date': forms.DateInput(format='%Y-%m-%d',attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(format='%Y-%m-%d',attrs={'class': 'form-control', 'type': 'date'}),
+            'inscription_start_date': forms.DateInput(format='%Y-%m-%d',attrs={'class': 'form-control', 'type': 'date'}),
+            'inscription_end_date': forms.DateInput(format='%Y-%m-%d',attrs={'class': 'form-control', 'type': 'date'}),
             'vacancies': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'min_inscriptions': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'yield_paid': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'yield_sponsored': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'collaborators': forms.SelectMultiple(attrs={'class': 'form-select', 'size': '4'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('user', None) 
+        super().__init__(*args, **kwargs)
+        from .models import Course
+        self.fields['course'].queryset = Course.objects.all().order_by('name')
+
+        self.fields['collaborators'].queryset = User.objects.filter(
+            groups__name="Professor",
+            is_active=True
+        ).order_by('first_name')
+        self.fields['collaborators'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get('start_date')
+        end = cleaned_data.get('end_date')
+        insc_start = cleaned_data.get('inscription_start_date')
+        insc_end = cleaned_data.get('inscription_end_date')
+
+        # Travas lógicas de cronograma
+        if start and end and start > end:
+            self.add_error('end_date', 'O fim da campanha não pode ser antes do início.')
+            
+        if insc_start and insc_end and insc_start > insc_end:
+            self.add_error('inscription_end_date', 'O fim das inscrições não pode ser antes do início.')
+            
+        if start and insc_start and insc_start < start:
+            self.add_error('inscription_start_date', 'As inscrições não podem ser abertas antes do início da captação.')
+
+        return cleaned_data
+    
 class CampaignDailyRecordForm(forms.ModelForm):
     class Meta:
         model = CampaignDailyRecord

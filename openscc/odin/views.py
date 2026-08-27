@@ -11,6 +11,7 @@ from django.shortcuts import redirect
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db.models import Q
 
 class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """Garante que o usuário logado seja um Aluno"""
@@ -64,8 +65,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['total_courses'] = Course.objects.filter(professor=user).count()
             context['total_disciplines'] = Discipline.objects.count() # Catálogo Global
             context['active_ppcs'] = PPCProposal.objects.filter(course__professor=user, is_active=True).count()
-            context['active_campaigns'] = VestibularCampaign.objects.filter(created_by=user).count()
-            
+            context['active_campaigns'] = VestibularCampaign.objects.filter(
+                Q(created_by=user) | Q(collaborators=user)
+            ).distinct().count()
             # ==========================================
             # MÉTRICAS DE PESQUISA (Orientação e Ad-hoc)
             # ==========================================
@@ -273,8 +275,9 @@ class VestibularCampaignListView(ProfessorRequiredMixin, ListView):
     context_object_name = 'campaigns'
 
     def get_queryset(self):
-        return VestibularCampaign.objects.filter(created_by=self.request.user).order_by('-start_date')
-    
+        return VestibularCampaign.objects.filter(
+            Q(created_by=self.request.user) | Q(collaborators=self.request.user)
+        ).distinct().order_by('-start_date')
 class VestibularCampaignCreateView(ProfessorRequiredMixin, CreateView):
     model = VestibularCampaign
     form_class = VestibularCampaignForm
@@ -292,7 +295,9 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
     context_object_name = 'campaign'
 
     def get_queryset(self):
-        return VestibularCampaign.objects.filter(course__professor=self.request.user)
+        return VestibularCampaign.objects.filter(
+            Q(created_by=self.request.user) | Q(collaborators=self.request.user)
+        ).distinct()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
