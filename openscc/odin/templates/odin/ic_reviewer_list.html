@@ -10,38 +10,90 @@
     </div>
 </div>
 
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i>{{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="row g-4">
-    {% for project in projects %}
+    {% for project in projects|default:object_list %}
     <div class="col-md-6">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
             <div class="card-body p-4">
-                <span class="badge bg-warning text-dark mb-2">Aguardando Avaliação</span>
+                <span class="badge bg-warning text-dark mb-3"><i class="bi bi-hourglass-split me-1"></i> Aguardando Avaliação</span>
                 <h5 class="fw-bold text-dark mb-3">{{ project.title }}</h5>
                 
                 <p class="text-muted small mb-4">
-                    <strong>Aluno(a):</strong> {{ project.student.get_full_name }}<br>
-                    <strong>Orientador(a):</strong> Prof. {{ project.advisor.get_full_name }}
+                    <strong>Aluno(a):</strong> {{ project.student.get_full_name|default:project.student.username }}<br>
+                    <strong>Orientador(a):</strong> Prof. {{ project.advisor.get_full_name|default:project.advisor.username }}
                 </p>
 
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center mt-auto border-top pt-3">
+                    
                     {% if project.project_file %}
-                        <a href="{{ project.project_file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                        <a href="{{ project.project_file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Baixar Proposta">
                             <i class="bi bi-download me-1"></i> Baixar Proposta
                         </a>
+                    {% else %}
+                        <div></div> 
                     {% endif %}
                     
-                    <a href="{% url 'odin:ic_reviewer_evaluate' project.id %}" class="btn btn-success fw-bold">
-                        <i class="bi bi-pencil-square me-1"></i> Emitir Parecer
-                    </a>
+                    <div class="d-flex gap-2">
+                        <!-- Botão que apenas ABRE o modal de recusa (sem o onclick js antigo) -->
+                        <button type="button" class="btn btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#recusarModal{{ project.id }}">
+                            <i class="bi bi-x-circle me-1"></i> Recusar
+                        </button>
+
+                        <!-- Botão de Avaliar -->
+                        <a href="{% url 'odin:ic_reviewer_evaluate' project.id %}" class="btn btn-success fw-bold">
+                            <i class="bi bi-pencil-square me-1"></i> Emitir Parecer
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO DE RECUSA (Específico para este projeto) -->
+    <div class="modal fade" id="recusarModal{{ project.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white border-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon-fill me-2"></i> Confirmar Devolução</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <i class="bi bi-arrow-return-left text-danger opacity-50 mb-3" style="font-size: 3rem;"></i>
+                    <h5 class="text-dark fw-bold mb-2">Tem certeza que deseja recusar?</h5>
+                    <p class="text-muted mb-0">O projeto <strong>"{{ project.title }}"</strong> será removido da sua lista e devolvido imediatamente para a fila de distribuição da CEPE.</p>
+                </div>
+                <div class="modal-footer bg-light border-0 d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-secondary px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+                    
+                    <!-- O Formulário de fato foi movido para DENTRO do modal -->
+                    <form method="post" action="{% url 'odin:ic_reviewer_refuse' project.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">
+                            Sim, Recusar Avaliação
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FIM DO MODAL -->
+
     {% empty %}
     <div class="col-12 text-center py-5">
-        <div class="text-muted opacity-50 mb-3"><i class="bi bi-emoji-smile fs-1"></i></div>
+        <div class="text-muted opacity-50 mb-3"><i class="bi bi-emoji-smile fs-1" style="font-size: 3rem;"></i></div>
         <h5 class="fw-bold text-dark">Nenhum parecer pendente</h5>
-        <p class="text-muted">Você não possui projetos aguardando sua avaliação no momento.</p>
+        <p class="text-muted">A CEPE ainda não distribuiu nenhum novo projeto para você avaliar.</p>
     </div>
     {% endfor %}
 </div>

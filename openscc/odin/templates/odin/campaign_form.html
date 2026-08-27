@@ -11,7 +11,7 @@
             <i class="bi bi-bullseye text-info me-2"></i>
             {% if form.instance.pk %}Editar Campanha: {{ form.instance.name }}{% else %}Configurar Nova Campanha{% endif %}
         </h3>
-        <p class="text-muted mb-0">Configure os parâmetros do vestibular e as metas de captação (Yield Management).</p>
+        <p class="text-muted mb-0">Configure os parâmetros do vestibular e a equipe de captação (Yield Management).</p>
     </div>
     <a href="{% url 'odin:campaign_list' %}" class="btn btn-outline-secondary fw-medium shadow-sm">
         <i class="bi bi-arrow-left me-1"></i> Voltar para Lista
@@ -31,20 +31,20 @@
             </div>
             {% endif %}
 
-            <!-- SEÇÃO 1: INFORMAÇÕES BÁSICAS -->
+            <!-- SEÇÃO 1: INFORMAÇÕES BÁSICAS E EQUIPE -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
                     <h6 class="fw-bold text-uppercase text-muted mb-0" style="letter-spacing: 0.5px;">1. Identificação da Campanha</h6>
                 </div>
                 <div class="card-body p-4">
-                    <div class="row g-4">
+                    <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">{{ form.course.label }}</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-mortarboard text-muted"></i></span>
                                 {{ form.course }}
                             </div>
-                            {% if form.course.errors %}<div class="text-danger small mt-1">{{ form.course.errors|striptags }}</div>{% endif %}
+                            {% if form.course.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.course.errors|striptags }}</div>{% endif %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">{{ form.name.label }}</label>
@@ -53,7 +53,21 @@
                                 {{ form.name }}
                             </div>
                             <div class="form-text small">Ex: Vestibular de Inverno 2026</div>
-                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors|striptags }}</div>{% endif %}
+                            {% if form.name.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.name.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <!-- BLOCO DE COLABORADORES -->
+                    <hr class="text-muted opacity-25 mb-4">
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark"><i class="bi bi-people-fill text-primary me-1"></i> {{ form.collaborators.label }}</label>
+                            {{ form.collaborators }}
+                            <div class="form-text small mt-2">Os colaboradores selecionados poderão visualizar e adicionar dados a esta campanha.</div>
+                            {% if form.collaborators.errors %}
+                                <div class="text-danger small mt-1 fw-bold">{{ form.collaborators.errors|striptags }}</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -62,27 +76,54 @@
             <!-- SEÇÃO 2: CRONOGRAMA -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
-                    <h6 class="fw-bold text-uppercase text-muted mb-0" style="letter-spacing: 0.5px;">2. Cronograma de Abertura</h6>
+                    <h6 class="fw-bold text-uppercase text-muted mb-0" style="letter-spacing: 0.5px;">2. Cronograma de Captação e Inscrições</h6>
                 </div>
                 <div class="card-body p-4">
-                    <div class="row g-4">
+                    
+                    <!-- Bloco A: Captação/Marketing -->
+                    <h6 class="fw-bold text-dark mb-3 small"><i class="bi bi-megaphone text-warning me-1"></i> Período de Captação (Mídia e Aquecimento)</h6>
+                    <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">{{ form.start_date.label }}</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-event text-success"></i></span>
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-play-circle text-success"></i></span>
                                 {{ form.start_date }}
                             </div>
-                            {% if form.start_date.errors %}<div class="text-danger small mt-1">{{ form.start_date.errors|striptags }}</div>{% endif %}
+                            {% if form.start_date.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.start_date.errors|striptags }}</div>{% endif %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">{{ form.end_date.label }}</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-x text-danger"></i></span>
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-stop-circle text-danger"></i></span>
                                 {{ form.end_date }}
                             </div>
-                            {% if form.end_date.errors %}<div class="text-danger small mt-1">{{ form.end_date.errors|striptags }}</div>{% endif %}
+                            {% if form.end_date.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.end_date.errors|striptags }}</div>{% endif %}
                         </div>
                     </div>
+
+                    <hr class="text-muted opacity-25 mb-4">
+
+                    <!-- Bloco B: Inscrições Oficiais -->
+                    <h6 class="fw-bold text-dark mb-3 small"><i class="bi bi-pencil-square text-primary me-1"></i> Período de Inscrições (Abertura do Sistema)</h6>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.inscription_start_date.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-event text-primary"></i></span>
+                                {{ form.inscription_start_date }}
+                            </div>
+                            {% if form.inscription_start_date.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.inscription_start_date.errors|striptags }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">{{ form.inscription_end_date.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-check text-dark"></i></span>
+                                {{ form.inscription_end_date }}
+                            </div>
+                            {% if form.inscription_end_date.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.inscription_end_date.errors|striptags }}</div>{% endif %}
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -94,14 +135,14 @@
                 <div class="card-body p-4">
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">{{ form.vacancies.label }} (Total de Vagas)</label>
+                            <label class="form-label fw-semibold text-dark">{{ form.vacancies.label }}</label>
                             {{ form.vacancies }}
-                            {% if form.vacancies.errors %}<div class="text-danger small mt-1">{{ form.vacancies.errors|striptags }}</div>{% endif %}
+                            {% if form.vacancies.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.vacancies.errors|striptags }}</div>{% endif %}
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">{{ form.min_inscriptions.label }} (Inscritos Esperados)</label>
+                            <label class="form-label fw-semibold text-dark">{{ form.min_inscriptions.label }}</label>
                             {{ form.min_inscriptions }}
-                            {% if form.min_inscriptions.errors %}<div class="text-danger small mt-1">{{ form.min_inscriptions.errors|striptags }}</div>{% endif %}
+                            {% if form.min_inscriptions.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.min_inscriptions.errors|striptags }}</div>{% endif %}
                         </div>
                     </div>
                     
@@ -115,7 +156,7 @@
                                 {{ form.yield_paid }}
                             </div>
                             <div class="form-text small">Custo máximo planejado por Lead pago.</div>
-                            {% if form.yield_paid.errors %}<div class="text-danger small mt-1">{{ form.yield_paid.errors|striptags }}</div>{% endif %}
+                            {% if form.yield_paid.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.yield_paid.errors|striptags }}</div>{% endif %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">{{ form.yield_sponsored.label }}</label>
@@ -124,7 +165,7 @@
                                 {{ form.yield_sponsored }}
                             </div>
                             <div class="form-text small">Verba de patrocínio destinada.</div>
-                            {% if form.yield_sponsored.errors %}<div class="text-danger small mt-1">{{ form.yield_sponsored.errors|striptags }}</div>{% endif %}
+                            {% if form.yield_sponsored.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.yield_sponsored.errors|striptags }}</div>{% endif %}
                         </div>
                     </div>
                 </div>
@@ -149,12 +190,27 @@
     .input-group .form-control:focus, .input-group .form-select:focus { 
         border-color: #dee2e6; 
         box-shadow: none; 
+        background-color: transparent;
     }
+    
+    /* Trava de segurança para garantir esticamento do input dentro do grupo */
+    .input-group > input, 
+    .input-group > select {
+        flex: 1 1 auto !important;
+        width: 1% !important;
+        border-left: none; 
+        padding-left: 0; 
+    }
+
     .input-group:focus-within {
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         border-radius: 0.375rem;
     }
-    .input-group:focus-within .input-group-text, .input-group:focus-within .form-control, .input-group:focus-within .form-select {
+    .input-group:focus-within .input-group-text, 
+    .input-group:focus-within .form-control, 
+    .input-group:focus-within .form-select,
+    .input-group:focus-within > input,
+    .input-group:focus-within > select {
         border-color: #86b7fe;
     }
 </style>

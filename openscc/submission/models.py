@@ -626,3 +626,25 @@ class Certificado(models.Model):
         buffer = BytesIO()
         img.save(buffer, format="PNG")
         return buffer.getvalue()
+
+class SolicitacaoAcesso(models.Model):
+    PAPEIS_CHOICES = [
+        ('Professor', 'Professor'),
+        ('Aluno', 'Aluno'),
+        ('Coordenador', 'Coordenador'),
+    ]
+    
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="solicitacoes_acesso")
+    papel_solicitado = models.CharField(max_length=50, choices=PAPEIS_CHOICES)
+    data_solicitacao = models.DateTimeField(auto_now_add=True)
+    resolvido = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Solicitação de Acesso"
+        verbose_name_plural = "Solicitações de Acesso"
+        # Evita que o usuário faça spam de solicitações para o mesmo papel
+        unique_together = ['usuario', 'papel_solicitado', 'resolvido']
+
+    def __str__(self):
+        status = "Resolvido" if self.resolvido else "Pendente"
+        return f"{self.usuario.username} quer ser {self.papel_solicitado} ({status})"

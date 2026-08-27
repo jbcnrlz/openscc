@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if step == 1 %}Novo Projeto de IC{% else %}Submeter Proposta{% endif %} - Odin
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0">
+            {% if step == 1 %}
+                <i class="bi bi-rocket-takeoff text-primary me-2"></i> Iniciar Projeto de Pesquisa
+            {% else %}
+                <i class="bi bi-cloud-arrow-up text-success me-2"></i> Submissão de Proposta
+            {% endif %}
+        </h3>
+        <p class="text-muted mb-0">Preencha as informações abaixo para prosseguir com o fluxo da CEPE.</p>
+    </div>
+    <a href="{% url 'odin:ic_student_list' %}" class="btn btn-outline-secondary fw-medium shadow-sm">
+        <i class="bi bi-arrow-left me-1"></i> Voltar para Meus Projetos
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-8">
+        
+        <!-- Alerta de Orientação -->
+        {% if step == 1 %}
+        <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 shadow-sm mb-4">
+            <h6 class="fw-bold text-primary mb-1"><i class="bi bi-info-circle-fill me-2"></i>Passo 1: Identificação e Orientação</h6>
+            <p class="small mb-0 ms-4">Defina um título provisório para a sua pesquisa e selecione o professor que aceitou lhe orientar. <strong>Importante:</strong> Converse com o professor antes de enviar este convite pelo sistema.</p>
+        </div>
+        {% else %}
+        <div class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 shadow-sm mb-4">
+            <h6 class="fw-bold text-success mb-1"><i class="bi bi-info-circle-fill me-2"></i>Passo 2: Envio do Arquivo</h6>
+            <p class="small mb-0 ms-4">Seu orientador aceitou o convite! Agora, faça o upload do seu projeto escrito. Após o envio, o projeto irá diretamente para a avaliação técnica da CEPE.</p>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-5">
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-4">
+                        {% for field in form %}
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-dark">{{ field.label }}</label>
+                            
+                            <!-- Adiciona pequenos ícones dependendo do campo -->
+                            {% if field.name == 'title' %}
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-type text-muted"></i></span>
+                                    {{ field }}
+                                </div>
+                            {% elif field.name == 'advisor' %}
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-badge text-muted"></i></span>
+                                    {{ field }}
+                                </div>
+                            {% else %}
+                                {{ field }}
+                            {% endif %}
+                            
+                            {% if field.help_text %}
+                            <div class="form-text small mt-1">{{ field.help_text }}</div>
+                            {% endif %}
+                            
+                            {% if field.errors %}
+                            <div class="text-danger small mt-1 fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- BARRA DE AÇÕES FIXA -->
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="{% url 'odin:ic_student_list' %}" class="btn btn-light px-4 py-2 fw-bold text-secondary border shadow-sm">Cancelar</a>
+                <button type="submit" class="btn {% if step == 1 %}btn-primary{% else %}btn-success{% endif %} px-5 py-2 fw-bold shadow-sm">
+                    {% if step == 1 %}
+                        <i class="bi bi-envelope-paper me-2"></i> Enviar Convite ao Orientador
+                    {% else %}
+                        <i class="bi bi-cloud-upload me-2"></i> Submeter Projeto à CEPE
+                    {% endif %}
+                </button>
+            </div>
+            
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Estilização para o input-group não ficar com borda dupla no meio */
+    .input-group-text { border-right: none; }
+    .input-group .form-control, .input-group .form-select { border-left: none; padding-left: 0; }
+    .input-group .form-control:focus, .input-group .form-select:focus { 
+        border-color: #dee2e6; 
+        box-shadow: none; 
+    }
+    .input-group:focus-within {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        border-radius: 0.375rem;
+    }
+    .input-group:focus-within .input-group-text, .input-group:focus-within .form-control, .input-group:focus-within .form-select {
+        border-color: #86b7fe;
+    }
+</style>
+{% endblock %}
