@@ -185,9 +185,10 @@ class CampaignDailyRecordForm(forms.ModelForm):
 class CampaignActionForm(forms.ModelForm):
     class Meta:
         model = CampaignAction
-        fields = ['title', 'description', 'scheduled_date', 'location', 'responsible']
+        fields = ['title', 'description', 'scheduled_date', 'location', 'responsible', 'is_global']
         widgets = {
             'scheduled_date': forms.DateInput(attrs={'type': 'date'}),
+            'is_global': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         
     def __init__(self, *args, **kwargs):
