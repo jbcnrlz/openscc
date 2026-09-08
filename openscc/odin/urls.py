@@ -97,5 +97,7 @@ urlpatterns = [
     path('api/v1/leads/', views.ExternalLeadAPIView.as_view(), name='api_lead_create'),
     # Rota Pública - Landing Page da Campanha (Split-Screen)
     path('inscricao/<int:pk>/', views.CampaignLandingPageView.as_view(), name='campaign_landing'),
-    path('campanha/<int:campaign_id>/lp-setup/', views.LandingPageConfigUpdateView.as_view(), name='campaign_lp_setup')
+    path('campanha/<int:campaign_id>/lp-setup/', views.LandingPageConfigUpdateView.as_view(), name='campaign_lp_setup'),
+    # Rota para gerar o QR Code da Landing Page
+    path('campanha/<int:pk>/qrcode/', views.CampaignQRCodeView.as_view(), name='campaign_qrcode'),
 ]
