@@ -1,11 +1,11 @@
-import csv, datetime, json
+import csv, datetime, json, qrcode
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
 from django.http import HttpResponse
 from django.views import View
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView, ListView, CreateView, DetailView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -865,3 +865,28 @@ class LandingPageConfigUpdateView(ProfessorRequiredMixin, UpdateView):
 
     def get_success_url(self):
         return reverse_lazy('odin:campaign_dashboard', kwargs={'pk': self.kwargs['campaign_id']})
+
+class CampaignQRCodeView(View):
+    """Gera um QR Code dinâmico apontando para a Landing Page da Campanha"""
+    
+    def get(self, request, pk, *args, **kwargs):
+        # 1. Constrói a URL ABSOLUTA (incluindo http:// e o domínio)
+        path = reverse('odin:campaign_landing', kwargs={'pk': pk})
+        full_url = request.build_absolute_uri(path)
+        
+        # 2. Configura e gera o QR Code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(full_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # 3. Devolve a imagem nativamente como resposta HTTP
+        response = HttpResponse(content_type="image/png")
+        img.save(response, "PNG")
+        
+        return response
