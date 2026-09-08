@@ -1,4 +1,8 @@
-import csv, datetime
+import csv, datetime, json
+from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from django.http import HttpResponse
 from django.views import View
 from django.urls import reverse_lazy
@@ -758,3 +762,59 @@ class ReviewerICListView(ProfessorRequiredMixin, ListView):
             reviewer=self.request.user, 
             status='UNDER_REVIEW'
         ).order_by('-id')
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ExternalLeadAPIView(View):
+    """API Endpoint para recebimento de Leads de sistemas externos"""
+    
+    def post(self, request, *args, **kwargs):
+        try:
+            # 1. Lê o corpo da requisição enviada pelo sistema externo
+            data = json.loads(request.body)
+            
+            # 2. Verificação de Segurança (API Key)
+            api_key = data.get('api_key')
+            if api_key != getattr(settings, 'ODIN_API_KEY', ''):
+                return JsonResponse({'error': 'Acesso negado. API Key inválida.'}, status=401)
+            
+            # 3. Extrai os dados do candidato
+            name = data.get('name')
+            phone = data.get('phone')
+            email = data.get('email', '')
+            course_id = data.get('course_id') # Opcional
+            
+            if not name or not phone:
+                return JsonResponse({'error': 'Nome e telefone são campos obrigatórios.'}, status=400)
+                
+            # 4. Roteamento Inteligente (Mesma lógica das ações globais)
+            course = None
+            campaign = None
+            
+            if course_id:
+                course = Course.objects.filter(id=course_id).first()
+                if course:
+                    # Encontra a campanha mais recente desse curso para vincular o lead
+                    campaign = VestibularCampaign.objects.filter(
+                        course=course
+                    ).order_by('-start_date').first()
+                    
+            # 5. Salva o Lead no Banco de Dados
+            lead = CampaignLead.objects.create(
+                name=name,
+                phone=phone,
+                email=email,
+                interested_course=course,
+                campaign=campaign,
+                # Pode adicionar um campo "origin='API'" no banco depois, se quiser rastrear
+            )
+            
+            return JsonResponse({
+                'success': True, 
+                'lead_id': lead.id, 
+                'message': 'Lead cadastrado com sucesso!'
+            }, status=201)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Formato JSON inválido.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)

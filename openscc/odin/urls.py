@@ -93,4 +93,7 @@ urlpatterns = [
     path('ic/parecerista/painel/', views.ReviewerICListView.as_view(), name='ic_reviewer_list'),
     path('ic/parecerista/<int:pk>/avaliar/', views.ReviewerEvaluateView.as_view(), name='ic_reviewer_evaluate'),
     path('ic/parecerista/<int:pk>/recusar/', views.ReviewerRefuseView.as_view(), name='ic_reviewer_refuse'), # <--- NOVA ROTA AQUI
+    # Rota da API de Integração de Leads
+    path('api/v1/leads/', views.ExternalLeadAPIView.as_view(), name='api_lead_create'),
+
 ]
