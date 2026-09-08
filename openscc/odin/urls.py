@@ -95,5 +95,7 @@ urlpatterns = [
     path('ic/parecerista/<int:pk>/recusar/', views.ReviewerRefuseView.as_view(), name='ic_reviewer_refuse'), # <--- NOVA ROTA AQUI
     # Rota da API de Integração de Leads
     path('api/v1/leads/', views.ExternalLeadAPIView.as_view(), name='api_lead_create'),
-
+    # Rota Pública - Landing Page da Campanha (Split-Screen)
+    path('inscricao/<int:pk>/', views.CampaignLandingPageView.as_view(), name='campaign_landing'),
+    path('campanha/<int:campaign_id>/lp-setup/', views.LandingPageConfigUpdateView.as_view(), name='campaign_lp_setup')
 ]

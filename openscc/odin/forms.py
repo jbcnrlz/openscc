@@ -1,6 +1,9 @@
 from django import forms
 from .models import *
 from django.contrib.auth.models import Group
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, View
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse_lazy
 class FormativeAxisForm(forms.ModelForm):
     class Meta:
         model = FormativeAxis
@@ -335,3 +338,45 @@ class ICFinalReportForm(forms.ModelForm):
     class Meta:
         model = ScientificProject
         fields = ['final_report_file']
+
+class PublicLeadForm(forms.ModelForm):
+    class Meta:
+        model = CampaignLead
+        fields = ['name', 'phone', 'email']
+        
+        # No design de Floating Labels, o 'placeholder' é obrigatório e atua como a label flutuante
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Nome Completo'
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': '(00) 00000-0000'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'seu@email.com'
+            }),
+        }
+
+class LandingPageConfigForm(forms.ModelForm):
+    class Meta:
+        model = LandingPageConfig
+        exclude = ['campaign'] # A campanha será preenchida automaticamente pela View
+        
+        widgets = {
+            'logo': forms.FileInput(attrs={'class': 'form-control'}), # <--- NOVO
+            'primary_color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
+            'main_headline': forms.TextInput(attrs={'class': 'form-control'}),
+            'sub_headline': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'about_title': forms.TextInput(attrs={'class': 'form-control'}),
+            'about_text': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'feature_1_title': forms.TextInput(attrs={'class': 'form-control'}),
+            'feature_1_text': forms.TextInput(attrs={'class': 'form-control'}),
+            'feature_2_title': forms.TextInput(attrs={'class': 'form-control'}),
+            'feature_2_text': forms.TextInput(attrs={'class': 'form-control'}),
+            'feature_3_title': forms.TextInput(attrs={'class': 'form-control'}),
+            'feature_3_text': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+

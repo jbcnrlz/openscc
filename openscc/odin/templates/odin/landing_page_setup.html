@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurar Landing Page - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-0">
+            <i class="bi bi-layout-text-window text-primary me-2"></i> Configurar Landing Page
+        </h3>
+        <p class="text-muted mb-0">Personalize o visual e os textos da página de captação desta campanha.</p>
+    </div>
+    <a href="{% url 'odin:campaign_dashboard' view.kwargs.campaign_id %}" class="btn btn-outline-secondary fw-medium shadow-sm">
+        <i class="bi bi-arrow-left me-1"></i> Voltar ao Painel
+    </a>
+</div>
+
+<!-- O enctype="multipart/form-data" é obrigatório para o upload da logo funcionar -->
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ form.non_field_errors }}
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        
+        <!-- ==========================================
+             COLUNA ESQUERDA: Identidade e Textos (Hero)
+             ========================================== -->
+        <div class="col-lg-6">
+            
+            <!-- Bloco 1: Identidade Visual -->
+            <div class="card border-0 shadow-sm mb-4 h-100">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0">
+                        <i class="bi bi-palette text-primary me-2"></i>1. Identidade Visual
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Campo LOGO -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">{{ form.logo.label }}</label>
+                        
+                        <!-- Lógica visual elegante para exibir a logo atual -->
+                        {% if form.instance.logo %}
+                            <div class="mb-3 p-3 border rounded bg-light text-center">
+                                <span class="d-block small text-muted mb-2">Logo atual:</span>
+                                <img src="{{ form.instance.logo.url }}" alt="Logo atual" style="max-height: 60px; max-width: 100%;">
+                            </div>
+                        {% endif %}
+                        
+                        {{ form.logo }}
+                        <div class="form-text mt-1 text-muted">{{ form.logo.help_text }}</div>
+                        {% if form.logo.errors %}
+                            <div class="text-danger small fw-bold mt-1">{{ form.logo.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Campo COR -->
+                    <div>
+                        <label class="form-label fw-bold">{{ form.primary_color.label }}</label>
+                        <div class="d-flex align-items-center gap-3">
+                            {{ form.primary_color }}
+                            <span class="small text-muted">Clique na caixa ao lado para escolher a cor principal.</span>
+                        </div>
+                        {% if form.primary_color.errors %}
+                            <div class="text-danger small fw-bold mt-1">{{ form.primary_color.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                    
+                </div>
+
+                <!-- Bloco 2: Textos Principais (Hero) -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0">
+                        <i class="bi bi-megaphone text-success me-2"></i>2. Chamada Principal (Topo)
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Título -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Título Principal (Headline)</label>
+                        {{ form.main_headline }}
+                        {% if form.main_headline.errors %}
+                            <div class="text-danger small fw-bold mt-1">{{ form.main_headline.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Subtítulo -->
+                    <div>
+                        <label class="form-label fw-bold">Texto de Apoio (Sub-headline)</label>
+                        {{ form.sub_headline }}
+                        {% if form.sub_headline.errors %}
+                            <div class="text-danger small fw-bold mt-1">{{ form.sub_headline.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                    
+                </div>
+            </div>
+            </div>
+
+            
+
+        </div>
+
+        <!-- ==========================================
+             COLUNA DIREITA: Sobre e Diferenciais
+             ========================================== -->
+        <div class="col-lg-6">
+            
+            <!-- Bloco 3: Sobre o Curso -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0">
+                        <i class="bi bi-info-circle text-info me-2"></i>3. Sobre o Curso
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Título da Seção</label>
+                        {{ form.about_title }}
+                    </div>
+                    <div>
+                        <label class="form-label fw-bold">Descrição Completa</label>
+                        {{ form.about_text }}
+                        <div class="form-text mt-1">{{ form.about_text.help_text }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bloco 4: Diferenciais (Features) -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-uppercase text-muted mb-0">
+                        <i class="bi bi-star text-warning me-2"></i>4. Diferenciais do Curso
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Diferencial 1 -->
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold mb-3 text-dark">Diferencial 1</h6>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted mb-1">Título</label>
+                            {{ form.feature_1_title }}
+                        </div>
+                        <div>
+                            <label class="form-label small fw-bold text-muted mb-1">Texto Curto</label>
+                            {{ form.feature_1_text }}
+                        </div>
+                    </div>
+                    
+                    <!-- Diferencial 2 -->
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold mb-3 text-dark">Diferencial 2</h6>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted mb-1">Título</label>
+                            {{ form.feature_2_title }}
+                        </div>
+                        <div>
+                            <label class="form-label small fw-bold text-muted mb-1">Texto Curto</label>
+                            {{ form.feature_2_text }}
+                        </div>
+                    </div>
+
+                    <!-- Diferencial 3 -->
+                    <div class="p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold mb-3 text-dark">Diferencial 3</h6>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted mb-1">Título</label>
+                            {{ form.feature_3_title }}
+                        </div>
+                        <div>
+                            <label class="form-label small fw-bold text-muted mb-1">Texto Curto</label>
+                            {{ form.feature_3_text }}
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Barra Inferior de Ações -->
+    <div class="card border-0 shadow-sm mt-4 mb-5 bg-light">
+        <div class="card-body p-4 d-flex justify-content-end gap-3">
+            <a href="{% url 'odin:campaign_dashboard' view.kwargs.campaign_id %}" class="btn btn-outline-secondary px-4 fw-bold">
+                Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary px-5 fw-bold shadow-sm">
+                <i class="bi bi-save me-2"></i> Salvar e Atualizar Landing Page
+            </button>
+        </div>
+    </div>
+
+</form>
+{% endblock %}
