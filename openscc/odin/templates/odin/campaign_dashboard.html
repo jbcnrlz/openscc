@@ -23,6 +23,15 @@
         <a href="{% url 'odin:campaign_update' campaign.id %}" class="btn btn-outline-secondary btn-sm fw-medium">
             <i class="bi bi-pencil me-1"></i> Editar Parâmetros
         </a>
+
+        <a href="{% url 'odin:campaign_landing' campaign.id %}" target="_blank" class="btn btn-primary fw-bold shadow-sm">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Ver Landing Page
+        </a>
+
+        <a href="{% url 'odin:campaign_lp_setup' campaign.id %}" class="btn btn-outline-primary fw-bold shadow-sm">
+            <i class="bi bi-palette me-1"></i> Personalizar Landing Page
+        </a>
+
     </div>
 </div>
 

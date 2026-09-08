@@ -546,3 +546,37 @@ class CampaignLead(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.interested_course.name if self.interested_course else 'Sem curso definido'}"
+
+class LandingPageConfig(models.Model):
+    # Liga essa configuração a uma campanha específica
+    campaign = models.OneToOneField(VestibularCampaign, on_delete=models.CASCADE, related_name='landing_config')
+    
+    # Seção 1: Hero (Topo da página)
+    main_headline = models.CharField(max_length=255, default="Transforme seu futuro com a FATEC Marília")
+    sub_headline = models.TextField(default="Inscreva-se no vestibular e garanta sua vaga em um dos mercados que mais crescem.")
+    primary_color = models.CharField(max_length=7, default="#b11116", verbose_name="Cor Principal (Hexadecimal)") # Vermelho Fatec
+    
+    # Seção 2: Sobre o Curso
+    about_title = models.CharField(max_length=150, default="O que você vai aprender?")
+    about_text = models.TextField(blank=True, help_text="Descrição completa do curso.")
+    
+    # Seção 3: Diferenciais (3 blocos)
+    feature_1_title = models.CharField(max_length=100, default="Ensino Público Gratuito")
+    feature_1_text = models.CharField(max_length=200, default="Qualidade reconhecida sem mensalidades.")
+    
+    feature_2_title = models.CharField(max_length=100, default="Foco na Prática")
+    feature_2_text = models.CharField(max_length=200, default="Laboratórios modernos e projetos reais.")
+    
+    feature_3_title = models.CharField(max_length=100, default="Alta Empregabilidade")
+    feature_3_text = models.CharField(max_length=200, default="Nossos alunos saem prontos para o mercado.")
+
+    logo = models.ImageField(
+        upload_to='campaign_logos/', 
+        null=True, 
+        blank=True, 
+        verbose_name="Logotipo da Campanha/Curso",
+        help_text="Formatos recomendados: PNG transparente ou JPG. Altura ideal: 60px."
+    )
+
+    def __str__(self):
+        return f"Setup LP - {self.campaign.name}"

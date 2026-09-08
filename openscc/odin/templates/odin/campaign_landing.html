@@ -1,0 +1,262 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ campaign.course.name }} | Inscrições Abertas</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            /* Variável de cor puxada do banco, fallback para um tom escuro/neutro se der erro */
+            --brand-color: {{ campaign.landing_config.primary_color|default:"#0f2027" }};
+        }
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; background-color: #f8f9fa;}
+        
+        /* NAVBAR */
+        .navbar-custom { background-color: #ffffff; box-shadow: 0 2px 15px rgba(0,0,0,0.05); }
+        
+        /* HERO SECTION */
+        .hero-section {
+            background: linear-gradient(135deg, rgba(17,17,17,0.92) 0%, rgba(30,30,30,0.96) 100%), url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1920&q=80') center/cover;
+            padding: 80px 0 120px 0;
+            position: relative;
+        }
+
+        .text-brand { color: var(--brand-color) !important; }
+        .bg-brand { background-color: var(--brand-color) !important; color: white; }
+        .btn-brand { 
+            background-color: var(--brand-color); 
+            color: white; 
+            padding: 14px 24px; 
+            font-weight: 700; 
+            border-radius: 8px; 
+            border: none; 
+            transition: all 0.3s ease;
+        }
+        .btn-brand:hover { filter: brightness(1.15); color: white; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
+
+        /* FORMULÁRIO FLUTUANTE */
+        .form-card {
+            background: white;
+            border-radius: 16px;
+            padding: 3rem 2.5rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            margin-top: -80px; /* Faz o form subir em cima da faixa escura */
+            position: relative;
+            z-index: 10;
+        }
+
+        /* SEÇÕES DE CONTEÚDO */
+        .section-padding { padding: 100px 0; }
+        .feature-box { 
+            padding: 40px 30px; 
+            border-radius: 16px; 
+            background: #ffffff; 
+            height: 100%; 
+            transition: 0.3s; 
+            border: 1px solid #e9ecef;
+            border-bottom: 4px solid transparent;
+        }
+        .feature-box:hover { 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.05); 
+            border-bottom-color: var(--brand-color); 
+            transform: translateY(-5px); 
+        }
+        .feature-icon { font-size: 3rem; color: var(--brand-color); margin-bottom: 25px; }
+
+        /* Ajustes dos Inputs */
+        .form-control { border-radius: 8px; padding: 12px 16px; border: 2px solid #e9ecef; }
+        .form-control:focus { border-color: var(--brand-color); box-shadow: 0 0 0 0.25rem rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO -->
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top py-3">
+        <div class="container d-flex justify-content-between align-items-center">
+            
+            <!-- LÓGICA DO LOGOTIPO -->
+            <a class="navbar-brand fw-bold d-flex align-items-center text-dark text-decoration-none" href="#">
+                {% if campaign.landing_config.logo %}
+                    <img src="{{ campaign.landing_config.logo.url }}" alt="Logo" style="max-height: 45px; width: auto;">
+                {% else %}
+                    <!-- Texto FATEC de reserva -->
+                    <div class="bg-light p-2 rounded-3 me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="bi bi-buildings-fill text-brand fs-4"></i>
+                    </div>
+                    <span>FATEC<span class="fw-light ms-1">Marília</span></span>
+                {% endif %}
+            </a>
+            
+            <span class="badge bg-light text-dark border px-3 py-2 rounded-pill d-none d-md-block shadow-sm">
+                <i class="bi bi-mortarboard-fill text-brand me-1"></i> {{ campaign.name }}
+            </span>
+        </div>
+    </nav>
+
+    <!-- 1. HERO SECTION -->
+    <section class="hero-section">
+        <div class="container text-center">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 text-white">
+                    <span class="text-uppercase fw-bold tracking-widest text-brand mb-3 d-inline-block bg-white px-3 py-1 rounded-pill small">
+                        Inscrições Abertas
+                    </span>
+                    <h1 class="display-4 fw-bolder mb-4 lh-sm">
+                        {{ campaign.landing_config.main_headline|default:"Transforme seu futuro profissional" }}
+                    </h1>
+                    <p class="fs-5 text-white-50 mb-0 lh-base px-md-5">
+                        {{ campaign.landing_config.sub_headline|default:"Garanta sua vaga e estude com os melhores professores da região." }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. ÁREA DO FORMULÁRIO (Sobreposto) -->
+    <section class="form-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-6 col-md-8">
+                    <div class="form-card">
+                        
+                        {% if request.GET.sucesso %}
+                            <!-- TELA DE SUCESSO -->
+                            <div class="text-center py-4">
+                                <div class="mb-4 d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle" style="width: 90px; height: 90px;">
+                                    <i class="bi bi-check-lg" style="font-size: 3rem;"></i>
+                                </div>
+                                <h3 class="fw-bold text-dark mb-3">Inscrição Recebida!</h3>
+                                <p class="text-muted fs-6 mb-0">Obrigado pelo interesse no curso de <strong>{{ campaign.course.name }}</strong>. Nossa equipe comercial entrará em contato via WhatsApp nas próximas horas.</p>
+                            </div>
+                        {% else %}
+                            <!-- FORMULÁRIO DE CAPTURA -->
+                            <div class="text-center mb-4">
+                                <h4 class="fw-bold text-dark">Preencha seus dados</h4>
+                                <p class="text-muted small">Receba o roteiro de estudos e fale com nossa equipe.</p>
+                            </div>
+                            
+                            <form method="post" action="{% url 'odin:campaign_landing' campaign.id %}" enctype="multipart/form-data" novalidate>
+                                {% csrf_token %}
+                                
+                                <div class="mb-3 text-start">
+                                    <label class="form-label fw-bold small text-muted"><i class="bi bi-person me-1"></i> Nome Completo</label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.name.errors|striptags }}</div>{% endif %}
+                                </div>
+                                
+                                <div class="mb-3 text-start">
+                                    <label class="form-label fw-bold small text-muted"><i class="bi bi-whatsapp me-1 text-success"></i> WhatsApp com DDD</label>
+                                    {{ form.phone }}
+                                    {% if form.phone.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.phone.errors|striptags }}</div>{% endif %}
+                                </div>
+                                
+                                <div class="mb-4 text-start">
+                                    <label class="form-label fw-bold small text-muted"><i class="bi bi-envelope me-1"></i> Melhor E-mail</label>
+                                    {{ form.email }}
+                                    {% if form.email.errors %}<div class="text-danger small mt-1 fw-bold">{{ form.email.errors|striptags }}</div>{% endif %}
+                                </div>
+                                
+                                <button type="submit" class="btn btn-brand w-100 fs-5">
+                                    Quero me inscrever <i class="bi bi-arrow-right ms-2"></i>
+                                </button>
+                                
+                                <div class="text-center mt-3">
+                                    <span class="small text-muted"><i class="bi bi-shield-check me-1"></i> Seus dados estão 100% seguros.</span>
+                                </div>
+                            </form>
+                        {% endif %}
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. SOBRE O CURSO -->
+    <section class="section-padding bg-light">
+        <div class="container">
+            <div class="row justify-content-center text-center mb-5">
+                <div class="col-lg-8">
+                    <h2 class="fw-bold">{{ campaign.landing_config.about_title|default:"Sobre o Curso" }}</h2>
+                    <div class="bg-brand mx-auto mt-3 mb-4" style="height: 4px; width: 60px; border-radius: 2px;"></div>
+                    <p class="fs-5 text-muted lh-base">
+                        {{ campaign.landing_config.about_text|default:"Curso desenhado para atender às demandas mais modernas do mercado de trabalho. Prepare-se para atuar com excelência, usando as melhores práticas da atualidade." }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. DIFERENCIAIS -->
+    <section class="section-padding bg-white">
+        <div class="container">
+            <div class="row g-4">
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-box text-center shadow-sm">
+                        <i class="bi bi-award-fill feature-icon"></i>
+                        <h4 class="fw-bold">{{ campaign.landing_config.feature_1_title|default:"Ensino de Qualidade" }}</h4>
+                        <p class="text-muted mb-0">{{ campaign.landing_config.feature_1_text|default:"Corpo docente especializado e atuante no mercado." }}</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-box text-center shadow-sm">
+                        <i class="bi bi-laptop feature-icon"></i>
+                        <h4 class="fw-bold">{{ campaign.landing_config.feature_2_title|default:"Foco na Prática" }}</h4>
+                        <p class="text-muted mb-0">{{ campaign.landing_config.feature_2_text|default:"Aprenda desenvolvendo projetos reais em laboratórios." }}</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-box text-center shadow-sm">
+                        <i class="bi bi-briefcase-fill feature-icon"></i>
+                        <h4 class="fw-bold">{{ campaign.landing_config.feature_3_title|default:"Alta Empregabilidade" }}</h4>
+                        <p class="text-muted mb-0">{{ campaign.landing_config.feature_3_text|default:"Nossos alunos são absorvidos rapidamente pelas empresas." }}</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- RODAPÉ -->
+    <footer class="bg-dark text-white py-4 text-center">
+        <div class="container">
+            <p class="mb-0 opacity-75 small">
+                © {% now "Y" %} {{ campaign.name }}. Todos os direitos reservados.
+            </p>
+        </div>
+    </footer>
+
+    <!-- SCRIPT DE MÁSCARA DO TELEFONE -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Adiciona as classes do Bootstrap nos inputs gerados pelo Django
+            document.getElementById('id_name')?.classList.add('form-control', 'form-control-lg', 'bg-light');
+            document.getElementById('id_email')?.classList.add('form-control', 'form-control-lg', 'bg-light');
+            
+            const phoneInput = document.getElementById('id_phone');
+            if (phoneInput) {
+                phoneInput.classList.add('form-control', 'form-control-lg', 'bg-light');
+                
+                phoneInput.addEventListener('input', function(e) {
+                    let x = e.target.value.replace(/\D/g, '');
+                    if (x.length === 0) { e.target.value = ''; return; }
+                    let formatted = '(' + x.substring(0, 2);
+                    if (x.length > 2) formatted += ') ' + x.substring(2, 7);
+                    if (x.length > 7) formatted += '-' + x.substring(7, 11);
+                    e.target.value = formatted;
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -818,3 +818,50 @@ class ExternalLeadAPIView(View):
             return JsonResponse({'error': 'Formato JSON inválido.'}, status=400)
         except Exception as e:
             return JsonResponse({'error': f'Erro interno: {str(e)}'}, status=500)
+
+class CampaignLandingPageView(CreateView):
+    """Página pública de captura de leads com design Split-Screen"""
+    model = CampaignLead
+    form_class = PublicLeadForm
+    template_name = 'odin/campaign_landing.html' # Mantemos o mesmo nome do arquivo
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['campaign'] = get_object_or_404(VestibularCampaign, pk=self.kwargs['pk'])
+        return context
+
+    def form_valid(self, form):
+        campaign = get_object_or_404(VestibularCampaign, pk=self.kwargs['pk'])
+        form.instance.campaign = campaign
+        form.instance.interested_course = campaign.course
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('odin:campaign_landing', kwargs={'pk': self.kwargs['pk']}) + '?sucesso=true'
+
+class LandingPageConfigUpdateView(ProfessorRequiredMixin, UpdateView):
+    model = LandingPageConfig
+    form_class = LandingPageConfigForm
+    template_name = 'odin/generic_form.html'
+    
+    def get_object(self, queryset=None):
+        # Pega a campanha da URL. Se não tiver config de LP, cria uma em branco.
+        campaign = get_object_or_404(VestibularCampaign, id=self.kwargs['campaign_id'])
+        config, created = LandingPageConfig.objects.get_or_create(campaign=campaign)
+        return config
+
+    def get_success_url(self):
+        return reverse_lazy('odin:campaign_dashboard', kwargs={'pk': self.kwargs['campaign_id']})
+
+class LandingPageConfigUpdateView(ProfessorRequiredMixin, UpdateView):
+    model = LandingPageConfig
+    form_class = LandingPageConfigForm
+    template_name = 'odin/landing_page_setup.html' # <--- NOVO TEMPLATE
+    
+    def get_object(self, queryset=None):
+        campaign = get_object_or_404(VestibularCampaign, id=self.kwargs['campaign_id'])
+        config, created = LandingPageConfig.objects.get_or_create(campaign=campaign)
+        return config
+
+    def get_success_url(self):
+        return reverse_lazy('odin:campaign_dashboard', kwargs={'pk': self.kwargs['campaign_id']})
