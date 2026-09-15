@@ -529,7 +529,7 @@ class CampaignLead(models.Model):
         on_delete=models.CASCADE, 
         related_name='leads',
         null=True,
-        blank=True   
+        blank=True
     )
     
     # Rastreabilidade: de onde essa pessoa veio?
