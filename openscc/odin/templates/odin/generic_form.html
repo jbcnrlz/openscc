@@ -66,4 +66,30 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const phoneInput = document.getElementById('id_phone');
+        
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function(e) {
+                let x = e.target.value.replace(/\D/g, '');
+                if (x.length === 0) {
+                    e.target.value = '';
+                    return;
+                }
+                
+                let formatted = '(' + x.substring(0, 2);
+                if (x.length > 2) {
+                    formatted += ') ' + x.substring(2, 7);
+                }
+                if (x.length > 7) {
+                    formatted += '-' + x.substring(7, 11);
+                }
+                
+                e.target.value = formatted;
+            });
+        }
+    });
+</script>
 {% endblock %}

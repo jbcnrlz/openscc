@@ -100,4 +100,7 @@ urlpatterns = [
     path('campanha/<int:campaign_id>/lp-setup/', views.LandingPageConfigUpdateView.as_view(), name='campaign_lp_setup'),
     # Rota para gerar o QR Code da Landing Page
     path('campanha/<int:pk>/qrcode/', views.CampaignQRCodeView.as_view(), name='campaign_qrcode'),
+    path('lead/<int:pk>/editar/', views.CampaignLeadUpdateView.as_view(), name='lead_update'),
+    # Cadastro manual de Leads pela equipe
+    path('leads/novo/', views.ManualLeadCreateView.as_view(), name='lead_create_manual'),
 ]
