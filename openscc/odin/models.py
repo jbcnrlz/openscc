@@ -513,13 +513,23 @@ class ActionPhoto(models.Model):
 
 
 class CampaignLead(models.Model):
+
+    STATUS_CHOICES = [
+        ('novo', 'Novo (Não Contatado)'),
+        ('em_contato', 'Em Contato'),
+        ('isencao', 'Aguardando Isenção/Redução'),
+        ('inscrito_nao_pago', 'Inscrito (Boleto Não Pago)'),
+        ('pago', 'Inscrição Paga (Confirmado)'),
+        ('desistiu', 'Desistiu / Perdeu Interesse'),
+    ]
+
     """Base Central de Interessados (Pré-inscrição)"""
     campaign = models.ForeignKey(
         VestibularCampaign, 
         on_delete=models.CASCADE, 
         related_name='leads',
-        null=True,   # <--- Adicionado
-        blank=True   # <--- Adicionado
+        null=True,
+        blank=True   
     )
     
     # Rastreabilidade: de onde essa pessoa veio?
@@ -531,13 +541,27 @@ class CampaignLead(models.Model):
     phone = models.CharField(max_length=20, verbose_name="Celular / WhatsApp")
     
     # Qual curso chamou a atenção dele?
-    interested_course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, verbose_name="Curso de Interesse")
+    interested_course = models.ForeignKey(
+        Course, 
+        on_delete=models.SET_NULL, # Se o curso for apagado, o lead fica com curso vazio
+        null=True,                 # Permite nulo no Banco de Dados
+        blank=True,                # Permite vazio nos formulários
+        related_name='leads',
+        verbose_name="Curso de Interesse"
+    )
     
     # Status de conversão para a equipe de captação trabalhar depois
     contacted = models.BooleanField(default=False, verbose_name="Já foi contatado?")
     converted_to_paid = models.BooleanField(default=False, verbose_name="Pagou a Inscrição?")
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    status = models.CharField(
+        max_length=25,
+        choices=STATUS_CHOICES,
+        default='novo',
+        verbose_name="Status do Funil"
+    )
 
     class Meta:
         verbose_name = "Interessado (Lead)"

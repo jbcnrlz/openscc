@@ -9,10 +9,15 @@
         <p class="text-muted mb-0">Consolidação de todos os interessados gerados pelas ações de captação</p>
     </div>
     
-    <!-- Botão de Exportação -->
-    <a href="{% url 'odin:lead_export_csv' %}" class="btn btn-success d-flex align-items-center fw-medium px-4 py-2 hover-lift shadow-sm">
-        <i class="bi bi-file-earmark-excel fs-5 me-2"></i> Exportar para Excel
-    </a>
+    <!-- AÇÕES: Exportar e Novo Lead -->
+    <div class="d-flex gap-2">
+        <a href="{% url 'odin:lead_export_csv' %}" class="btn btn-outline-success d-flex align-items-center fw-medium px-4 py-2 hover-lift shadow-sm">
+            <i class="bi bi-file-earmark-excel fs-5 me-2"></i> Exportar
+        </a>
+        <a href="{% url 'odin:lead_create_manual' %}" class="btn btn-primary d-flex align-items-center fw-bold px-4 py-2 hover-lift shadow-sm">
+            <i class="bi bi-plus-lg fs-5 me-2"></i> Novo Lead
+        </a>
+    </div>
 </div>
 
 <div class="row">
@@ -27,7 +32,8 @@
                                 <th>Origem da Captação</th>
                                 <th>Curso de Interesse</th>
                                 <th>Data de Cadastro</th>
-                                <th class="text-center pe-4">Status</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end pe-4">Ação</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -41,35 +47,66 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="fw-medium text-dark">{{ lead.source_action.title|default:"Orgânico / Link Direto" }}</div>
-                                    <div class="small text-muted">{{ lead.campaign.name }}</div>
+                                    <div class="fw-medium text-dark">
+                                        {% if lead.source_action %}
+                                            {{ lead.source_action.title }}
+                                        {% else %}
+                                            Orgânico / Landing Page
+                                        {% endif %}
+                                    </div>
+                                    {% if lead.campaign %}
+                                        <div class="small text-muted">{{ lead.campaign.name }}</div>
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark border px-2 py-1">
-                                        {{ lead.interested_course.name|default:"Não informado" }}
-                                    </span>
+                                    {% if lead.interested_course %}
+                                        <span class="badge bg-light text-dark border px-2 py-1">
+                                            {{ lead.interested_course.name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">
+                                            <i class="bi bi-clock-history me-1"></i> A definir
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {{ lead.created_at|date:"d/m/Y \à\s H:i" }}
                                 </td>
-                                <td class="text-center pe-4">
-                                    {% if lead.converted_to_paid %}
-                                        <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="bi bi-check-circle me-1"></i>Matriculado</span>
-                                    {% elif lead.contacted %}
-                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning"><i class="bi bi-telephone-outbound me-1"></i>Contatado</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-hourglass-split me-1"></i>Aguardando</span>
+                                <td class="text-center">
+                                    <!-- NOVA LÓGICA DE STATUS DO FUNIL -->
+                                    {% if lead.status == 'novo' %}
+                                        <span class="badge bg-danger"><i class="bi bi-asterisk me-1"></i> Novo</span>
+                                    {% elif lead.status == 'em_contato' %}
+                                        <span class="badge bg-info text-dark"><i class="bi bi-chat-dots me-1"></i> Em Contato</span>
+                                    {% elif lead.status == 'isencao' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-file-earmark-text me-1"></i> Isenção/Redução</span>
+                                    {% elif lead.status == 'inscrito_nao_pago' %}
+                                        <span class="badge bg-primary"><i class="bi bi-upc-scan me-1"></i> Boleto Gerado</span>
+                                    {% elif lead.status == 'pago' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Pago (Confirmado)</span>
+                                    {% elif lead.status == 'desistiu' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i> Desistiu</span>
                                     {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="https://wa.me/55{{ lead.phone|slugify }}" target="_blank" class="btn btn-success" title="Chamar no WhatsApp">
+                                            <i class="bi bi-whatsapp"></i>
+                                        </a>
+                                        <a href="{% url 'odin:lead_update' lead.id %}" class="btn btn-outline-primary" title="Atualizar Status">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center py-5">
+                                <td colspan="6" class="text-center py-5">
                                     <div class="text-muted opacity-50 mb-3">
                                         <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                                     </div>
                                     <h5 class="fw-bold text-dark">Sua base de leads está vazia</h5>
-                                    <p class="text-muted">Os interessados começarão a aparecer aqui assim que os professores cadastrarem nas ações.</p>
+                                    <p class="text-muted">Os interessados começarão a aparecer aqui assim que os candidatos se cadastrarem nas Landing Pages ou ações.</p>
                                 </td>
                             </tr>
                             {% endfor %}

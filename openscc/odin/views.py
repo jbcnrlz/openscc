@@ -318,6 +318,13 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
         
         # Formulário para inserir dados diários rapidamente na mesma tela
         context['record_form'] = CampaignDailyRecordForm()
+
+        leads = self.object.leads.all()
+        context['total_leads'] = leads.count()
+        context['leads_novos'] = leads.filter(status='novo').count()
+        context['leads_quentes'] = leads.filter(status__in=['em_contato', 'isencao', 'inscrito_nao_pago']).count()
+        context['leads_convertidos'] = leads.filter(status='pago').count()
+        context['leads_perdidos'] = leads.filter(status='desistiu').count()
         
         return context
 
@@ -463,10 +470,10 @@ class CampaignLeadListView(ProfessorRequiredMixin, ListView):
     def get_queryset(self):
         # Traz todos os leads das campanhas que pertencem aos cursos deste coordenador
         return CampaignLead.objects.filter(
-            campaign__course__professor=self.request.user
-        ).select_related(
-            'campaign', 'source_action', 'interested_course'
-        ).order_by('-created_at')
+            Q(campaign__created_by=self.request.user) | 
+            Q(campaign__collaborators=self.request.user) |
+            Q(campaign__isnull=True)  # <--- Libera os leads cadastrados manualmente
+        ).distinct().order_by('-created_at')
 
 class ExportLeadsCSVView(ProfessorRequiredMixin, View):
     """Gera o arquivo CSV formatado para abrir perfeitamente no Excel pt-BR"""
@@ -890,3 +897,33 @@ class CampaignQRCodeView(View):
         img.save(response, "PNG")
         
         return response
+
+class CampaignLeadUpdateView(ProfessorRequiredMixin, UpdateView):
+    model = CampaignLead
+    form_class = CampaignLeadUpdateForm
+    template_name = 'odin/generic_form.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = "Atualizar Status do Lead"
+        return context
+
+    def get_success_url(self):
+        # Volta automaticamente para o dashboard da campanha atual do lead
+        return reverse_lazy('odin:campaign_dashboard', kwargs={'pk': self.object.campaign.id})
+
+class ManualLeadCreateView(ProfessorRequiredMixin, CreateView):
+    """View para a equipe cadastrar leads manualmente via telefone/balcão"""
+    model = CampaignLead
+    form_class = InternalLeadForm
+    template_name = 'odin/generic_form.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = "Cadastrar Lead Manualmente"
+        return context
+
+    def get_success_url(self):
+        # Após salvar, redireciona de volta para a Base Central de Leads
+        # (Substitua 'odin:lead_list' pelo nome exato da URL da sua Base Central, se for diferente)
+        return reverse_lazy('odin:lead_list')
