@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <title>{{ problema.titulo }}</title>
     <style>
+        /* Configuração da Página e Margens */
         @page {
             size: A4;
-            margin: 2cm;
+            margin: 2.5cm 2cm 2.5cm 2cm;
             @frame footer {
                 -pdf-frame-content: footerContent;
                 bottom: 1cm;
@@ -16,145 +17,161 @@
             }
         }
         
+        /* Tipografia Base */
         body {
             font-family: "Helvetica", "Arial", sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #000;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333333;
         }
         
+        /* Cabeçalho do Documento */
         .header {
             text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
+            margin-bottom: 30px;
         }
         
         .header h1 {
-            font-size: 18px;
-            margin: 0;
-            color: #2c3e50;
+            font-size: 18pt;
+            margin: 0 0 5px 0;
+            color: #1a365d; /* Azul acadêmico escuro */
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
         .header .subtitle {
-            font-size: 14px;
+            font-size: 11pt;
             color: #7f8c8d;
-            margin: 5px 0;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
+            margin-bottom: 0;
         }
         
-        .info-grid {
-            display: table;
+        /* Ficha Técnica (Quadro de Metadados) */
+        .metadata-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px 20px;
+            margin-bottom: 35px;
+        }
+        
+        .metadata-table {
             width: 100%;
-            margin-bottom: 15px;
+            border-collapse: collapse;
         }
         
-        .info-row {
-            display: table-row;
-        }
-        
-        .info-label {
-            display: table-cell;
-            font-weight: bold;
-            padding: 4px 8px 4px 0;
-            width: 30%;
-            vertical-align: top;
-        }
-        
-        .info-value {
-            display: table-cell;
-            padding: 4px 0;
-            vertical-align: top;
-        }
-        
-        .parte {
-            margin-bottom: 15px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            page-break-inside: avoid;
-        }
-        
-        .parte-header {
-            background-color: #ecf0f1;
-            padding: 6px 10px;
-            margin: -10px -10px 10px -10px;
-            border-radius: 4px 4px 0 0;
+        .metadata-label {
+            width: 20%;
             font-weight: bold;
             color: #2c3e50;
+            padding: 4px 10px 4px 0;
+            vertical-align: top;
+            font-size: 10pt;
+            text-transform: uppercase;
         }
         
-        .parte-content {
-            font-size: 11px;
-            line-height: 1.5;
+        .metadata-value {
+            width: 80%;
+            color: #2b2b2b;
+            padding: 4px 0;
+            vertical-align: top;
+            text-align: justify;
         }
         
+        /* Listas dentro do quadro */
         .lista-obj {
-            margin: 5px 0;
-            padding-left: 15px;
+            margin: 0;
+            padding-left: 18px;
         }
         
         .lista-obj li {
-            margin-bottom: 3px;
+            margin-bottom: 4px;
         }
         
+        /* Estrutura das Partes do Problema */
+        .parte {
+            margin-bottom: 30px;
+            /* Evita que a parte quebre de forma feia no meio se for pequena */
+            page-break-inside: auto; 
+        }
+        
+        .parte-header {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1a365d;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            /* Evita que o título fique na página anterior sozinho */
+            page-break-after: avoid; 
+        }
+        
+        .parte-content {
+            font-size: 11pt;
+            text-align: justify;
+            text-justify: inter-word;
+        }
+
+        /* Rodapé */
         .footer {
             text-align: center;
-            font-size: 10px;
-            color: #7f8c8d;
-        }
-        
-        ul, ol {
-            margin: 5px 0;
-            padding-left: 20px;
-        }
-        
-        li {
-            margin-bottom: 3px;
+            font-size: 9pt;
+            color: #95a5a6;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 5px;
         }
     </style>
 </head>
 <body>
+    
+    <!-- Cabeçalho -->
     <div class="header">
         <h1>{{ problema.titulo }}</h1>
-        <div class="subtitle">Caso Clínico - Exportado em {{ data_exportacao }}</div>
+        <div class="subtitle">Caderno do Caso Clínico &bull; Exportado em {{ data_exportacao }}</div>
     </div>
 
-    <!-- Informações do Problema -->
-    <div class="info-grid">
-        <div class="info-row">
-            <div class="info-label">Tema:</div>
-            <div class="info-value">{{ problema.tema.nome }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Assunto:</div>
-            <div class="info-value">{{ problema.assunto.nome }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Data de Aplicação:</div>
-            <div class="info-value">{{ problema.dataAplicacao|date:"d/m/Y" }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Objetivos:</div>
-            <div class="info-value">
-                <ul class="lista-obj">
-                    {% for objetivo in problema.objetivos.all %}
-                    <li>{{ objetivo.descricao }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
+    <!-- Ficha Técnica -->
+    <div class="metadata-box">
+        <table class="metadata-table">
+            <tr>
+                <td class="metadata-label">Tema:</td>
+                <td class="metadata-value">{{ problema.tema.nome }}</td>
+            </tr>
+            <tr>
+                <td class="metadata-label">Assunto:</td>
+                <td class="metadata-value">{{ problema.assunto.nome }}</td>
+            </tr>
+            <tr>
+                <td class="metadata-label">Aplicação:</td>
+                <td class="metadata-value">{{ problema.dataAplicacao|date:"d/m/Y" }}</td>
+            </tr>
+            <tr>
+                <td class="metadata-label" style="padding-top: 10px;">Objetivos:</td>
+                <td class="metadata-value" style="padding-top: 10px;">
+                    <ul class="lista-obj">
+                        {% for objetivo in problema.objetivos.all %}
+                        <li>{{ objetivo.descricao }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <!-- Partes do Problema -->
+    <!-- Narrativa / Partes -->
     {% for parte in partes %}
     <div class="parte">
         <div class="parte-header">Parte {{ parte.ordem }}</div>
-        <div class="parte-content">{{ parte.enunciado|linebreaks }}</div>
+        <div class="parte-content">
+            {{ parte.enunciado|linebreaks }}
+        </div>
     </div>
     {% endfor %}
 
+    <!-- Rodapé Renderizado via @frame -->
     <div id="footerContent" class="footer">
-        Página <pdf:pagenumber> de <pdf:pagecount> - {{ problema.titulo }} - Gerado em {{ data_exportacao }}
+        Página <pdf:pagenumber> de <pdf:pagecount> &mdash; {{ problema.titulo }}
     </div>
+
 </body>
 </html>
