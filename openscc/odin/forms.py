@@ -380,3 +380,46 @@ class LandingPageConfigForm(forms.ModelForm):
             'feature_3_text': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+
+class CampaignLeadUpdateForm(forms.ModelForm):
+    class Meta:
+        model = CampaignLead
+        fields = ['name', 'phone', 'email', 'status', 'interested_course']
+        
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'interested_course': forms.Select(attrs={'class': 'form-select'}),
+            # Destacamos o select de status visualmente
+            'status': forms.Select(attrs={'class': 'form-select fw-bold text-primary bg-light'}), 
+        }
+
+    # ADICIONE ESTE BLOCO
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['interested_course'].required = False
+        self.fields['interested_course'].empty_label = "--- A definir / Aguardando Isenção ---"
+
+class InternalLeadForm(forms.ModelForm):
+    class Meta:
+        model = CampaignLead
+        fields = ['name', 'phone', 'email', 'interested_course', 'campaign', 'status']
+        
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome Completo'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(00) 00000-0000'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@exemplo.com'}),
+            'interested_course': forms.Select(attrs={'class': 'form-select'}),
+            'campaign': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select fw-bold text-primary bg-light'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Permite salvar o lead sem curso e sem campanha
+        self.fields['interested_course'].required = False
+        self.fields['interested_course'].empty_label = "--- A definir / Aguardando Isenção ---"
+        
+        self.fields['campaign'].required = False
+        self.fields['campaign'].empty_label = "--- Banco Geral (Sem campanha) ---"
