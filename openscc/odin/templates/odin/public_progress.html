@@ -1,0 +1,128 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progresso do Vestibular - {{ campaign.course.name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8f9fa; }
+        .hero-header { background: linear-gradient(135deg, #b11116 0%, #8a0c10 100%); color: white; padding: 3rem 0; }
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO FATEC -->
+    <div class="hero-header text-center shadow-sm">
+        <div class="container">
+            <h5 class="text-white-50 text-uppercase tracking-widest mb-2"><i class="bi bi-buildings-fill me-2"></i>FATEC Marília</h5>
+            <h1 class="display-5 fw-bold mb-0">Progresso de Captação</h1>
+            <p class="fs-5 mt-2 mb-0 opacity-75">{{ campaign.name }}</p>
+        </div>
+    </div>
+
+    <div class="container py-5">
+        
+        <!-- KPIs BÁSICOS -->
+        <div class="row g-4 mb-5 justify-content-center">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm text-center h-100">
+                    <div class="card-body p-4">
+                        <h6 class="text-muted fw-bold text-uppercase mb-3">Vagas Abertas</h6>
+                        <h1 class="display-4 fw-bolder text-dark mb-0">{{ goal }}</h1>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm text-center h-100 border-bottom border-4 border-success">
+                    <div class="card-body p-4">
+                        <h6 class="text-success fw-bold text-uppercase mb-3">Inscritos Pagos</h6>
+                        <h1 class="display-4 fw-bolder text-success mb-0">{{ total_paid }}</h1>
+                        <span class="badge bg-success mt-2">{{ progress_pct }}% da meta</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GRÁFICO LIMPO (SEM PATROCÍNIOS) -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0 text-dark text-center"><i class="bi bi-graph-up me-2"></i>Curva de Crescimento (Real vs Esperado)</h5>
+                    </div>
+                    
+                    <div class="card-body p-4" style="height: 400px; position: relative;">
+                        <canvas id="publicYieldChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-5 text-muted small">
+            <p>© {% now "Y" %} FATEC Marília. Atualizado em tempo real pelo motor de Yield Management.</p>
+        </div>
+    </div>
+
+    <!-- SCRIPT DO GRÁFICO (REDUZIDO) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('publicYieldChart').getContext('2d');
+            
+            // Pega o JSON limpo gerado pela View
+            const chartData = JSON.parse('{{ clean_chart_data|escapejs }}');
+            
+            if (chartData && chartData.labels) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [
+                            {
+                                label: 'Inscritos Pagos (Real)',
+                                data: chartData.real_pagantes,
+                                borderColor: '#198754', 
+                                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#198754'
+                            },
+                            {
+                                label: 'Projeção Matemática (Curva S)',
+                                data: chartData.projetada,
+                                borderColor: '#adb5bd', 
+                                borderDash: [5, 5], 
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }
+                            // NOTE: O dataset de patrocínios foi removido no Python e não existe aqui!
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { 
+                            legend: { position: 'top' },
+                            tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.8)' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, grid: { borderDash: [2, 4] } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

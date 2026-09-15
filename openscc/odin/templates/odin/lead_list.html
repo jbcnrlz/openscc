@@ -11,7 +11,12 @@
     
     <!-- AÇÕES: Exportar e Novo Lead -->
     <div class="d-flex gap-2">
-        <a href="{% url 'odin:lead_export_csv' %}" class="btn btn-outline-success d-flex align-items-center fw-medium px-4 py-2 hover-lift shadow-sm">
+<!-- NOVO: Botão de Importar -->
+        <a href="{% url 'odin:lead_import_isencao' %}" class="btn btn-outline-warning text-dark d-flex align-items-center fw-bold px-3 py-2 hover-lift shadow-sm">
+            <i class="bi bi-upload fs-5 me-2"></i> Importar Isenções
+        </a>
+        
+        <a href="{% url 'odin:lead_export_csv' %}" class="btn btn-outline-success d-flex align-items-center fw-medium px-3 py-2 hover-lift shadow-sm">
             <i class="bi bi-file-earmark-excel fs-5 me-2"></i> Exportar
         </a>
         <a href="{% url 'odin:lead_create_manual' %}" class="btn btn-primary d-flex align-items-center fw-bold px-4 py-2 hover-lift shadow-sm">

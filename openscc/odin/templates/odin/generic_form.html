@@ -34,7 +34,7 @@
                 <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Novo Registro Institucional</h5>
             </div>
             <div class="card-body bg-white p-4">
-                <form method="post" class="django-form">
+                <form method="post" class="django-form" enctype="multipart/form-data" novalidate>
                     {% csrf_token %}
                     
                     {% for field in form %}

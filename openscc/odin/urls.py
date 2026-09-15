@@ -103,4 +103,7 @@ urlpatterns = [
     path('lead/<int:pk>/editar/', views.CampaignLeadUpdateView.as_view(), name='lead_update'),
     # Cadastro manual de Leads pela equipe
     path('leads/novo/', views.ManualLeadCreateView.as_view(), name='lead_create_manual'),
+    path('leads/importar-isencao/', views.ImportIsencaoView.as_view(), name='lead_import_isencao'),
+    # Link público para os professores acompanharem o vestibular
+    path('campanha/<int:pk>/progresso/', views.CampaignPublicProgressView.as_view(), name='campaign_public_progress'),
 ]
