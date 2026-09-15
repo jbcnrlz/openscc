@@ -1,8 +1,8 @@
-import csv, datetime, json, qrcode
+import csv, datetime, json, qrcode, pandas as pd
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-
+from django.views.generic import FormView
 from django.http import HttpResponse
 from django.views import View
 from django.urls import reverse_lazy, reverse
@@ -927,3 +927,106 @@ class ManualLeadCreateView(ProfessorRequiredMixin, CreateView):
         # Após salvar, redireciona de volta para a Base Central de Leads
         # (Substitua 'odin:lead_list' pelo nome exato da URL da sua Base Central, se for diferente)
         return reverse_lazy('odin:lead_list')
+
+# 1. Formulário embutido para fazer o Upload
+class ImportIsencaoForm(forms.Form):
+    arquivo = forms.FileField(
+        label="Arquivo de Isenção (.xls)",
+        help_text="Faça o upload do arquivo Inscritos-Isencao.xls gerado pelo sistema. Todos entrarão com status 'Isenção'."
+    )
+    # Deixa a equipe vincular esses leads a uma campanha específica, se quiser
+    campaign = forms.ModelChoiceField(
+        queryset=VestibularCampaign.objects.all(),
+        required=False,
+        empty_label="--- Nenhuma (Deixar na Base Central) ---",
+        label="Vincular à Campanha (Opcional)",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['arquivo'].widget.attrs.update({'class': 'form-control', 'accept': '.xls,.html'})
+
+
+# 2. A View que processa o arquivo
+class ImportIsencaoView(ProfessorRequiredMixin, FormView):
+    template_name = 'odin/generic_form.html'
+    form_class = ImportIsencaoForm
+    success_url = reverse_lazy('odin:lead_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = "Importar Planilha de Isenções"
+        return context
+
+    def form_valid(self, form):
+        arquivo = self.request.FILES['arquivo']
+        campaign = form.cleaned_data.get('campaign')
+
+        try:
+            # O Pandas lê automaticamente a tabela HTML escondida no .xls
+            dfs = pd.read_html(arquivo)
+            df = dfs[0]
+
+            novos_leads = []
+            
+            # Percorre cada linha da planilha
+            for index, row in df.iterrows():
+                nome = str(row.get('Nome', '')).strip()
+                celular = str(row.get('Celular', '')).strip()
+                email = str(row.get('E-mail', '')).strip()
+
+                # Se a linha tiver um nome válido (ignora linhas vazias/NaN)
+                if nome and nome.lower() != 'nan' and nome != '---':
+                    
+                    # Limpa "nan" do telefone e email caso estejam em branco
+                    if celular.lower() == 'nan': celular = ''
+                    if email.lower() == 'nan': email = ''
+
+                    novos_leads.append(CampaignLead(
+                        name=nome,
+                        phone=celular,
+                        email=email,
+                        status='isencao', # <--- Já entra com o status correto do funil
+                        campaign=campaign
+                    ))
+
+            # Salva todos os 56 de uma vez no banco de dados!
+            CampaignLead.objects.bulk_create(novos_leads)
+            
+            messages.success(self.request, f"{len(novos_leads)} candidatos importados com sucesso para a fila de Isenção!")
+            
+        except Exception as e:
+            messages.error(self.request, f"Erro ao processar o arquivo. Verifique se o formato está correto. Detalhe técnico: {str(e)}")
+
+        return super().form_valid(form)
+
+class CampaignPublicProgressView(DetailView):
+    """Dashboard de somente leitura para compartilhar com os professores (sem dados sensíveis)"""
+    model = VestibularCampaign
+    template_name = 'odin/public_progress.html'
+    context_object_name = 'campaign'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 1. Pega os dados originais do gráfico
+        raw_chart_data = self.object.get_chart_data()
+        chart_data = json.loads(raw_chart_data)
+        
+        # 2. APAGA os dados de patrocínio para esconder a estratégia financeira
+        if 'real_patrocinados' in chart_data:
+            del chart_data['real_patrocinados']
+            
+        # Devolve o JSON limpo para o template
+        context['clean_chart_data'] = json.dumps(chart_data)
+        
+        # 3. Indicadores Básicos
+        context['total_paid'] = self.object.accumulated_paid
+        context['goal'] = self.object.vacancies
+        if context['goal'] > 0:
+            context['progress_pct'] = round((context['total_paid'] / context['goal']) * 100, 1)
+        else:
+            context['progress_pct'] = 0
+            
+        return context
