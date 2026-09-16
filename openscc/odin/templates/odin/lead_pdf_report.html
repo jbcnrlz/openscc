@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>Relatório de Leads</title>
+    <style>
+        /* O WeasyPrint lida perfeitamente com a regra @page */
+        @page { 
+            size: A4 landscape; 
+            margin: 15mm 15mm; 
+            
+            /* Adiciona numeração de página no rodapé automaticamente */
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 9pt;
+                color: #6c757d;
+            }
+        }
+        
+        body { 
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+            font-size: 10pt; 
+            color: #333; 
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Cabeçalho do Documento */
+        .header { border-bottom: 3px solid #b11116; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h2 { color: #b11116; margin: 0 0 5px 0; font-size: 18pt; text-transform: uppercase; letter-spacing: 1px;}
+        .header p { margin: 0; color: #6c757d; font-size: 10pt; }
+
+        /* Tabela Profissional */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; text-align: left; }
+        th { 
+            background-color: #f8f9fa; 
+            color: #495057; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            font-size: 8pt;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Zebrado sutil */
+        tr:nth-child(even) { background-color: #fcfcfc; }
+        
+        .text-center { text-align: center; }
+        .badge { 
+            display: inline-block;
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-size: 8pt; 
+            font-weight: bold;
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        
+        /* Cores específicas para WeasyPrint ler e imprimir certinho */
+        .badge-novo { background-color: #f8d7da; color: #842029; }
+        .badge-isencao { background-color: #fff3cd; color: #664d03; }
+        .badge-pago { background-color: #d1e7dd; color: #0f5132; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>FATEC Marília | Relatório de Candidatos</h2>
+        <p><strong>Total de registros exportados:</strong> {{ leads|length }} &nbsp;|&nbsp; <strong>Data do relatório:</strong> {% now "d/m/Y H:i" %}</p>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Nome Completo</th>
+                <th>Telefone</th>
+                <th>E-mail</th>
+                <th>Curso de Interesse</th>
+                <th class="text-center">Status</th>
+                <th>Data Cadastro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lead in leads %}
+            <tr>
+                <td><strong>{{ lead.name }}</strong></td>
+                <td>{{ lead.phone }}</td>
+                <td>{{ lead.email|default:"-" }}</td>
+                <td>{{ lead.interested_course.name|default:"A definir" }}</td>
+                <td class="text-center">
+                    <!-- Aplica classes dinâmicas dependendo do status -->
+                    <span class="badge badge-{{ lead.status }}">{{ lead.get_status_display }}</span>
+                </td>
+                <td>{{ lead.created_at|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
