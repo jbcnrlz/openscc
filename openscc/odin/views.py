@@ -1,4 +1,5 @@
 import csv, datetime, json, qrcode, pandas as pd
+from django.template.loader import render_to_string
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -16,6 +17,7 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Q
+from weasyprint import HTML
 
 class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """Garante que o usuário logado seja um Aluno"""
@@ -468,12 +470,68 @@ class CampaignLeadListView(ProfessorRequiredMixin, ListView):
     context_object_name = 'leads'
 
     def get_queryset(self):
-        # Traz todos os leads das campanhas que pertencem aos cursos deste coordenador
-        return CampaignLead.objects.filter(
+        # 1. Traz todos os leads das campanhas que pertencem aos cursos deste coordenador 
+        # (incluindo os cadastrados manualmente sem campanha)
+        qs = CampaignLead.objects.filter(
             Q(campaign__created_by=self.request.user) | 
             Q(campaign__collaborators=self.request.user) |
-            Q(campaign__isnull=True)  # <--- Libera os leads cadastrados manualmente
-        ).distinct().order_by('-created_at')
+            Q(campaign__isnull=True)  
+        ).distinct()
+
+        # 2. Captura os parâmetros de busca e filtro da URL
+        q = self.request.GET.get('q', '').strip()
+        status = self.request.GET.get('status', '')
+        course = self.request.GET.get('course', '')
+        sort = self.request.GET.get('sort', '-created_at') # Padrão: Mais recentes
+
+        # 3. Aplica a Busca por Texto (Nome, Email ou Telefone)
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(phone__icontains=q) |
+                Q(email__icontains=q)
+            )
+        
+        # 4. Aplica o Filtro de Status
+        if status:
+            qs = qs.filter(status=status)
+            
+        # 5. Aplica o Filtro de Curso
+        if course:
+            if course == 'none':
+                qs = qs.filter(interested_course__isnull=True) # A definir (Sem curso)
+            else:
+                qs = qs.filter(interested_course_id=course)
+
+        # 6. Aplica a Ordenação Segura
+        valid_sorts = ['name', '-name', 'phone', '-phone', 'created_at', '-created_at']
+        if sort in valid_sorts:
+            qs = qs.order_by(sort)
+        else:
+            qs = qs.order_by('-created_at')
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Envia a lista de cursos para o HTML desenhar o Select de Filtro
+        context['courses'] = Course.objects.all().order_by('name')
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.GET.get('export') == 'pdf':
+            # 1. Renderiza o template HTML como uma string pura
+            html_string = render_to_string('odin/lead_pdf_report.html', context, request=self.request)
+            
+            # 2. O WeasyPrint lê a string e gera o PDF na memória
+            pdf_file = HTML(string=html_string, base_url=self.request.build_absolute_uri()).write_pdf()
+            
+            # 3. Configura o envio do arquivo para o navegador
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="Relatorio_Leads_FATEC.pdf"'
+            return response
+            
+        return super().render_to_response(context, **response_kwargs)
 
 class ExportLeadsCSVView(ProfessorRequiredMixin, View):
     """Gera o arquivo CSV formatado para abrir perfeitamente no Excel pt-BR"""
