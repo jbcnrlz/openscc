@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>Relatório Executivo - {{ campaign.name }}</title>
+    <style>
+        @page { 
+            size: A4 portrait; 
+            margin: 15mm; 
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 8pt;
+                color: #6c757d;
+            }
+        }
+        
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; margin: 0; }
+        
+        /* Cabeçalho */
+        .header { border-bottom: 3px solid #b11116; padding-bottom: 15px; margin-bottom: 25px; }
+        .header h1 { color: #b11116; margin: 0 0 5px 0; font-size: 20pt; text-transform: uppercase; }
+        .header p { margin: 0; color: #6c757d; font-size: 11pt; }
+        .badge { background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; }
+
+        /* Grid de Cartões */
+        .row { display: block; width: 100%; margin-bottom: 20px; clear: both; }
+        .col-half { width: 48%; float: left; }
+        .col-third { width: 31%; float: left; }
+        .spacer { width: 4%; float: left; height: 1px; } /* Espaço entre colunas */
+        .spacer-third { width: 3.5%; float: left; height: 1px; }
+        
+        /* Box de KPIs */
+        .kpi-box { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            border-radius: 6px; 
+            padding: 15px; 
+            text-align: center;
+            height: 80px;
+        }
+        .kpi-box h4 { margin: 0 0 5px 0; font-size: 10pt; color: #495057; text-transform: uppercase; }
+        .kpi-box .value { font-size: 24pt; font-weight: bold; margin: 0; color: #b11116; }
+        .kpi-box .subtext { font-size: 8pt; color: #6c757d; margin-top: 5px; }
+        
+        /* Tabelas */
+        h3 { color: #212529; font-size: 14pt; margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 6px; text-align: left; font-size: 9pt; }
+        th { background-color: #f1f3f5; color: #495057; text-transform: uppercase; font-size: 8pt; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO -->
+    <div class="header">
+        <h1>Relatório de Desempenho</h1>
+        <p><strong>Campanha:</strong> {{ campaign.name }} | <strong>Curso:</strong> {{ campaign.course.name }}</p>
+        <p style="margin-top: 5px;">
+            <strong>Meta de Vagas:</strong> {{ campaign.vacancies }} | 
+            <strong>Data do Relatório:</strong> {% now "d/m/Y H:i" %}
+        </p>
+    </div>
+
+    <!-- BLOCO 1: OTIMIZAÇÃO E MATEMÁTICA (YIELD) -->
+    <h3>1. Projeções Matemáticas (Yield Management)</h3>
+    <div class="row">
+        <div class="col-third">
+            <div class="kpi-box">
+                <h4>Projeção Final</h4>
+                <div class="value">{{ projections.projecao_final_pagantes }}</div>
+                <div class="subtext">Pagantes estimados</div>
+            </div>
+        </div>
+        <div class="spacer-third"></div>
+        
+        <div class="col-third">
+            <div class="kpi-box">
+                <h4>Cota de Patrocínios</h4>
+                <div class="value">{{ projections.s_alvo }}</div>
+                <div class="subtext">Para bater a meta de vagas</div>
+            </div>
+        </div>
+        <div class="spacer-third"></div>
+        
+        <div class="col-third">
+            <div class="kpi-box" style="border-color: #b11116; background-color: #fff5f5;">
+                <h4 style="color: #b11116;">Status Atual da Curva</h4>
+                <div class="value">{{ projections.progresso_esperado_pct }}%</div>
+                <div class="subtext">Progresso decorrido do funil</div>
+            </div>
+        </div>
+    </div>
+    <!-- Fim Float Fix -->
+    <div style="clear: both;"></div>
+
+
+    <!-- BLOCO 2: FUNIL COMERCIAL -->
+    <h3>2. Funil de Captação (CRM)</h3>
+    <div class="row">
+        <div class="col-half">
+            <table>
+                <thead>
+                    <tr><th>Estágio do Funil</th><th class="text-right">Volume</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Total de Leads Captados</td><td class="text-right"><strong>{{ total_leads }}</strong></td></tr>
+                    <tr><td>Novos (Ainda não atendidos)</td><td class="text-right">{{ leads_novos }}</td></tr>
+                    <tr><td>Em Negociação / Isenção</td><td class="text-right">{{ leads_quentes }}</td></tr>
+                    <tr><td>Perdidos / Desistentes</td><td class="text-right">{{ leads_perdidos }}</td></tr>
+                    <tr style="background-color: #e9ecef;">
+                        <td><strong>Convertidos (Matriculados)</strong></td>
+                        <td class="text-right"><strong style="color: #198754;">{{ leads_convertidos }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="spacer"></div>
+        <div class="col-half">
+            <div class="kpi-box" style="height: 125px; padding-top: 35px;">
+                <h4>Conversão Real de Leads</h4>
+                <!-- Regra de três simples para achar a taxa de conversão do funil -->
+                <div class="value">
+                    {% if total_leads > 0 %}
+                        {% widthratio leads_convertidos total_leads 100 %}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+                <div class="subtext">Dos leads que entraram, quantos pagaram.</div>
+            </div>
+        </div>
+    </div>
+    <div style="clear: both;"></div>
+
+
+    <!-- BLOCO 3: HISTÓRICO DE AÇÕES DE CAMPO -->
+    <h3>3. Ações e Eventos em Campo</h3>
+    {% if all_actions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Ação Executada</th>
+                    <th>Data</th>
+                    <th>Responsável</th>
+                    <th class="text-center">Leads Gerados</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for action in all_actions %}
+                <tr>
+                    <td><strong>{{ action.title }}</strong><br><span style="font-size: 8pt; color:#666;">{{ action.location }}</span></td>
+                    <td>{{ action.scheduled_date|date:"d/m/Y" }}</td>
+                    <td>{{ action.responsible.first_name|default:action.responsible.username|default:"Não atribuído" }}</td>
+                    <td class="text-center"><strong>{{ action.captured_leads.count }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: #6c757d; font-style: italic;">Nenhuma ação de campo foi vinculada a esta campanha até o momento.</p>
+    {% endif %}
+
+
+    <!-- BLOCO 4: HISTÓRICO DIÁRIO -->
+    <h3 style="page-break-before: always;">4. Histórico de Inserções Diárias</h3>
+    {% if records %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Data do Registro</th>
+                    <th class="text-center">Pagantes do Dia (Orgânico)</th>
+                    <th class="text-center">Patrocínios Liberados</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>{{ record.date|date:"d/m/Y" }}</td>
+                    <td class="text-center">+{{ record.new_paid }}</td>
+                    <td class="text-center">+{{ record.sponsored_released }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="background-color: #f1f3f5; font-weight: bold;">
+                    <td>TOTAL ACUMULADO</td>
+                    <td class="text-center">{{ campaign.accumulated_paid }}</td>
+                    <td class="text-center">{{ campaign.accumulated_sponsored }}</td>
+                </tr>
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: #6c757d; font-style: italic;">Nenhum registro diário foi feito no painel matemático ainda.</p>
+    {% endif %}
+
+</body>
+</html>
