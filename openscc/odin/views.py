@@ -330,6 +330,22 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
         
         return context
 
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.GET.get('export') == 'pdf':
+            # Renderiza o template específico para o PDF
+            html_string = render_to_string('odin/campaign_pdf_report.html', context, request=self.request)
+            
+            # Gera o PDF com WeasyPrint
+            pdf_file = HTML(string=html_string, base_url=self.request.build_absolute_uri()).write_pdf()
+            
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            # Nome do arquivo dinâmico
+            nome_arquivo = f"Relatorio_Campanha_{self.object.name.replace(' ', '_')}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+            return response
+            
+        return super().render_to_response(context, **response_kwargs)
+
 class DailyRecordCreateView(ProfessorRequiredMixin, CreateView):
     """Processa o formulário de novos pagantes do dia sem sair do painel"""
     model = CampaignDailyRecord
