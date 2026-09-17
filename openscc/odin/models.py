@@ -307,24 +307,37 @@ class VestibularCampaign(models.Model):
         return f"{self.name} - {self.course.name}"
 
     @property
+    def effective_start_date(self):
+        """Usa a data de inscrição se existir, senão cai para a data da campanha de marketing"""
+        return self.inscription_start_date if self.inscription_start_date else self.start_date
+
+    @property
+    def effective_end_date(self):
+        """Usa a data final de inscrição se existir, senão cai para a data final da campanha"""
+        return self.inscription_end_date if self.inscription_end_date else self.end_date
+
+    @property
     def total_days(self):
-        """Total de dias da campanha"""
-        return max(1, (self.end_date - self.start_date).days + 1)
+        """Total de dias reais de captação (Base da Curva S)"""
+        return max(1, (self.effective_end_date - self.effective_start_date).days + 1)
         
     @property
     def elapsed_days(self):
-        """Quantos dias já se passaram desde o início"""
+        """Quantos dias já se passaram desde a abertura das INSCRIÇÕES"""
+        from datetime import date
         hoje = date.today()
-        if hoje < self.start_date: return 0
-        if hoje > self.end_date: return self.total_days
-        return (hoje - self.start_date).days + 1
+        if hoje < self.effective_start_date: return 0
+        if hoje > self.effective_end_date: return self.total_days
+        return (hoje - self.effective_start_date).days + 1
 
     @property
     def accumulated_paid(self):
+        from django.db.models import Sum
         return self.daily_records.aggregate(total=Sum('new_paid'))['total'] or 0
 
     @property
     def accumulated_sponsored(self):
+        from django.db.models import Sum
         return self.daily_records.aggregate(total=Sum('sponsored_released'))['total'] or 0
 
     def get_yield_projections(self):
@@ -332,11 +345,12 @@ class VestibularCampaign(models.Model):
         if self.elapsed_days == 0:
             return {'projecao_final_pagantes': 0, 's_alvo': 0, 'liberar_hoje': 0}
 
-        # 1. Gera a Curva Logística Histórica (S-Curve) puramente com Math (sem numpy)
+        import math
+        # 1. Gera a Curva Logística Histórica (S-Curve)
         dias = self.total_days
         step = 6.0 / (dias - 1) if dias > 1 else 0
         curva = [1 / (1 + math.exp(-(-3.0 + (i * step)))) for i in range(dias)]
-        curva_historica = [c / curva[-1] for c in curva] # Normalizada para bater 100% no último dia
+        curva_historica = [c / curva[-1] for c in curva]
 
         # 2. Descobre onde estamos na curva
         dia_index = self.elapsed_days - 1
@@ -364,7 +378,6 @@ class VestibularCampaign(models.Model):
             'projecao_final_pagantes': int(projecao_final),
             's_alvo': s_alvo,
             'liberar_hoje': liberar_hoje
-
         }
 
     def get_chart_data(self):
@@ -375,7 +388,10 @@ class VestibularCampaign(models.Model):
         
         try:
             dias = self.total_days
-            labels = [(self.start_date + timedelta(days=i)).strftime('%d/%m') for i in range(dias)]
+            start = self.effective_start_date # <--- AQUI ESTÁ O SEGREDO DO GRÁFICO!
+            
+            # Os labels (eixo X) agora começam no dia da Inscrição
+            labels = [(start + timedelta(days=i)).strftime('%d/%m') for i in range(dias)]
 
             # S-Curve
             step = 6.0 / (dias - 1) if dias > 1 else 0
@@ -402,7 +418,7 @@ class VestibularCampaign(models.Model):
             acumulado_s = 0
 
             for i in range(dias):
-                current_date = self.start_date + timedelta(days=i)
+                current_date = start + timedelta(days=i) # Varre a partir do dia de inscrição
                 
                 if i < self.elapsed_days:
                     if current_date in records_dict:
@@ -422,13 +438,13 @@ class VestibularCampaign(models.Model):
             })
             
         except Exception as e:
-            # Em caso de falha matemática, forçamos o envio de um JSON de erro válido
             return json.dumps({
                 'labels': ['Erro de Cálculo', str(e)],
                 'projetada': [0, 0],
                 'real_pagantes': [0, 0],
                 'real_patrocinados': [0, 0]
-            })        
+            })
+
 class CampaignDailyRecord(models.Model):
     """Input diário do funil para corrigir as predições do algoritmo"""
     campaign = models.ForeignKey(VestibularCampaign, on_delete=models.CASCADE, related_name='daily_records')
