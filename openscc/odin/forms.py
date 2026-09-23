@@ -384,22 +384,29 @@ class LandingPageConfigForm(forms.ModelForm):
 class CampaignLeadUpdateForm(forms.ModelForm):
     class Meta:
         model = CampaignLead
-        fields = ['name', 'phone', 'email', 'status', 'interested_course']
+        # 1. Adicionamos o 'campaign' na lista de campos
+        fields = ['name', 'phone', 'email', 'status', 'interested_course', 'campaign']
         
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'interested_course': forms.Select(attrs={'class': 'form-select'}),
-            # Destacamos o select de status visualmente
+            # 2. Adicionamos o estilo para o select da campanha
+            'campaign': forms.Select(attrs={'class': 'form-select'}), 
             'status': forms.Select(attrs={'class': 'form-select fw-bold text-primary bg-light'}), 
         }
 
-    # ADICIONE ESTE BLOCO
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Regras do Curso
         self.fields['interested_course'].required = False
         self.fields['interested_course'].empty_label = "--- A definir / Aguardando Isenção ---"
+        
+        # 3. Regras da Campanha (Permite desvincular o lead de uma campanha)
+        self.fields['campaign'].required = False
+        self.fields['campaign'].empty_label = "--- Banco Geral (Sem campanha) ---"
 
 class InternalLeadForm(forms.ModelForm):
     class Meta:
