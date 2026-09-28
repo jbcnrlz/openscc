@@ -395,14 +395,13 @@ def listarPerguntas(request):
 def gerarPerguntas(request):
     if request.method == 'POST':
         form = GeracaoPerguntasForm(request.user, request.POST)
-        print("POST data:", request.POST)
         if form.is_valid():
             # Coletar dados do formulário
             fontes_selecionadas = form.cleaned_data['fontes_selecionadas']
 
             fontesPaths = []
             for ft in fontes_selecionadas:
-                fontesPaths.append([ft.fonte.path,ft.nome])
+                fontesPaths.append([ft.fonte.path, ft.nome])
 
             assunto = form.cleaned_data['assunto']
             prompt_personalizado = form.cleaned_data['prompt_personalizado']
@@ -411,30 +410,69 @@ def gerarPerguntas(request):
             
             # Coletar quantidades por tipo
             quantidades = {}
+            quantidades_raw = {} # Guardará os dados preenchidos para repopular em caso de erro 503
             tipos = TiposDePergunta.objects.all()
+            
             for tipo in tipos:
-                quantidade = int(request.POST[f'tipo_{tipo.id}'])
+                val_str = request.POST.get(f'tipo_{tipo.id}', '0')
+                quantidade = int(val_str) if val_str.isdigit() else 0
+                quantidades_raw[tipo.id] = quantidade
+                
                 if quantidade and quantidade > 0:
                     quantidades[tipo.descricao] = quantidade
                     contExtra += f'- {quantidade} QUESTÕES DO TIPO {tipo.descricao}\n'
                     if tipo.textoParaLLM is not None:
                         contExtra += tipo.textoParaLLM + '\n'
+
+            # Cria o Contexto de Recuperação Segura (State Backup)
+            import json
+            context_retry = {
+                'form': form,
+                'tipos_pergunta': tipos,
+                'titulo': 'Gerar Perguntas com IA',
+                'quantidades_raw_json': json.dumps(quantidades_raw)
+            }
             
             if not any(quantidades.values()):
                 messages.error(request, 'Selecione pelo menos uma quantidade de perguntas.')
-                return render(request, 'mimir/gerarPerguntas.html', {'form': form})
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
             
             if not fontes_selecionadas:
                 messages.error(request, 'Selecione pelo menos uma fonte.')
-                return render(request, 'mimir/gerarPerguntas.html', {'form': form})
-            print(f"Quantidades: {quantidades}")
-            iaResposta = processarRespostaIA(getQuestionsFromSource(fontesPaths, quantidades, contExtra))
-            context = {
-                'perguntas': iaResposta['perguntas'] if 'perguntas' in iaResposta else [],
-                'assunto': assunto
-            }
-            return render(request, 'mimir/perguntasGeradas.html', context)
-    
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
+            
+            try:
+                resposta_bruta = getQuestionsFromSource(fontesPaths, quantidades, contExtra, request.user)
+                iaResposta = processarRespostaIA(resposta_bruta)
+                
+                # 1. Verifica se a API do LangChain retornou o erro empacotado no JSON
+                if isinstance(iaResposta, dict) and 'erro' in iaResposta:
+                    messages.warning(request, f"A IA não conseguiu completar a geração. Motivo: {iaResposta['erro']}. Seus dados estão salvos, tente novamente.")
+                    return render(request, 'mimir/gerarPerguntas.html', context_retry)
+                    
+                # 2. Verifica se a IA teve sobrecarga (503) e retornou vazio sem erro explícito
+                if not iaResposta or (isinstance(iaResposta, dict) and not iaResposta.get('perguntas')):
+                    messages.warning(request, "A API está enfrentando instabilidade (High Demand - Erro 503). Por favor, não mude de tela e clique em Gerar novamente.")
+                    return render(request, 'mimir/gerarPerguntas.html', context_retry)
+
+                # Se sucesso, avança para a próxima tela
+                context = {
+                    'perguntas': iaResposta['perguntas'] if 'perguntas' in iaResposta else [],
+                    'assunto': assunto
+                }
+                return render(request, 'mimir/perguntasGeradas.html', context)
+                
+            except Exception as e:
+                messages.error(request, f"Falha de comunicação: {str(e)}")
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
+                
+        else:
+            messages.error(request, 'Por favor, corrija os erros no formulário.')
+            return render(request, 'mimir/gerarPerguntas.html', {
+                'form': form,
+                'tipos_pergunta': TiposDePergunta.objects.all(),
+                'titulo': 'Gerar Perguntas com IA'
+            })
     else:
         form = GeracaoPerguntasForm(request.user)
     
