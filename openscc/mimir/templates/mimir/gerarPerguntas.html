@@ -208,6 +208,7 @@
     </div>
 </div>
 
+<!-- Loader Modal -->
 <div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
@@ -226,16 +227,41 @@
 </div>
 
 <script>
-// Troca de Abas Manual via Botão
+// Troca de Abas Manual via Botão (Resolve o bug do empilhamento)
 function switchTab(tabId) {
     const triggerEl = document.querySelector(`#${tabId}`);
     if (triggerEl) {
-        bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        // Simula o clique exato na aba superior para limpar o estado ativo anterior
+        triggerEl.click();
+        
+        // Rola a tela suavemente para o topo do form para evitar que o usuário se perca
+        window.scrollTo({
+            top: document.querySelector('.card-header').offsetTop - 20,
+            behavior: 'smooth'
+        });
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     calcularTotal();
+
+    // --- LÓGICA DE RECUPERAÇÃO DE ESTADO (ERRO 503 / HIGH DEMAND) ---
+    // Se a API falhar, o Django recarregará a tela. Este script pega o que havia 
+    // sido preenchido e repopula os números instantaneamente.
+    {% if quantidades_raw_json %}
+        try {
+            const qtds_restauradas = JSON.parse('{{ quantidades_raw_json|safe }}');
+            for (const [id, val] of Object.entries(qtds_restauradas)) {
+                const inputNum = document.getElementById('id_tipo_' + id);
+                if(inputNum) {
+                    inputNum.value = val;
+                }
+            }
+            calcularTotal(); // Atualiza os banners de totais com os dados recuperados
+        } catch(e) { 
+            console.error("Não foi possível restaurar os dados das quantidades:", e); 
+        }
+    {% endif %}
 
     // --- LÓGICA DE FILTRO DAS FONTES DE REFERÊNCIA ---
     const searchFontes = document.getElementById('searchFontes');
