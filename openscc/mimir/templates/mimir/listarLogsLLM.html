@@ -2,6 +2,7 @@
 
 {% block mainContent %}
 <div class="container-fluid px-4 mt-4">
+    <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
         <h2 class="h4 mb-0 text-dark fw-bold">
             <i class="fas fa-microchip me-2 text-indigo"></i> Monitoramento de Inteligência Artificial
@@ -13,6 +14,7 @@
         </div>
     </div>
 
+    <!-- Cards de Estatísticas -->
     <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6">
             <div class="card border-start border-indigo border-4 shadow-sm h-100 py-2 border-0">
@@ -81,6 +83,7 @@
         </div>
     </div>
 
+    <!-- Tabela de Logs -->
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 fs-6 fw-bold text-secondary">
@@ -140,76 +143,12 @@
                                     </button>
                                 </td>
                             </tr>
-
-                            <div class="modal fade" id="logModal{{ log.id }}" tabindex="-1">
-                                <div class="modal-dialog modal-xl modal-dialog-centered">
-                                    <div class="modal-content shadow-lg border-0">
-                                        <div class="modal-header bg-light border-bottom">
-                                            <h5 class="modal-title fw-bold text-dark">
-                                                <i class="fas fa-bug me-2 text-indigo"></i> Detalhes da Requisição #{{ log.id }}
-                                            </h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body bg-light p-4">
-                                            
-                                            <div class="d-flex justify-content-between align-items-center bg-white p-3 border rounded shadow-sm mb-4">
-                                                <div>
-                                                    <span class="badge bg-indigo text-white me-2">{{ log.model_used }}</span>
-                                                    <span class="text-muted small">Executado em: {{ log.created_at|date:"d/m/Y H:i:s" }}</span>
-                                                </div>
-                                                <div>
-                                                    <span class="text-muted small border-end pe-2 me-2">Duração: <strong>{{ log.duration_ms|default:"0" }}ms</strong></span>
-                                                    <span class="text-muted small border-end pe-2 me-2">Prompt: <strong>{{ log.tokens_input|default:"0" }}</strong> tk</span>
-                                                    <span class="text-muted small">Resposta: <strong>{{ log.tokens_output|default:"0" }}</strong> tk</span>
-                                                </div>
-                                            </div>
-
-                                            {% if log.status == 'error' %}
-                                            <div class="alert alert-danger shadow-sm border-danger">
-                                                <h6 class="fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Mensagem de Erro Retornada:</h6>
-                                                <div class="font-monospace small mt-2">{{ log.error_message|linebreaksbr }}</div>
-                                            </div>
-                                            {% endif %}
-
-                                            <div class="row g-4">
-                                                <div class="col-md-6">
-                                                    <div class="card h-100 border-secondary shadow-sm">
-                                                        <div class="card-header bg-secondary text-white fw-bold py-2 d-flex justify-content-between align-items-center">
-                                                            <span><i class="fas fa-upload me-1"></i> Prompt Enviado</span>
-                                                            <button class="btn btn-sm btn-light py-0 px-2 text-secondary" onclick="copiarTexto('prompt-{{ log.id }}')" title="Copiar Prompt">
-                                                                <i class="fas fa-copy"></i>
-                                                            </button>
-                                                        </div>
-                                                        <div class="card-body bg-white p-0">
-                                                            <pre class="m-0 p-3 text-dark custom-scrollbar" id="prompt-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.prompt }}</pre>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-md-6">
-                                                    <div class="card h-100 border-indigo shadow-sm">
-                                                        <div class="card-header bg-indigo text-white fw-bold py-2 d-flex justify-content-between align-items-center">
-                                                            <span><i class="fas fa-download me-1"></i> Retorno do Modelo (Payload)</span>
-                                                            <button class="btn btn-sm btn-light py-0 px-2 text-indigo" onclick="copiarTexto('response-{{ log.id }}')" title="Copiar Resposta">
-                                                                <i class="fas fa-copy"></i>
-                                                            </button>
-                                                        </div>
-                                                        <div class="card-body bg-indigo bg-opacity-10 p-0">
-                                                            <pre class="m-0 p-3 text-dark custom-scrollbar" id="response-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.response|default:"Nenhuma resposta recebida." }}</pre>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
+                <!-- Paginação -->
                 {% if is_paginated %}
                 <div class="card-footer bg-white border-top py-3">
                     <nav aria-label="Navegação de páginas">
@@ -238,6 +177,77 @@
         </div>
     </div>
 </div>
+
+<!-- ========================================== -->
+<!-- ZONA DE MODAIS (Fora da Tabela)            -->
+<!-- ========================================== -->
+{% for log in logs %}
+<div class="modal fade" id="logModal{{ log.id }}" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-light border-bottom">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="fas fa-bug me-2 text-indigo"></i> Detalhes da Requisição #{{ log.id }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                
+                <div class="d-flex justify-content-between align-items-center bg-white p-3 border rounded shadow-sm mb-4">
+                    <div>
+                        <span class="badge bg-indigo text-white me-2">{{ log.model_used }}</span>
+                        <span class="text-muted small">Executado em: {{ log.created_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-muted small border-end pe-2 me-2">Duração: <strong>{{ log.duration_ms|default:"0" }}ms</strong></span>
+                        <span class="text-muted small border-end pe-2 me-2">Prompt: <strong>{{ log.tokens_input|default:"0" }}</strong> tk</span>
+                        <span class="text-muted small">Resposta: <strong>{{ log.tokens_output|default:"0" }}</strong> tk</span>
+                    </div>
+                </div>
+
+                {% if log.status == 'error' %}
+                <div class="alert alert-danger shadow-sm border-danger">
+                    <h6 class="fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Mensagem de Erro Retornada:</h6>
+                    <div class="font-monospace small mt-2">{{ log.error_message|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-secondary shadow-sm">
+                            <div class="card-header bg-secondary text-white fw-bold py-2 d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-upload me-1"></i> Prompt Enviado</span>
+                                <button class="btn btn-sm btn-light py-0 px-2 text-secondary" onclick="copiarTexto('prompt-{{ log.id }}')" title="Copiar Prompt">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body bg-white p-0">
+                                <pre class="m-0 p-3 text-dark custom-scrollbar" id="prompt-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.prompt }}</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card h-100 border-indigo shadow-sm">
+                            <div class="card-header bg-indigo text-white fw-bold py-2 d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-download me-1"></i> Retorno do Modelo (Payload)</span>
+                                <button class="btn btn-sm btn-light py-0 px-2 text-indigo" onclick="copiarTexto('response-{{ log.id }}')" title="Copiar Resposta">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body bg-indigo bg-opacity-10 p-0">
+                                <pre class="m-0 p-3 text-dark custom-scrollbar" id="response-{{ log.id }}" style="height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap;">{{ log.response|default:"Nenhuma resposta recebida." }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 
 <style>
 /* Identidade Visual Índigo para o Módulo de IA */
