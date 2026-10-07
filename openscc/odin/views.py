@@ -1104,3 +1104,83 @@ class CampaignPublicProgressView(DetailView):
             context['progress_pct'] = 0
             
         return context
+
+class CampaignLeadDeleteView(ProfessorRequiredMixin, DeleteView):
+    """View para excluir um lead com tela de confirmação"""
+    model = CampaignLead
+    template_name = 'odin/lead_confirm_delete.html'
+    
+    def get_success_url(self):
+        # Redireciona para a base central após apagar
+        return reverse_lazy('odin:lead_list')
+        
+    def delete(self, request, *args, **kwargs):
+        # Mensagem de sucesso flutuante ao confirmar
+        messages.success(self.request, "Lead excluído com sucesso da base de dados.")
+        return super().delete(request, *args, **kwargs)
+
+class UpdateLeadsStatusView(ProfessorRequiredMixin, FormView):
+    template_name = 'odin/generic_form.html'
+    form_class = UpdateLeadsStatusForm
+    success_url = reverse_lazy('odin:lead_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = "Atualizar Status em Lote (Via Planilha)"
+        return context
+
+    def form_valid(self, form):
+        arquivo = self.request.FILES['arquivo']
+
+        try:
+            # Lê o arquivo HTML disfarçado de XLS
+            dfs = pd.read_html(arquivo)
+            df = dfs[0]
+
+            # Pega o nome da última coluna (que contém o status: Boleto, Pago, etc.)
+            coluna_status = df.columns[-1]
+
+            # Dicionário de tradução Vunesp/CPS -> Nosso Funil
+            mapa_status = {
+                'boleto': 'inscrito_nao_pago',
+                'pago': 'pago',
+                'efetivada': 'pago',
+                'isento': 'pago', # Isentos confirmados também garantem vaga
+            }
+
+            atualizados = 0
+
+            for index, row in df.iterrows():
+                nome = str(row.get('Nome', '')).strip()
+                email = str(row.get('E-mail', '')).strip()
+                telefone = str(row.get('Celular', '')).strip()
+                status_raw = str(row.get(coluna_status, '')).strip().lower()
+
+                # Tenta traduzir o status da planilha para o do nosso sistema
+                novo_status = mapa_status.get(status_raw)
+
+                if novo_status and nome and nome != 'nan':
+                    # Busca o Lead no nosso banco. A ordem de prioridade é: E-mail, depois Celular, depois Nome exato.
+                    query = Q()
+                    if email and email != 'nan':
+                        query |= Q(email__iexact=email)
+                    if telefone and telefone != 'nan':
+                        query |= Q(phone__icontains=telefone[-8:]) # Compara os últimos 8 dígitos do telefone
+                    if not query:
+                        query = Q(name__iexact=nome)
+
+                    leads_encontrados = CampaignLead.objects.filter(query)
+
+                    # Se achou o lead e o status dele for diferente, atualiza
+                    for lead in leads_encontrados:
+                        if lead.status != novo_status:
+                            lead.status = novo_status
+                            lead.save(update_fields=['status'])
+                            atualizados += 1
+
+            messages.success(self.request, f"Sucesso! {atualizados} candidatos tiveram seus status atualizados no funil.")
+
+        except Exception as e:
+            messages.error(self.request, f"Erro ao processar o arquivo. Verifique o formato. Detalhe técnico: {str(e)}")
+
+        return super().form_valid(form)

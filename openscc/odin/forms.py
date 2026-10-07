@@ -430,3 +430,13 @@ class InternalLeadForm(forms.ModelForm):
         
         self.fields['campaign'].required = False
         self.fields['campaign'].empty_label = "--- Banco Geral (Sem campanha) ---"
+
+class UpdateLeadsStatusForm(forms.Form):
+    arquivo = forms.FileField(
+        label="Planilha de Acompanhamento (.xls)",
+        help_text="Faça o upload do arquivo de Acompanhamento das Inscrições. O sistema buscará os candidatos pelo e-mail/celular e atualizará os status."
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['arquivo'].widget.attrs.update({'class': 'form-control', 'accept': '.xls,.html'})

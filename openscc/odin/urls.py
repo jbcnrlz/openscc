@@ -106,4 +106,8 @@ urlpatterns = [
     path('leads/importar-isencao/', views.ImportIsencaoView.as_view(), name='lead_import_isencao'),
     # Link público para os professores acompanharem o vestibular
     path('campanha/<int:pk>/progresso/', views.CampaignPublicProgressView.as_view(), name='campaign_public_progress'),
+    # Exclusão de Lead
+    path('lead/<int:pk>/excluir/', views.CampaignLeadDeleteView.as_view(), name='lead_delete'),
+    # Rota para atualização em lote via planilha de acompanhamento
+    path('leads/atualizar-status/', views.UpdateLeadsStatusView.as_view(), name='lead_update_status_xls'),
 ]
