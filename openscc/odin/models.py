@@ -340,107 +340,63 @@ class VestibularCampaign(models.Model):
         from django.db.models import Sum
         return self.daily_records.aggregate(total=Sum('sponsored_released'))['total'] or 0
 
-    def get_yield_projections(self):
-        """O Motor de Inferência: Retorna a projeção final e a cota ideal de patrocínio"""
-        if self.elapsed_days == 0:
-            return {'projecao_final_pagantes': 0, 's_alvo': 0, 'liberar_hoje': 0}
-
-        import math
-        # 1. Gera a Curva Logística Histórica (S-Curve)
-        dias = self.total_days
-        step = 6.0 / (dias - 1) if dias > 1 else 0
-        curva = [1 / (1 + math.exp(-(-3.0 + (i * step)))) for i in range(dias)]
-        curva_historica = [c / curva[-1] for c in curva]
-
-        # 2. Descobre onde estamos na curva
-        dia_index = self.elapsed_days - 1
-        progresso_esperado = curva_historica[dia_index]
-        
-        pagantes_atuais = self.accumulated_paid
-        patrocinios_atuais = self.accumulated_sponsored
-
-        # 3. Estima pagantes totais ao fim do funil
-        if progresso_esperado < 0.05 or pagantes_atuais == 0:
-            projecao_final = 0
-        else:
-            projecao_final = pagantes_atuais / progresso_esperado
-
-        # 4. Calcula o número ótimo de patrocínios (Controlador)
-        gap_vagas = self.vacancies - (self.yield_paid * projecao_final)
-        s_vagas = max(0, gap_vagas / self.yield_sponsored)
-        s_volume = max(0, self.min_inscriptions - projecao_final)
-        
-        s_alvo = math.ceil(max(s_vagas, s_volume))
-        liberar_hoje = max(0, s_alvo - patrocinios_atuais)
-
-        return {
-            'progresso_esperado_pct': round(progresso_esperado * 100, 1),
-            'projecao_final_pagantes': int(projecao_final),
-            's_alvo': s_alvo,
-            'liberar_hoje': liberar_hoje
-        }
-
-    def get_chart_data(self):
-        """Prepara os dados da campanha garantindo a devolução de um JSON válido"""
-        import json
-        import math
-        from datetime import timedelta
-        
+    def get_yield_projections(self, periodo_override=None):
+        """O Motor de Inferência Preditiva (Machine Learning + Andamento + Yield Management)"""
         try:
-            dias = self.total_days
-            start = self.effective_start_date # <--- AQUI ESTÁ O SEGREDO DO GRÁFICO!
-            
-            # Os labels (eixo X) agora começam no dia da Inscrição
-            labels = [(start + timedelta(days=i)).strftime('%d/%m') for i in range(dias)]
+            from .ml_vestibular import PreditorVestibularOdin
+            preditor = PreditorVestibularOdin()
+            res = preditor.projetar_campanha_odin(self, periodo_override=periodo_override)
+            # Remove chave interna de array numpy para serialização limpa no template
+            res.pop('_curva_aprendida_grid', None)
+            return res
+        except Exception:
+            if self.elapsed_days == 0:
+                return {'projecao_final_pagantes': 0, 's_alvo': 0, 'liberar_hoje': 0, 'progresso_esperado_pct': 0}
 
-            # S-Curve
+            import math
+            dias = self.total_days
             step = 6.0 / (dias - 1) if dias > 1 else 0
             curva = [1 / (1 + math.exp(-(-3.0 + (i * step)))) for i in range(dias)]
             curva_historica = [c / curva[-1] for c in curva]
 
-            # Projeção
-            projecoes = self.get_yield_projections()
-            projecao = projecoes.get('projecao_final_pagantes', 0) if projecoes else 0
+            dia_index = self.elapsed_days - 1
+            progresso_esperado = curva_historica[dia_index]
             
-            if projecao == 0:
-                taxa = self.yield_paid if self.yield_paid > 0 else 0.60
-                projecao = int(self.vacancies / taxa)
-                
-            linha_projetada = [round(c * projecao) for c in curva_historica]
+            pagantes_atuais = self.accumulated_paid
+            patrocinios_atuais = self.accumulated_sponsored
 
-            # Dados Reais
-            records = list(self.daily_records.all().order_by('date'))
-            records_dict = {r.date: r for r in records}
+            if progresso_esperado < 0.05 or pagantes_atuais == 0:
+                projecao_final = 0
+            else:
+                projecao_final = pagantes_atuais / progresso_esperado
 
-            linha_real_pagantes = []
-            linha_real_patrocinados = []
-            acumulado_p = 0
-            acumulado_s = 0
-
-            for i in range(dias):
-                current_date = start + timedelta(days=i) # Varre a partir do dia de inscrição
-                
-                if i < self.elapsed_days:
-                    if current_date in records_dict:
-                        acumulado_p += records_dict[current_date].new_paid
-                        acumulado_s += records_dict[current_date].sponsored_released
-                    linha_real_pagantes.append(acumulado_p)
-                    linha_real_patrocinados.append(acumulado_s)
-                else:
-                    linha_real_pagantes.append(None)
-                    linha_real_patrocinados.append(None)
-
-            return json.dumps({
-                'labels': labels,
-                'projetada': linha_projetada,
-                'real_pagantes': linha_real_pagantes,
-                'real_patrocinados': linha_real_patrocinados,
-            })
+            gap_vagas = self.vacancies - (self.yield_paid * projecao_final)
+            s_vagas = max(0, gap_vagas / self.yield_sponsored)
+            s_volume = max(0, self.min_inscriptions - projecao_final)
             
+            s_alvo = math.ceil(max(s_vagas, s_volume))
+            liberar_hoje = max(0, s_alvo - patrocinios_atuais)
+
+            return {
+                'progresso_esperado_pct': round(progresso_esperado * 100, 1),
+                'projecao_final_pagantes': int(projecao_final),
+                's_alvo': s_alvo,
+                'liberar_hoje': liberar_hoje
+            }
+
+    def get_chart_data(self, periodo_override=None):
+        """Prepara os dados da campanha usando a curva aprendida pelo modelo de ML e o andamento real"""
+        try:
+            from .ml_vestibular import PreditorVestibularOdin
+            preditor = PreditorVestibularOdin()
+            return preditor.gerar_dados_grafico_campanha(self, periodo_override=periodo_override)
         except Exception as e:
+            import json
             return json.dumps({
                 'labels': ['Erro de Cálculo', str(e)],
                 'projetada': [0, 0],
+                'cenario_otimista': [0, 0],
+                'cenario_pessimista': [0, 0],
                 'real_pagantes': [0, 0],
                 'real_patrocinados': [0, 0]
             })

@@ -41,6 +41,7 @@ urlpatterns = [
     path('configuracoes/eixos-formativos/', views.FormativeAxisListView.as_view(), name='formative_axis_list'),
     path('configuracoes/eixos-formativos/novo/', views.FormativeAxisCreateView.as_view(), name='formative_axis_create'),
     path('vestibular/', views.VestibularCampaignListView.as_view(), name='campaign_list'),
+    path('vestibular/preditor-ml/', views.VestibularMLPredictorView.as_view(), name='vestibular_ml_predictor'),
     path('vestibular/nova/', views.VestibularCampaignCreateView.as_view(), name='campaign_create'),
     path('vestibular/<int:pk>/', views.VestibularCampaignDetailView.as_view(), name='campaign_dashboard'),
     path('vestibular/<int:campaign_id>/registro/', views.DailyRecordCreateView.as_view(), name='daily_record_create'),

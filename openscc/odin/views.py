@@ -308,12 +308,16 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
+        periodo_override = self.request.GET.get('periodo', '').strip().upper() or None
+        context['periodo_selecionado'] = periodo_override or ''
+
         context['all_actions'] = CampaignAction.objects.filter(
             Q(campaign=self.object) | Q(is_global=True)
         ).order_by('scheduled_date')
         
-        # Injeta o motor matemático na view
-        context['projections'] = self.object.get_yield_projections()
+        # Injeta o motor de Aprendizado de Máquina + Andamento na view
+        context['projections'] = self.object.get_yield_projections(periodo_override=periodo_override)
+        context['chart_data_json'] = self.object.get_chart_data(periodo_override=periodo_override)
         
         # Histórico de registros diários
         context['records'] = self.object.daily_records.all()
@@ -331,7 +335,8 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
         return context
 
     def render_to_response(self, context, **response_kwargs):
-        if self.request.GET.get('export') == 'pdf':
+        export_type = self.request.GET.get('export')
+        if export_type == 'pdf':
             # Renderiza o template específico para o PDF
             html_string = render_to_string('odin/campaign_pdf_report.html', context, request=self.request)
             
@@ -339,8 +344,37 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
             pdf_file = HTML(string=html_string, base_url=self.request.build_absolute_uri()).write_pdf()
             
             response = HttpResponse(pdf_file, content_type='application/pdf')
-            # Nome do arquivo dinâmico
             nome_arquivo = f"Relatorio_Campanha_{self.object.name.replace(' ', '_')}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+            return response
+
+        if export_type == 'xlsx':
+            from .ml_vestibular import PreditorVestibularOdin
+            preditor = PreditorVestibularOdin()
+            periodo_override = self.request.GET.get('periodo', '').strip().upper() or None
+            dados = preditor.extrair_andamento_campanha(self.object)
+            res = preditor.projetar(
+                nome_curso=f"{self.object.course.name} ({self.object.name})",
+                periodo=periodo_override,
+                inscritos_hoje=dados['inscritos_pagos'],
+                dia_atual=max(1, dados['dia_atual']),
+                total_dias=dados['dias_totais'],
+                meta=self.object.min_inscriptions,
+                andamento_diario=dados['andamento_pagos'],
+                num_registros_reais=dados['num_registros'],
+                leads_boletos_pendentes=dados['boletos_pendentes'],
+                leads_em_negociacao=dados['em_negociacao'],
+            )
+            xlsx_bytes = preditor.gerar_bytes_excel(
+                [res],
+                dia_atual=max(1, dados['dia_atual']),
+                total_dias=dados['dias_totais'],
+            )
+            response = HttpResponse(
+                xlsx_bytes,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            nome_arquivo = f"Projecao_ML_{self.object.name.replace(' ', '_')}.xlsx"
             response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
             return response
             
@@ -351,8 +385,36 @@ class DailyRecordCreateView(ProfessorRequiredMixin, CreateView):
     model = CampaignDailyRecord
     form_class = CampaignDailyRecordForm
 
+    def post(self, request, *args, **kwargs):
+        campaign = get_object_or_404(
+            VestibularCampaign.objects.filter(
+                Q(created_by=request.user) | Q(collaborators=request.user) | Q(course__professor=request.user)
+            ).distinct(),
+            id=self.kwargs.get('campaign_id'),
+        )
+        date_val = request.POST.get('date')
+        new_paid_val = int(request.POST.get('new_paid') or 0)
+        sponsored_val = int(request.POST.get('sponsored_released') or 0)
+        if date_val:
+            CampaignDailyRecord.objects.update_or_create(
+                campaign=campaign,
+                date=date_val,
+                defaults={
+                    'new_paid': max(0, new_paid_val),
+                    'sponsored_released': max(0, sponsored_val),
+                },
+            )
+            messages.success(request, "Registro diário salvo! As projeções de Machine Learning foram recalibradas com o novo andamento.")
+            return redirect('odin:campaign_dashboard', pk=campaign.id)
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
-        campaign = get_object_or_404(VestibularCampaign, id=self.kwargs.get('campaign_id'), course__professor=self.request.user)
+        campaign = get_object_or_404(
+            VestibularCampaign.objects.filter(
+                Q(created_by=self.request.user) | Q(collaborators=self.request.user) | Q(course__professor=self.request.user)
+            ).distinct(),
+            id=self.kwargs.get('campaign_id'),
+        )
         form.instance.campaign = campaign
         return super().form_valid(form)
 
@@ -1184,3 +1246,277 @@ class UpdateLeadsStatusView(ProfessorRequiredMixin, FormView):
             messages.error(self.request, f"Erro ao processar o arquivo. Verifique o formato. Detalhe técnico: {str(e)}")
 
         return super().form_valid(form)
+
+
+class VestibularMLPredictorView(ProfessorRequiredMixin, TemplateView):
+    """
+    Painel Consolidado de Inteligência Preditiva (Machine Learning) e Simulador do Vestibular.
+    Integra:
+      1. Projeção automática de todas as campanhas de vestibular do Odin usando o andamento diário real.
+      2. Simulador interativo para cursos novos/existentes (com suporte a andamento e exportação Excel .xlsx com gráfico).
+      3. Explorador e atualizador da base histórica vestibular.csv.
+    """
+    template_name = 'odin/vestibular_ml_predictor.html'
+
+    DEFAULT_SIMULATOR_COURSES = [
+        {"nome": "Tecnologia de Alimentos", "periodo": "N", "inscritos": 15, "meta": 60, "andamento_str": ""},
+        {"nome": "Desenvolvimento de Software Multiplataforma (DSM)", "periodo": "M", "inscritos": 19, "meta": 60, "andamento_str": ""},
+        {"nome": "Engenharia de Alimentos", "periodo": "M", "inscritos": 22, "meta": 60, "andamento_str": ""},
+        {"nome": "Gestão Comercial", "periodo": "N", "inscritos": 15, "meta": 60, "andamento_str": ""},
+    ]
+
+    @staticmethod
+    def _parse_andamento_str(andamento_str: str):
+        if not andamento_str or not andamento_str.strip():
+            return None
+        partes = [p.strip() for p in andamento_str.replace(";", ",").split(",") if p.strip()]
+        vals = []
+        for p in partes:
+            try:
+                vals.append(float(p))
+            except ValueError:
+                continue
+        return vals if len(vals) >= 2 else None
+
+    def _obter_projecoes_campanhas_ativas(self, preditor):
+        campaigns = VestibularCampaign.objects.filter(
+            Q(created_by=self.request.user) | Q(collaborators=self.request.user)
+        ).select_related('course').distinct().order_by('-start_date')
+
+        resultados_campanhas = []
+        for camp in campaigns:
+            dados = preditor.extrair_andamento_campanha(camp)
+            res = preditor.projetar(
+                nome_curso=f"{camp.course.name} — {camp.name}",
+                periodo=None,
+                inscritos_hoje=dados['inscritos_pagos'],
+                dia_atual=max(1, dados['dia_atual']),
+                total_dias=dados['dias_totais'],
+                meta=camp.min_inscriptions,
+                andamento_diario=dados['andamento_pagos'],
+                num_registros_reais=dados['num_registros'],
+                leads_boletos_pendentes=dados['boletos_pendentes'],
+                leads_em_negociacao=dados['em_negociacao'],
+            )
+            res['campaign_id'] = camp.id
+            res['campaign_name'] = camp.name
+            res['course_name'] = camp.course.name
+            res['vacancies'] = camp.vacancies
+            res['num_registros'] = dados['num_registros']
+            res.pop('_curva_aprendida_grid', None)
+            resultados_campanhas.append(res)
+        return resultados_campanhas
+
+    def get(self, request, *args, **kwargs):
+        from .ml_vestibular import PreditorVestibularOdin, BASE_CSV_PATH
+
+        preditor = PreditorVestibularOdin()
+        export_mode = request.GET.get('export')
+
+        if export_mode == 'csv_historico' and BASE_CSV_PATH.exists():
+            with open(BASE_CSV_PATH, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='text/csv; charset=utf-8')
+                response['Content-Disposition'] = 'attachment; filename="vestibular.csv"'
+                return response
+
+        if export_mode == 'xlsx_campanhas':
+            campanhas_proj = self._obter_projecoes_campanhas_ativas(preditor)
+            if not campanhas_proj:
+                messages.warning(request, "Não há campanhas cadastradas para exportar.")
+                return redirect('odin:vestibular_ml_predictor')
+            dia_ref = campanhas_proj[0]['dia_atual']
+            total_ref = campanhas_proj[0]['total_dias']
+            xlsx_bytes = preditor.gerar_bytes_excel(campanhas_proj, dia_atual=dia_ref, total_dias=total_ref)
+            response = HttpResponse(
+                xlsx_bytes,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            response['Content-Disposition'] = 'attachment; filename="projecao_ml_campanhas_odin.xlsx"'
+            return response
+
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        from .ml_vestibular import PreditorVestibularOdin, BASE_CSV_PATH
+
+        acao = request.POST.get('acao', 'simular')
+
+        # 1. Upload de nova base histórica vestibular.csv
+        if acao == 'upload_csv':
+            arquivo = request.FILES.get('arquivo_csv')
+            if not arquivo:
+                messages.error(request, "Selecione um arquivo .csv válido para atualizar a base histórica.")
+                return redirect('odin:vestibular_ml_predictor')
+            try:
+                conteudo = arquivo.read().decode('utf-8')
+                linhas = [l for l in conteudo.splitlines() if l.strip()]
+                if len(linhas) < 2 or 'curso' not in linhas[0].lower():
+                    messages.error(request, "O arquivo CSV deve conter o cabeçalho 'curso,período,0,1,2,...' e pelo menos uma linha de dados.")
+                    return redirect('odin:vestibular_ml_predictor')
+                BASE_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
+                with open(BASE_CSV_PATH, 'w', encoding='utf-8') as f:
+                    f.write(conteudo)
+                messages.success(request, "Base histórica (vestibular.csv) atualizada e modelo de Machine Learning re-treinado com sucesso!")
+            except Exception as e:
+                messages.error(request, f"Erro ao processar o arquivo CSV: {str(e)}")
+            return redirect('odin:vestibular_ml_predictor')
+
+        # 2. Simulação de Cursos / Exportação Excel do Simulador
+        preditor = PreditorVestibularOdin()
+        try:
+            dia_atual = max(1, int(request.POST.get('dia_atual') or 38))
+            total_dias = max(1, int(request.POST.get('total_dias') or 54))
+        except ValueError:
+            dia_atual, total_dias = 38, 54
+
+        nomes = request.POST.getlist('curso_nome')
+        periodos = request.POST.getlist('curso_periodo')
+        inscritos_list = request.POST.getlist('curso_inscritos')
+        metas_list = request.POST.getlist('curso_meta')
+        andamentos_list = request.POST.getlist('curso_andamento')
+
+        cursos_simulados = []
+        resultados_simulador = []
+
+        for i in range(len(nomes)):
+            nome = nomes[i].strip()
+            if not nome:
+                continue
+            per = periodos[i].strip() if i < len(periodos) else 'N'
+            try:
+                insc = float(inscritos_list[i]) if i < len(inscritos_list) and inscritos_list[i] != '' else 0.0
+            except ValueError:
+                insc = 0.0
+            try:
+                meta_v = int(metas_list[i]) if i < len(metas_list) and metas_list[i] != '' else 60
+            except ValueError:
+                meta_v = 60
+            andamento_raw = andamentos_list[i].strip() if i < len(andamentos_list) else ''
+            andamento_parsed = self._parse_andamento_str(andamento_raw)
+            if andamento_parsed and insc == 0.0:
+                insc = andamento_parsed[-1]
+
+            cursos_simulados.append({
+                "nome": nome,
+                "periodo": per,
+                "inscritos": int(round(insc)),
+                "meta": meta_v,
+                "andamento_str": andamento_raw,
+            })
+
+            res = preditor.projetar(
+                nome_curso=nome,
+                periodo=per,
+                inscritos_hoje=insc,
+                dia_atual=dia_atual,
+                total_dias=total_dias,
+                meta=meta_v,
+                andamento_diario=andamento_parsed,
+                num_registros_reais=len(andamento_parsed) if andamento_parsed else 0,
+            )
+            res['andamento_str'] = andamento_raw
+            res.pop('_curva_aprendida_grid', None)
+            resultados_simulador.append(res)
+
+        if acao == 'exportar_excel_simulador' and resultados_simulador:
+            xlsx_bytes = preditor.gerar_bytes_excel(
+                resultados_simulador, dia_atual=dia_atual, total_dias=total_dias
+            )
+            response = HttpResponse(
+                xlsx_bytes,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            response['Content-Disposition'] = 'attachment; filename="projecao_novos_cursos_ml.xlsx"'
+            return response
+
+        context = self.get_context_data(
+            dia_atual_sim=dia_atual,
+            total_dias_sim=total_dias,
+            cursos_simulados=cursos_simulados,
+            resultados_simulador=resultados_simulador,
+            aba_ativa='simulador',
+        )
+        return self.render_to_response(context)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .ml_vestibular import PreditorVestibularOdin
+
+        preditor = PreditorVestibularOdin()
+        campanhas_proj = self._obter_projecoes_campanhas_ativas(preditor)
+        context['campanhas_proj'] = campanhas_proj
+
+        # Totais consolidados das campanhas ativas
+        context['total_inscritos_campanhas'] = sum(c['inscritos_hoje'] for c in campanhas_proj)
+        context['total_projecao_ml_campanhas'] = sum(c['projecao_esperada'] for c in campanhas_proj)
+        context['total_otimista_campanhas'] = sum(c['cenario_otimista'] for c in campanhas_proj)
+        context['total_pessimista_campanhas'] = sum(c['cenario_pessimista'] for c in campanhas_proj)
+        context['total_meta_campanhas'] = sum(c['meta'] for c in campanhas_proj)
+
+        # Estado inicial ou pós-submissão do Simulador
+        dia_atual_sim = kwargs.get('dia_atual_sim', 38)
+        total_dias_sim = kwargs.get('total_dias_sim', 54)
+        cursos_sim = kwargs.get('cursos_simulados')
+        resultados_sim = kwargs.get('resultados_simulador')
+
+        if cursos_sim is None:
+            # Se houver campanhas ativas, usa como ponto de partida; caso contrário usa os 4 cursos de exemplo
+            if campanhas_proj:
+                dia_atual_sim = campanhas_proj[0]['dia_atual']
+                total_dias_sim = campanhas_proj[0]['total_dias']
+                cursos_sim = []
+                for c in campanhas_proj:
+                    cursos_sim.append({
+                        "nome": c['course_name'],
+                        "periodo": c['periodo'],
+                        "inscritos": c['inscritos_hoje'],
+                        "meta": c['meta'],
+                        "andamento_str": "",
+                    })
+            else:
+                cursos_sim = self.DEFAULT_SIMULATOR_COURSES
+
+        if resultados_sim is None:
+            resultados_sim = []
+            for c in cursos_sim:
+                andamento_parsed = self._parse_andamento_str(c.get("andamento_str", ""))
+                res = preditor.projetar(
+                    nome_curso=c["nome"],
+                    periodo=c["periodo"],
+                    inscritos_hoje=c["inscritos"],
+                    dia_atual=dia_atual_sim,
+                    total_dias=total_dias_sim,
+                    meta=c["meta"],
+                    andamento_diario=andamento_parsed,
+                    num_registros_reais=len(andamento_parsed) if andamento_parsed else 0,
+                )
+                res['andamento_str'] = c.get("andamento_str", "")
+                res.pop('_curva_aprendida_grid', None)
+                resultados_sim.append(res)
+
+        context['dia_atual_sim'] = dia_atual_sim
+        context['total_dias_sim'] = total_dias_sim
+        context['cursos_simulados'] = cursos_sim
+        context['resultados_simulador'] = resultados_sim
+        context['aba_ativa'] = kwargs.get('aba_ativa', self.request.GET.get('tab', 'campanhas' if campanhas_proj else 'simulador'))
+
+        # Totais do simulador e JSON para o gráfico comparativo do simulador
+        context['sim_total_inscritos'] = sum(r['inscritos_hoje'] for r in resultados_sim)
+        context['sim_total_pessimista'] = sum(r['cenario_pessimista'] for r in resultados_sim)
+        context['sim_total_esperada'] = sum(r['projecao_esperada'] for r in resultados_sim)
+        context['sim_total_otimista'] = sum(r['cenario_otimista'] for r in resultados_sim)
+        context['sim_total_meta'] = sum(r['meta'] for r in resultados_sim)
+        context['sim_total_deficit'] = sum(r['deficit_meta'] for r in resultados_sim)
+
+        context['sim_chart_json'] = json.dumps({
+            "labels": [r['curso'] for r in resultados_sim],
+            "atual": [r['inscritos_hoje'] for r in resultados_sim],
+            "pessimista": [r['cenario_pessimista'] for r in resultados_sim],
+            "esperada": [r['projecao_esperada'] for r in resultados_sim],
+            "otimista": [r['cenario_otimista'] for r in resultados_sim],
+            "meta": [r['meta'] for r in resultados_sim],
+        })
+
+        # Resumo da base histórica vestibular.csv
+        context['historico_info'] = preditor.obter_resumo_historico_csv()
+        return context
