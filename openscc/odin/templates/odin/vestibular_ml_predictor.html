@@ -18,13 +18,16 @@
             Ensemble de Aprendizado de Máquina calibrado por curvas históricas de turno (<code>vestibular.csv</code>) e pelo andamento diário real das campanhas no Odin.
         </p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-info text-dark btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#shareConsolidadoModal">
+            <i class="bi bi-send-check-fill me-1"></i> Enviar Dashboard de Decisão (Externo)
+        </button>
         <a href="?export=csv_historico" class="btn btn-outline-secondary btn-sm fw-semibold shadow-sm">
             <i class="bi bi-filetype-csv me-1"></i> Baixar vestibular.csv
         </a>
         {% if campanhas_proj %}
         <a href="?export=xlsx_campanhas" class="btn btn-success btn-sm fw-bold shadow-sm">
-            <i class="bi bi-file-earmark-excel me-1"></i> Exportar Campanhas Odin (.xlsx)
+            <i class="bi bi-file-earmark-excel me-1"></i> Exportar Campanhas (.xlsx)
         </a>
         {% endif %}
         <a href="{% url 'odin:campaign_list' %}" class="btn btn-outline-dark btn-sm fw-semibold shadow-sm">
@@ -111,14 +114,22 @@
         </div>
 
         <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                     <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-table me-2"></i>Projeções Calibradas pelo Andamento de Cada Campanha</h6>
                     <small class="text-muted">O modelo analisa os registros diários (<code>CampaignDailyRecord</code>) de cada campanha para ajustar o ritmo e encontrar a curva histórica mais próxima.</small>
                 </div>
-                <a href="?export=xlsx_campanhas" class="btn btn-sm btn-success fw-bold">
-                    <i class="bi bi-file-earmark-excel me-1"></i> Baixar Planilha Consolidada (.xlsx)
-                </a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_publica_campanhas }}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Abrir Painel Executivo Externo
+                    </a>
+                    <a href="?export=html_campanhas" class="btn btn-sm btn-info text-dark fw-bold">
+                        <i class="bi bi-filetype-html me-1"></i> Baixar Dashboard Interativo (.html)
+                    </a>
+                    <a href="?export=xlsx_campanhas" class="btn btn-sm btn-success fw-bold">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Planilha Consolidada (.xlsx)
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -315,14 +326,22 @@
             <!-- RESULTADOS DA SIMULAÇÃO -->
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-navy text-white py-3 d-flex justify-content-between align-items-center" style="background-color: #1e3a8a;">
+                    <div class="card-header bg-navy text-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="background-color: #1e3a8a;">
                         <div>
                             <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-line me-2"></i>Painel de Projeções: Posição Dia {{ dia_atual_sim }} de {{ total_dias_sim }}</h6>
                             <small class="text-white-50">Dinâmica calibrada por aprendizado de turno histórico + trajetória de andamento</small>
                         </div>
-                        <button type="button" class="btn btn-sm btn-light fw-bold text-primary" onclick="document.getElementById('inputAcaoSimulador').value='exportar_excel_simulador'; document.getElementById('formSimulador').submit();">
-                            <i class="bi bi-download me-1"></i> Baixar Planilha c/ Gráfico Embutido (.xlsx)
-                        </button>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ url_publica_simulador }}" target="_blank" class="btn btn-sm btn-info text-dark fw-bold">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> Abrir Painel Executivo Externo
+                            </a>
+                            <button type="button" class="btn btn-sm btn-warning text-dark fw-bold" onclick="document.getElementById('inputAcaoSimulador').value='exportar_html_simulador'; document.getElementById('formSimulador').submit();">
+                                <i class="bi bi-filetype-html me-1"></i> Baixar Dashboard Interativo (.html)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light fw-bold text-primary" onclick="document.getElementById('inputAcaoSimulador').value='exportar_excel_simulador'; document.getElementById('formSimulador').submit();">
+                                <i class="bi bi-download me-1"></i> Planilha c/ Gráfico (.xlsx)
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -514,8 +533,202 @@
 
 </div>
 
+<!-- Modal de Compartilhamento do Painel Executivo Consolidado / Simulador -->
+<div class="modal fade" id="shareConsolidadoModal" tabindex="-1" aria-labelledby="shareConsolidadoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="shareConsolidadoModalLabel">
+                    <i class="bi bi-send-check-fill text-info me-2"></i>Enviar Dashboard Executivo de Decisão (Para Pessoas Fora do Sistema)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-info border-0 bg-info bg-opacity-10 text-dark small mb-3">
+                    <i class="bi bi-lightbulb-fill text-primary me-1"></i>
+                    <strong>Dashboard Executivo Interativo:</strong> Quem receber o link ou o arquivo <code>.html</code> terá acesso às projeções de Machine Learning, matriz de risco por curso, recomendações táticas automatizadas e um <strong>Simulador Interativo "E se?"</strong> (para testar aumentos de ritmo de captação na hora), sem precisar de login no Odin.
+                </div>
+
+                <!-- Seletor de Fonte: Campanhas Ativas vs Simulador -->
+                <ul class="nav nav-tabs mb-3" id="shareSourceTabs" role="tablist">
+                    {% if campanhas_proj %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active fw-bold small" id="share-campanhas-tab" data-bs-toggle="tab" data-bs-target="#share-campanhas-pane" type="button" role="tab">
+                            <i class="bi bi-speedometer2 me-1"></i> Campanhas Ativas no Odin ({{ campanhas_proj|length }})
+                        </button>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not campanhas_proj %}active{% endif %} fw-bold small" id="share-simulador-tab" data-bs-toggle="tab" data-bs-target="#share-simulador-pane" type="button" role="tab">
+                            <i class="bi bi-sliders me-1"></i> Cenário do Simulador ({{ resultados_simulador|length }} cursos)
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    {% if campanhas_proj %}
+                    <!-- ABA INTERNA 1: COMPARTILHAR CAMPANHAS ATIVAS -->
+                    <div class="tab-pane fade show active" id="share-campanhas-pane" role="tabpanel">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="border rounded-3 p-3 h-100 bg-light">
+                                    <h6 class="fw-bold text-dark small mb-1"><i class="bi bi-globe2 text-primary me-1"></i> 1. Link Público Interativo (Sem Login)</h6>
+                                    <p class="text-muted small mb-2">Link assinado criptograficamente com os dados em tempo real das campanhas.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" id="urlPubCampanhasInput" class="form-control" value="{{ url_publica_campanhas }}" readonly>
+                                        <button class="btn btn-outline-primary fw-bold" type="button" onclick="copiarCampo('urlPubCampanhasInput', this)">Copiar</button>
+                                    </div>
+                                    <a href="{{ url_publica_campanhas }}" target="_blank" class="btn btn-sm btn-primary w-100 fw-semibold">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Abrir Painel Executivo
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded-3 p-3 h-100 bg-light">
+                                    <h6 class="fw-bold text-dark small mb-1"><i class="bi bi-filetype-html text-success me-1"></i> 2. Arquivo Dashboard Autocontido (.html)</h6>
+                                    <p class="text-muted small mb-2">Arquivo único interativo para anexar no WhatsApp, Teams ou E-mail.</p>
+                                    <div class="d-grid gap-2 mt-3">
+                                        <a href="?export=html_campanhas" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-download me-1"></i> Baixar Dashboard (.html)
+                                        </a>
+                                        <a href="?export=xlsx_campanhas" class="btn btn-sm btn-outline-success fw-semibold">
+                                            <i class="bi bi-file-earmark-excel me-1"></i> Baixar Planilha (.xlsx)
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border rounded-3 p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark small mb-0"><i class="bi bi-whatsapp text-success me-1"></i> 3. Resumo Executivo para WhatsApp</h6>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copiarCampo('whatsCampanhasTxt', this)">
+                                        <i class="bi bi-clipboard me-1"></i> Copiar
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-success fw-bold" onclick="abrirWhatsApp('whatsCampanhasTxt')">
+                                        <i class="bi bi-whatsapp me-1"></i> Enviar no WhatsApp
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="whatsCampanhasTxt" class="form-control form-control-sm font-monospace bg-light" rows="5" readonly>{{ resumo_whatsapp_campanhas }}</textarea>
+                        </div>
+
+                        <div class="border rounded-3 p-3 bg-light">
+                            <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-envelope-paper-fill text-primary me-1"></i> 4. Enviar por E-mail (com Dashboard .html em Anexo)</h6>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="enviar_email_executivo">
+                                <input type="hidden" name="origem_dados" value="campanhas">
+                                <input type="hidden" name="token_assinado" value="{{ token_campanhas }}">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <input type="text" name="destinatarios" class="form-control form-control-sm" placeholder="E-mails separados por vírgula" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="text" name="mensagem_extra" class="form-control form-control-sm" placeholder="Nota opcional...">
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-primary fw-bold">Enviar</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- ABA INTERNA 2: COMPARTILHAR SIMULADOR -->
+                    <div class="tab-pane fade {% if not campanhas_proj %}show active{% endif %}" id="share-simulador-pane" role="tabpanel">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="border rounded-3 p-3 h-100 bg-light">
+                                    <h6 class="fw-bold text-dark small mb-1"><i class="bi bi-globe2 text-primary me-1"></i> 1. Link Público do Cenário Simulado</h6>
+                                    <p class="text-muted small mb-2">Qualquer pessoa com este link abre o Dashboard Executivo com os cursos simulados.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" id="urlPubSimInput" class="form-control" value="{{ url_publica_simulador }}" readonly>
+                                        <button class="btn btn-outline-primary fw-bold" type="button" onclick="copiarCampo('urlPubSimInput', this)">Copiar</button>
+                                    </div>
+                                    <a href="{{ url_publica_simulador }}" target="_blank" class="btn btn-sm btn-primary w-100 fw-semibold">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Abrir Painel Executivo do Simulador
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded-3 p-3 h-100 bg-light">
+                                    <h6 class="fw-bold text-dark small mb-1"><i class="bi bi-filetype-html text-success me-1"></i> 2. Arquivo Dashboard Interativo (.html)</h6>
+                                    <p class="text-muted small mb-2">Baixe o arquivo HTML interativo para enviar diretamente por WhatsApp ou E-mail.</p>
+                                    <div class="d-grid gap-2 mt-3">
+                                        <a href="{{ url_publica_simulador }}?download=1" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-download me-1"></i> Baixar Dashboard (.html)
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-success fw-semibold" onclick="document.getElementById('inputAcaoSimulador').value='exportar_excel_simulador'; document.getElementById('formSimulador').submit();">
+                                            <i class="bi bi-file-earmark-excel me-1"></i> Baixar Planilha (.xlsx)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border rounded-3 p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark small mb-0"><i class="bi bi-whatsapp text-success me-1"></i> 3. Resumo Executivo para WhatsApp</h6>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copiarCampo('whatsSimTxt', this)">
+                                        <i class="bi bi-clipboard me-1"></i> Copiar
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-success fw-bold" onclick="abrirWhatsApp('whatsSimTxt')">
+                                        <i class="bi bi-whatsapp me-1"></i> Enviar no WhatsApp
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="whatsSimTxt" class="form-control form-control-sm font-monospace bg-light" rows="5" readonly>{{ resumo_whatsapp_simulador }}</textarea>
+                        </div>
+
+                        <div class="border rounded-3 p-3 bg-light">
+                            <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-envelope-paper-fill text-primary me-1"></i> 4. Enviar Cenário por E-mail (com Dashboard .html em Anexo)</h6>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="enviar_email_executivo">
+                                <input type="hidden" name="origem_dados" value="simulador">
+                                <input type="hidden" name="token_assinado" value="{{ token_simulador }}">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <input type="text" name="destinatarios" class="form-control form-control-sm" placeholder="E-mails separados por vírgula" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="text" name="mensagem_extra" class="form-control form-control-sm" placeholder="Nota opcional...">
+                                    </div>
+                                    <div class="col-md-2 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-primary fw-bold">Enviar</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+function copiarCampo(elId, btn) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    navigator.clipboard.writeText(el.value).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = 'Copiado!';
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+}
+
+function abrirWhatsApp(elId) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(el.value), '_blank');
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     // 1. Gráfico de Barras do Simulador
     const simCanvas = document.getElementById('simuladorBarChart');

@@ -547,12 +547,50 @@ class PreditorVestibularOdin:
         if meta is not None:
             if proj_esperada >= meta:
                 status = "Atingível (Dentro da Tendência)"
+                prioridade = "CONTROLADA"
             elif proj_otimista >= meta:
                 status = "Atenção (Exige Manter Ritmo Alto)"
+                prioridade = "ATENÇÃO"
             else:
                 status = "Exige Aceleração Extra"
+                prioridade = "CRÍTICA"
         else:
             status = "-"
+            prioridade = "CONTROLADA"
+
+        # Estimativa de probabilidade de atingir a meta baseada na distribuição triangular dos cenários ML
+        if meta_efetiva <= inscritos_hoje:
+            prob_meta_pct = 99
+        elif meta_efetiva <= proj_pessimista:
+            prob_meta_pct = 92
+        elif meta_efetiva <= proj_esperada:
+            span = max(1.0, proj_esperada - proj_pessimista)
+            prob_meta_pct = int(round(55 + 35 * ((proj_esperada - meta_efetiva) / span)))
+        elif meta_efetiva <= proj_otimista:
+            span = max(1.0, proj_otimista - proj_esperada)
+            prob_meta_pct = int(round(15 + 40 * ((proj_otimista - meta_efetiva) / span)))
+        else:
+            excess = (meta_efetiva - proj_otimista) / max(1.0, meta_efetiva)
+            prob_meta_pct = max(3, int(round(15 * (1.0 - min(1.0, excess * 2.5)))))
+
+        recomendacoes = self.gerar_recomendacoes_decisao(
+            nome_curso=nome_curso,
+            periodo=periodo_norm,
+            inscritos_hoje=int(round(inscritos_hoje)),
+            dia_atual=dia_atual,
+            total_dias=total_dias,
+            dias_restantes=dias_restantes,
+            proj_esperada=int(round(proj_esperada)),
+            proj_pessimista=int(round(proj_pessimista)),
+            proj_otimista=int(round(proj_otimista)),
+            meta=meta_efetiva,
+            deficit=int(round(deficit)),
+            taxa_diaria_necessaria=round(taxa_diaria, 2),
+            taxa_atual_7d=round(taxa_atual_7d, 2),
+            aceleracao_ratio=ens["aceleracao_ratio"],
+            leads_boletos_pendentes=leads_boletos_pendentes,
+            leads_em_negociacao=leads_em_negociacao,
+        )
 
         return {
             "curso": nome_curso,
@@ -575,11 +613,16 @@ class PreditorVestibularOdin:
             "cenario_otimista": int(round(proj_otimista)),
             "potencial_leads_quentes": potencial_leads,
             "projecao_com_leads": proj_com_leads,
+            "leads_boletos_pendentes": leads_boletos_pendentes,
+            "leads_em_negociacao": leads_em_negociacao,
             "meta": meta_efetiva,
             "deficit_meta": int(round(deficit)),
             "taxa_diaria_necessaria": round(taxa_diaria, 2),
             "taxa_diaria_atual_7d": round(taxa_atual_7d, 2),
             "status": status,
+            "prioridade_decisao": prioridade,
+            "probabilidade_meta_pct": prob_meta_pct,
+            "recomendacoes": recomendacoes,
             "usou_andamento_ml": ens["usou_andamento_ml"],
             "curva_mais_similar": ens["curva_mais_similar"],
             "similaridade_max_pct": ens["similaridade_max_pct"],
@@ -751,6 +794,11 @@ class PreditorVestibularOdin:
             "sigla_identificada": sigla,
             "potencial_leads_quentes": res_ml["potencial_leads_quentes"],
             "projecao_com_leads": res_ml["projecao_com_leads"],
+            "leads_boletos_pendentes": res_ml["leads_boletos_pendentes"],
+            "leads_em_negociacao": res_ml["leads_em_negociacao"],
+            "prioridade_decisao": res_ml["prioridade_decisao"],
+            "probabilidade_meta_pct": res_ml["probabilidade_meta_pct"],
+            "recomendacoes": res_ml["recomendacoes"],
             "num_registros": dados["num_registros"],
             "_curva_aprendida_grid": res_ml["_curva_aprendida_grid"],
         }
@@ -1096,6 +1144,170 @@ class PreditorVestibularOdin:
                 "curva_noturno": [round(float(media_n[i]) * 100, 1) for i in idx_sample],
             }),
         }
+
+    def gerar_recomendacoes_decisao(
+        self,
+        nome_curso: str,
+        periodo: str,
+        inscritos_hoje: int,
+        dia_atual: int,
+        total_dias: int,
+        dias_restantes: int,
+        proj_esperada: int,
+        proj_pessimista: int,
+        proj_otimista: int,
+        meta: int,
+        deficit: int,
+        taxa_diaria_necessaria: float,
+        taxa_atual_7d: float,
+        aceleracao_ratio: float,
+        leads_boletos_pendentes: int = 0,
+        leads_em_negociacao: int = 0,
+    ) -> list:
+        """
+        Gera recomendações executivas estruturadas para apoiar a tomada de decisão sobre os rumos do vestibular.
+        """
+        recs = []
+
+        # 1. Diagnóstico de Atingimento da Meta
+        if proj_esperada >= meta:
+            folga = proj_esperada - meta
+            recs.append({
+                "nivel": "success",
+                "icone": "bi-check2-circle",
+                "titulo": "Meta Dentro da Tendência Preditiva",
+                "acao": (
+                    f"Projeção ML ({proj_esperada} inscritos) supera a meta ({meta}) em +{folga}. "
+                    f"Manter cadência atual de captação ({taxa_atual_7d}/dia) e focar na presença de prova."
+                ),
+            })
+        elif proj_otimista >= meta:
+            gap_proj = meta - proj_esperada
+            acrescimo_diario = round(max(0.1, taxa_diaria_necessaria - taxa_atual_7d), 2)
+            recs.append({
+                "nivel": "warning",
+                "icone": "bi-exclamation-triangle-fill",
+                "titulo": "Zona de Atenção: Meta Exige Ritmo do Cenário Otimista",
+                "acao": (
+                    f"A projeção esperada ({proj_esperada}) está {gap_proj} abaixo da meta ({meta}), mas o "
+                    f"cenário otimista ({proj_otimista}) a alcança. É necessário elevar a conversão diária em "
+                    f"+{acrescimo_diario} inscrito(s)/dia pelos próximos {dias_restantes} dias."
+                ),
+            })
+        else:
+            gap_proj = meta - proj_esperada
+            recs.append({
+                "nivel": "danger",
+                "icone": "bi-lightning-charge-fill",
+                "titulo": "Intervenção Imediata Recomendada (Risco Alto de Déficit)",
+                "acao": (
+                    f"A tendência atual projeta {proj_esperada} inscritos (-{gap_proj} face à meta de {meta}). "
+                    f"Recomenda-se ação intensiva de campo/mídia e liberação estratégica de patrocínios para atingir "
+                    f"a média necessária de {taxa_diaria_necessaria} inscritos/dia."
+                ),
+            })
+
+        # 2. Análise de Momento e Dinâmica de Turno
+        if aceleracao_ratio < 0.88:
+            recs.append({
+                "nivel": "warning",
+                "icone": "bi-graph-down-arrow",
+                "titulo": "Desaceleração Recente Detectada pelo Modelo",
+                "acao": (
+                    f"A velocidade recente ({aceleracao_ratio}x do padrão histórico) perdeu tração. "
+                    "Antecipar divulgações em escolas parceiras e disparos de lembrete de prazo."
+                ),
+            })
+        elif aceleracao_ratio > 1.15:
+            recs.append({
+                "nivel": "info",
+                "icone": "bi-graph-up-arrow",
+                "titulo": "Tração Positiva no Andamento Recente",
+                "acao": (
+                    f"O curso apresenta aceleração de {aceleracao_ratio}x acima da curva histórica. "
+                    "Aproveitar o momento das ações atuais para maximizar conversões orgânicas."
+                ),
+            })
+
+        if periodo == "M" and (dia_atual / max(1, total_dias)) < 0.85:
+            recs.append({
+                "nivel": "info",
+                "icone": "bi-sunrise-fill",
+                "titulo": "Comportamento de Turno Matutino ( Pico de Reta Final )",
+                "acao": (
+                    "Historicamente, cursos Matutinos concentram até 55% das inscrições nos últimos 25% de dias. "
+                    "Reforçar visitas em turmas de 3º ano do Ensino Médio antes da reta final."
+                ),
+            })
+
+        # 3. Alavanca de Curto Prazo no Funil CRM
+        if leads_boletos_pendentes > 0 or leads_em_negociacao > 0:
+            recs.append({
+                "nivel": "primary",
+                "icone": "bi-whatsapp",
+                "titulo": "Alavanca Imediata no Funil de Leads (CRM)",
+                "acao": (
+                    f"Há {leads_boletos_pendentes} boleto(s) gerado(s) aguardando pagamento e "
+                    f"{leads_em_negociacao} candidato(s) em negociação/isenção. A abordagem ativa via WhatsApp "
+                    "pode converter esses candidatos sem custo adicional de atração."
+                ),
+            })
+
+        return recs
+
+    def gerar_resumo_executivo_texto(
+        self,
+        resultados: list,
+        titulo: str = "Vestibular",
+        url_publica: str = "",
+        url_painel: str = "",
+    ) -> str:
+        """
+        Gera um resumo executivo formatado (pronto para WhatsApp / E-mail) com todas as projeções
+        e recomendações de tomada de decisão.
+        """
+        url_final = url_publica or url_painel
+        if not resultados:
+            return "Nenhuma projeção disponível no momento."
+
+        tot_insc = sum(r.get("inscritos_hoje", 0) for r in resultados)
+        tot_esp = sum(r.get("projecao_esperada", 0) for r in resultados)
+        tot_pess = sum(r.get("cenario_pessimista", 0) for r in resultados)
+        tot_otim = sum(r.get("cenario_otimista", 0) for r in resultados)
+        tot_meta = sum(r.get("meta", 0) for r in resultados)
+        dia_ref = resultados[0].get("dia_atual", 0)
+        total_ref = resultados[0].get("total_dias", 0)
+
+        linhas = [
+            f"📊 *PAINEL EXECUTIVO DE DECISÃO — {titulo.upper()}*",
+            f"⏱️ *Posição da Campanha:* Dia {dia_ref} de {total_ref} ({ max(0, total_ref - dia_ref) } dias restantes)",
+            "━━━━━━━━━━━━━━━━━━━━",
+            f"🎯 *RESUMO CONSOLIDADO:*",
+            f"• Inscritos Pagos Hoje: *{tot_insc}*",
+            f"• Projeção Final ML (Esperada): *{tot_esp}* _(Meta: {tot_meta})_",
+            f"• Intervalo de Cenários ML: *{tot_pess}* (Pessimista) a *{tot_otim}* (Otimista)",
+            "━━━━━━━━━━━━━━━━━━━━",
+            "📌 *DIAGNÓSTICO POR CURSO:*",
+        ]
+
+        for r in resultados:
+            icone_st = "✅" if "Atingível" in r.get("status", "") else ("⚠️" if "Atenção" in r.get("status", "") else "🚨")
+            linhas.append(
+                f"{icone_st} *{r.get('curso')}* ({r.get('turno_extenso')})\n"
+                f"   • Hoje: *{r.get('inscritos_hoje')}* | Projeção ML: *{r.get('projecao_esperada')}* "
+                f"_[Pess: {r.get('cenario_pessimista')} | Otim: {r.get('cenario_otimista')}]_\n"
+                f"   • Meta: {r.get('meta')} (Faltam {r.get('deficit_meta')}) | Ritmo Nec.: *{r.get('taxa_diaria_necessaria')}/dia*\n"
+                f"   • Status: _{r.get('status')}_ (Chance Meta: {r.get('probabilidade_meta_pct', 50)}%)"
+            )
+
+        if url_final:
+            linhas.extend([
+                "━━━━━━━━━━━━━━━━━━━━",
+                f"🔗 *Acesse o Dashboard Interativo de Decisão:*",
+                f"{url_final}",
+            ])
+
+        return "\n".join(linhas)
 
 
 # Alias mantendo compatibilidade com o nome da classe em vestibularEstimator.py

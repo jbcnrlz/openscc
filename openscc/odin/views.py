@@ -12,12 +12,98 @@ from django.views.generic import TemplateView, ListView, CreateView, DetailView,
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .models import *
 from .forms import *
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.contrib import messages
-from django.core.mail import send_mail
+from django.core import signing
+from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
 from django.db.models import Q
 from weasyprint import HTML
+
+
+def _build_executive_dashboard_context(
+    preditor,
+    resultados,
+    titulo="Painel Executivo de Decisão — Vestibular",
+    subtitulo="",
+    campaign=None,
+    periodo_override=None,
+):
+    """
+    Constrói o dicionário completo de contexto para renderizar o template standalone
+    `odin/executive_decision_dashboard.html` (tanto via link público quanto como
+    arquivo .html autocontido para envio por WhatsApp/E-mail).
+    """
+    resultados_limpos = []
+    for r in resultados:
+        copia = dict(r)
+        copia.pop('_curva_aprendida_grid', None)
+        resultados_limpos.append(copia)
+
+    if resultados_limpos:
+        dia_ref = resultados_limpos[0].get('dia_atual', 38)
+        total_ref = resultados_limpos[0].get('total_dias', 54)
+    else:
+        dia_ref, total_ref = 38, 54
+    dias_restantes = max(0, total_ref - dia_ref)
+
+    tot_insc = sum(r.get('inscritos_hoje', 0) for r in resultados_limpos)
+    tot_esp = sum(r.get('projecao_esperada', 0) for r in resultados_limpos)
+    tot_pess = sum(r.get('cenario_pessimista', 0) for r in resultados_limpos)
+    tot_otim = sum(r.get('cenario_otimista', 0) for r in resultados_limpos)
+    tot_meta = sum(r.get('meta', 0) for r in resultados_limpos)
+    tot_deficit = max(0, tot_meta - tot_insc)
+    progresso_pct = round((tot_insc / tot_meta) * 100.0, 1) if tot_meta > 0 else 0.0
+    taxa_nec_total = round(tot_deficit / dias_restantes, 2) if dias_restantes > 0 else float(tot_deficit)
+
+    courses_bar_chart = {
+        "labels": [r.get('curso', '') for r in resultados_limpos],
+        "atual": [r.get('inscritos_hoje', 0) for r in resultados_limpos],
+        "pessimista": [r.get('cenario_pessimista', 0) for r in resultados_limpos],
+        "esperada": [r.get('projecao_esperada', 0) for r in resultados_limpos],
+        "otimista": [r.get('cenario_otimista', 0) for r in resultados_limpos],
+        "meta": [r.get('meta', 0) for r in resultados_limpos],
+    }
+
+    historico_info = preditor.obter_resumo_historico_csv()
+
+    ctx = {
+        "dashboard_title": titulo,
+        "dashboard_subtitle": subtitulo,
+        "dia_atual_ref": dia_ref,
+        "total_dias_ref": total_ref,
+        "dias_restantes_ref": dias_restantes,
+        "kpi_total_inscritos": tot_insc,
+        "kpi_progresso_meta_pct": progresso_pct,
+        "kpi_total_esperada": tot_esp,
+        "kpi_total_pessimista": tot_pess,
+        "kpi_total_otimista": tot_otim,
+        "kpi_total_meta": tot_meta,
+        "kpi_total_deficit": tot_deficit,
+        "kpi_taxa_necessaria_total": taxa_nec_total,
+        "resultados": resultados_limpos,
+        "courses_bar_chart_json": json.dumps(courses_bar_chart),
+        "historico_curvas_json": historico_info.get("chart_curvas_json", "{}"),
+    }
+
+    if campaign is not None:
+        raw_chart = json.loads(campaign.get_chart_data(periodo_override=periodo_override))
+        # Remove dados financeiros de patrocínio para compartilhamento externo seguro
+        raw_chart.pop('real_patrocinados', None)
+        ctx["single_campaign_chart_json"] = json.dumps(raw_chart)
+
+        leads_qs = campaign.leads.all()
+        ctx["funil_resumo"] = {
+            "total_leads": leads_qs.count(),
+            "boletos_pendentes": leads_qs.filter(status='inscrito_nao_pago').count(),
+            "em_negociacao": leads_qs.filter(status__in=['novo', 'em_contato', 'isencao']).count(),
+            "convertidos": leads_qs.filter(status='pago').count(),
+        }
+        ctx["acoes_campo"] = CampaignAction.objects.filter(
+            Q(campaign=campaign) | Q(is_global=True)
+        ).order_by('scheduled_date')
+
+    return ctx
 
 class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """Garante que o usuário logado seja um Aluno"""
@@ -331,11 +417,144 @@ class VestibularCampaignDetailView(ProfessorRequiredMixin, DetailView):
         context['leads_quentes'] = leads.filter(status__in=['em_contato', 'isencao', 'inscrito_nao_pago']).count()
         context['leads_convertidos'] = leads.filter(status='pago').count()
         context['leads_perdidos'] = leads.filter(status='desistiu').count()
+
+        # URL pública do Painel Executivo de Decisão e texto formatado para WhatsApp/E-mail
+        from .ml_vestibular import PreditorVestibularOdin
+        preditor = PreditorVestibularOdin()
+        dados = preditor.extrair_andamento_campanha(self.object)
+        res_ml = preditor.projetar(
+            nome_curso=f"{self.object.course.name} — {self.object.name}",
+            periodo=periodo_override,
+            inscritos_hoje=dados['inscritos_pagos'],
+            dia_atual=max(1, dados['dia_atual']),
+            total_dias=dados['dias_totais'],
+            meta=self.object.min_inscriptions,
+            andamento_diario=dados['andamento_pagos'],
+            num_registros_reais=dados['num_registros'],
+            leads_boletos_pendentes=dados['boletos_pendentes'],
+            leads_em_negociacao=dados['em_negociacao'],
+        )
+        url_pub = self.request.build_absolute_uri(
+            reverse('odin:campaign_public_progress', kwargs={'pk': self.object.pk})
+        )
+        context['url_painel_publico'] = url_pub
+        context['resumo_executivo_texto'] = preditor.gerar_resumo_executivo_texto(
+            [res_ml],
+            titulo=f"{self.object.course.name} ({self.object.name})",
+            url_publica=url_pub,
+        )
         
         return context
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        acao = request.POST.get('acao', '')
+        if acao == 'enviar_email_dashboard':
+            destinatarios_raw = request.POST.get('destinatarios', '')
+            mensagem_extra = request.POST.get('mensagem_extra', '').strip()
+            emails = [
+                e.strip() for e in destinatarios_raw.replace(';', ',').split(',')
+                if e.strip() and '@' in e.strip()
+            ]
+            if not emails:
+                messages.error(request, "Informe pelo menos um endereço de e-mail válido para enviar o Dashboard Executivo.")
+                return redirect('odin:campaign_dashboard', pk=self.object.pk)
+
+            from .ml_vestibular import PreditorVestibularOdin
+            preditor = PreditorVestibularOdin()
+            periodo_override = request.POST.get('periodo', '').strip().upper() or None
+            dados = preditor.extrair_andamento_campanha(self.object)
+            res = preditor.projetar(
+                nome_curso=f"{self.object.course.name} — {self.object.name}",
+                periodo=periodo_override,
+                inscritos_hoje=dados['inscritos_pagos'],
+                dia_atual=max(1, dados['dia_atual']),
+                total_dias=dados['dias_totais'],
+                meta=self.object.min_inscriptions,
+                andamento_diario=dados['andamento_pagos'],
+                num_registros_reais=dados['num_registros'],
+                leads_boletos_pendentes=dados['boletos_pendentes'],
+                leads_em_negociacao=dados['em_negociacao'],
+            )
+            url_pub = request.build_absolute_uri(
+                reverse('odin:campaign_public_progress', kwargs={'pk': self.object.pk})
+            )
+            exec_ctx = _build_executive_dashboard_context(
+                preditor,
+                [res],
+                titulo=f"Painel Executivo: {self.object.course.name}",
+                subtitulo=f"Campanha {self.object.name} · Vagas: {self.object.vacancies} · Meta Mínima: {self.object.min_inscriptions}",
+                campaign=self.object,
+                periodo_override=periodo_override,
+            )
+            html_attachment = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=request)
+            resumo_txt = preditor.gerar_resumo_executivo_texto(
+                [res],
+                titulo=f"{self.object.course.name} ({self.object.name})",
+                url_publica=url_pub,
+            ).replace('*', '')
+
+            corpo_email = (
+                f"Olá,\n\n"
+                f"Você recebeu o Painel Executivo de Decisão do Vestibular ({self.object.course.name} — {self.object.name}).\n"
+                f"{('Observação: ' + mensagem_extra + chr(10) + chr(10)) if mensagem_extra else ''}"
+                f"Você pode acessar o painel interativo pelo link abaixo (não requer login no sistema) "
+                f"ou abrir o arquivo HTML interativo em anexo diretamente no seu navegador:\n"
+                f"{url_pub}\n\n"
+                f"------------------------------------------------------------\n"
+                f"{resumo_txt}\n"
+                f"------------------------------------------------------------\n"
+                f"Enviado pelo Sistema de Inteligência Preditiva Odin."
+            )
+            nome_anexo = f"Dashboard_Executivo_{self.object.name.replace(' ', '_')}.html"
+            try:
+                email_msg = EmailMessage(
+                    subject=f"Odin | Painel Executivo de Decisão — {self.object.course.name} ({self.object.name})",
+                    body=corpo_email,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@odin.edu.br'),
+                    to=emails,
+                )
+                email_msg.attach(nome_anexo, html_attachment.encode('utf-8'), 'text/html')
+                email_msg.send(fail_silently=False)
+                messages.success(request, f"Dashboard Executivo enviado com sucesso para: {', '.join(emails)}!")
+            except Exception as e:
+                messages.error(request, f"Não foi possível enviar o e-mail (verifique as configurações SMTP): {str(e)}")
+            return redirect('odin:campaign_dashboard', pk=self.object.pk)
+
+        return redirect('odin:campaign_dashboard', pk=self.object.pk)
+
     def render_to_response(self, context, **response_kwargs):
         export_type = self.request.GET.get('export')
+        if export_type == 'html_dashboard':
+            from .ml_vestibular import PreditorVestibularOdin
+            preditor = PreditorVestibularOdin()
+            periodo_override = self.request.GET.get('periodo', '').strip().upper() or None
+            dados = preditor.extrair_andamento_campanha(self.object)
+            res = preditor.projetar(
+                nome_curso=f"{self.object.course.name} — {self.object.name}",
+                periodo=periodo_override,
+                inscritos_hoje=dados['inscritos_pagos'],
+                dia_atual=max(1, dados['dia_atual']),
+                total_dias=dados['dias_totais'],
+                meta=self.object.min_inscriptions,
+                andamento_diario=dados['andamento_pagos'],
+                num_registros_reais=dados['num_registros'],
+                leads_boletos_pendentes=dados['boletos_pendentes'],
+                leads_em_negociacao=dados['em_negociacao'],
+            )
+            exec_ctx = _build_executive_dashboard_context(
+                preditor,
+                [res],
+                titulo=f"Painel Executivo: {self.object.course.name}",
+                subtitulo=f"Campanha {self.object.name} · Vagas: {self.object.vacancies} · Meta Mínima: {self.object.min_inscriptions}",
+                campaign=self.object,
+                periodo_override=periodo_override,
+            )
+            html_str = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=self.request)
+            response = HttpResponse(html_str, content_type='text/html; charset=utf-8')
+            nome_arquivo = f"Dashboard_Executivo_{self.object.name.replace(' ', '_')}.html"
+            response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+            return response
         if export_type == 'pdf':
             # Renderiza o template específico para o PDF
             html_string = render_to_string('odin/campaign_pdf_report.html', context, request=self.request)
@@ -1138,33 +1357,55 @@ class ImportIsencaoView(ProfessorRequiredMixin, FormView):
         return super().form_valid(form)
 
 class CampaignPublicProgressView(DetailView):
-    """Dashboard de somente leitura para compartilhar com os professores (sem dados sensíveis)"""
+    """
+    Painel Executivo de Decisão de somente leitura para compartilhar com pessoas
+    externas ao sistema (professores, coordenação, direção), sem expor dados
+    pessoais de candidatos nem valores financeiros de patrocínio.
+    """
     model = VestibularCampaign
-    template_name = 'odin/public_progress.html'
+    template_name = 'odin/executive_decision_dashboard.html'
     context_object_name = 'campaign'
+
+    def get_template_names(self):
+        if self.request.GET.get('modo') == 'simples':
+            return ['odin/public_progress.html']
+        return ['odin/executive_decision_dashboard.html']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # 1. Pega os dados originais do gráfico
-        raw_chart_data = self.object.get_chart_data()
-        chart_data = json.loads(raw_chart_data)
-        
-        # 2. APAGA os dados de patrocínio para esconder a estratégia financeira
-        if 'real_patrocinados' in chart_data:
-            del chart_data['real_patrocinados']
-            
-        # Devolve o JSON limpo para o template
-        context['clean_chart_data'] = json.dumps(chart_data)
-        
-        # 3. Indicadores Básicos
+        from .ml_vestibular import PreditorVestibularOdin
+
+        periodo_override = self.request.GET.get('periodo', '').strip().upper() or None
+        preditor = PreditorVestibularOdin()
+        dados = preditor.extrair_andamento_campanha(self.object)
+        res = preditor.projetar(
+            nome_curso=f"{self.object.course.name} — {self.object.name}",
+            periodo=periodo_override,
+            inscritos_hoje=dados['inscritos_pagos'],
+            dia_atual=max(1, dados['dia_atual']),
+            total_dias=dados['dias_totais'],
+            meta=self.object.min_inscriptions,
+            andamento_diario=dados['andamento_pagos'],
+            num_registros_reais=dados['num_registros'],
+            leads_boletos_pendentes=dados['boletos_pendentes'],
+            leads_em_negociacao=dados['em_negociacao'],
+        )
+        exec_ctx = _build_executive_dashboard_context(
+            preditor,
+            [res],
+            titulo=f"Painel Executivo: {self.object.course.name}",
+            subtitulo=f"Campanha {self.object.name} · Vagas Ofertadas: {self.object.vacancies} · Meta Mínima: {self.object.min_inscriptions}",
+            campaign=self.object,
+            periodo_override=periodo_override,
+        )
+        context.update(exec_ctx)
+
+        # Compatibilidade com ?modo=simples (public_progress.html)
+        context['clean_chart_data'] = exec_ctx.get('single_campaign_chart_json', '{}')
         context['total_paid'] = self.object.accumulated_paid
         context['goal'] = self.object.vacancies
-        if context['goal'] > 0:
-            context['progress_pct'] = round((context['total_paid'] / context['goal']) * 100, 1)
-        else:
-            context['progress_pct'] = 0
-            
+        context['progress_pct'] = round((context['total_paid'] / context['goal']) * 100, 1) if context['goal'] > 0 else 0
+
         return context
 
 class CampaignLeadDeleteView(ProfessorRequiredMixin, DeleteView):
@@ -1334,6 +1575,22 @@ class VestibularMLPredictorView(ProfessorRequiredMixin, TemplateView):
             response['Content-Disposition'] = 'attachment; filename="projecao_ml_campanhas_odin.xlsx"'
             return response
 
+        if export_mode == 'html_campanhas':
+            campanhas_proj = self._obter_projecoes_campanhas_ativas(preditor)
+            if not campanhas_proj:
+                messages.warning(request, "Não há campanhas cadastradas para exportar o Dashboard Executivo.")
+                return redirect('odin:vestibular_ml_predictor')
+            exec_ctx = _build_executive_dashboard_context(
+                preditor,
+                campanhas_proj,
+                titulo="Painel Executivo Consolidado — Campanhas do Vestibular",
+                subtitulo="Projeções de Machine Learning com Andamento Diário Real e Recomendações de Decisão",
+            )
+            html_str = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=request)
+            response = HttpResponse(html_str, content_type='text/html; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="Dashboard_Executivo_Campanhas_Vestibular.html"'
+            return response
+
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -1361,7 +1618,83 @@ class VestibularMLPredictorView(ProfessorRequiredMixin, TemplateView):
                 messages.error(request, f"Erro ao processar o arquivo CSV: {str(e)}")
             return redirect('odin:vestibular_ml_predictor')
 
-        # 2. Simulação de Cursos / Exportação Excel do Simulador
+        # 2. Envio do Painel Executivo Consolidado por E-mail
+        if acao == 'enviar_email_executivo':
+            destinatarios_raw = request.POST.get('destinatarios', '')
+            mensagem_extra = request.POST.get('mensagem_extra', '').strip()
+            origem_dados = request.POST.get('origem_dados', 'campanhas')
+            token_assinado = request.POST.get('token_assinado', '').strip()
+            emails = [
+                e.strip() for e in destinatarios_raw.replace(';', ',').split(',')
+                if e.strip() and '@' in e.strip()
+            ]
+            if not emails:
+                messages.error(request, "Informe pelo menos um endereço de e-mail válido.")
+                return redirect('odin:vestibular_ml_predictor')
+
+            preditor = PreditorVestibularOdin()
+            resultados_envio = []
+            titulo_envio = "Painel Executivo de Decisão — Vestibular"
+            if token_assinado:
+                try:
+                    payload = signing.loads(token_assinado)
+                    resultados_envio = VestibularPublicExecutiveDashboardView.reconstruir_resultados_token(preditor, payload)
+                    titulo_envio = payload.get('t', titulo_envio)
+                except Exception:
+                    resultados_envio = []
+
+            if not resultados_envio:
+                resultados_envio = self._obter_projecoes_campanhas_ativas(preditor)
+
+            if not resultados_envio:
+                messages.warning(request, "Não há dados de projeção disponíveis para envio.")
+                return redirect('odin:vestibular_ml_predictor')
+
+            url_pub = ""
+            if token_assinado:
+                url_pub = request.build_absolute_uri(
+                    reverse('odin:vestibular_public_executive', kwargs={'token': token_assinado})
+                )
+
+            exec_ctx = _build_executive_dashboard_context(
+                preditor,
+                resultados_envio,
+                titulo=titulo_envio,
+                subtitulo="Projeções de Machine Learning, Simulador 'E se?' e Plano de Ação Tático",
+            )
+            html_attachment = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=request)
+            resumo_txt = preditor.gerar_resumo_executivo_texto(
+                resultados_envio,
+                titulo=titulo_envio,
+                url_publica=url_pub,
+            ).replace('*', '')
+
+            corpo_email = (
+                f"Olá,\n\n"
+                f"Você recebeu o {titulo_envio} com as projeções de Machine Learning e recomendações táticas de captação.\n"
+                f"{('Observação: ' + mensagem_extra + chr(10) + chr(10)) if mensagem_extra else ''}"
+                f"{('Acesse o painel interativo pelo link (não exige login): ' + url_pub + chr(10) + chr(10)) if url_pub else ''}"
+                f"Você também pode abrir o arquivo HTML interativo em anexo diretamente no seu navegador.\n\n"
+                f"------------------------------------------------------------\n"
+                f"{resumo_txt}\n"
+                f"------------------------------------------------------------\n"
+                f"Enviado pelo Sistema de Inteligência Preditiva Odin."
+            )
+            try:
+                email_msg = EmailMessage(
+                    subject=f"Odin | {titulo_envio}",
+                    body=corpo_email,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@odin.edu.br'),
+                    to=emails,
+                )
+                email_msg.attach("Dashboard_Executivo_Vestibular.html", html_attachment.encode('utf-8'), 'text/html')
+                email_msg.send(fail_silently=False)
+                messages.success(request, f"Dashboard Executivo enviado com sucesso para: {', '.join(emails)}!")
+            except Exception as e:
+                messages.error(request, f"Erro ao enviar e-mail (verifique as configurações SMTP): {str(e)}")
+            return redirect('odin:vestibular_ml_predictor')
+
+        # 3. Simulação de Cursos / Exportação Excel ou HTML do Simulador
         preditor = PreditorVestibularOdin()
         try:
             dia_atual = max(1, int(request.POST.get('dia_atual') or 38))
@@ -1427,6 +1760,18 @@ class VestibularMLPredictorView(ProfessorRequiredMixin, TemplateView):
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             )
             response['Content-Disposition'] = 'attachment; filename="projecao_novos_cursos_ml.xlsx"'
+            return response
+
+        if acao == 'exportar_html_simulador' and resultados_simulador:
+            exec_ctx = _build_executive_dashboard_context(
+                preditor,
+                resultados_simulador,
+                titulo="Painel Executivo de Decisão — Projeção de Cursos do Vestibular",
+                subtitulo=f"Simulação Preditiva ML · Dia {dia_atual} de {total_dias} · Com Simulador 'E se?' e Plano Tático",
+            )
+            html_str = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=request)
+            response = HttpResponse(html_str, content_type='text/html; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="Dashboard_Executivo_Simulador_Vestibular.html"'
             return response
 
         context = self.get_context_data(
@@ -1517,6 +1862,145 @@ class VestibularMLPredictorView(ProfessorRequiredMixin, TemplateView):
             "meta": [r['meta'] for r in resultados_sim],
         })
 
+        # Tokens criptografados para compartilhamento externo (sem necessidade de login)
+        if campanhas_proj:
+            payload_campanhas = {
+                "m": "campanhas",
+                "t": "Painel Executivo Consolidado — Campanhas do Vestibular",
+                "ids": [c['campaign_id'] for c in campanhas_proj],
+            }
+            token_campanhas = signing.dumps(payload_campanhas, compress=True)
+            url_pub_campanhas = self.request.build_absolute_uri(
+                reverse('odin:vestibular_public_executive', kwargs={'token': token_campanhas})
+            )
+            context['token_campanhas'] = token_campanhas
+            context['url_publica_campanhas'] = url_pub_campanhas
+            context['resumo_whatsapp_campanhas'] = preditor.gerar_resumo_executivo_texto(
+                campanhas_proj,
+                titulo="Campanhas Ativas do Vestibular (Odin)",
+                url_publica=url_pub_campanhas,
+            )
+        else:
+            context['token_campanhas'] = ''
+            context['url_publica_campanhas'] = ''
+            context['resumo_whatsapp_campanhas'] = ''
+
+        payload_simulador = {
+            "m": "simulador",
+            "t": "Painel Executivo de Decisão — Projeção de Cursos do Vestibular",
+            "d": dia_atual_sim,
+            "td": total_dias_sim,
+            "c": [
+                {
+                    "n": c["nome"],
+                    "p": c["periodo"],
+                    "i": c["inscritos"],
+                    "mt": c["meta"],
+                    "a": c.get("andamento_str", ""),
+                }
+                for c in cursos_sim
+            ],
+        }
+        token_simulador = signing.dumps(payload_simulador, compress=True)
+        url_pub_simulador = self.request.build_absolute_uri(
+            reverse('odin:vestibular_public_executive', kwargs={'token': token_simulador})
+        )
+        context['token_simulador'] = token_simulador
+        context['url_publica_simulador'] = url_pub_simulador
+        context['resumo_whatsapp_simulador'] = preditor.gerar_resumo_executivo_texto(
+            resultados_sim,
+            titulo="Simulação Estratégica de Cursos do Vestibular",
+            url_publica=url_pub_simulador,
+        )
+
         # Resumo da base histórica vestibular.csv
         context['historico_info'] = preditor.obter_resumo_historico_csv()
         return context
+
+
+class VestibularPublicExecutiveDashboardView(View):
+    """
+    View pública (não requer login) que decodifica um token criptograficamente
+    assinado pelo Django (`django.core.signing`) e renderiza o Painel Executivo
+    de Decisão (`odin/executive_decision_dashboard.html`) para pessoas externas
+    ao sistema (direção, coordenadores, comitê de vestibular).
+    """
+
+    @staticmethod
+    def reconstruir_resultados_token(preditor, payload):
+        modo = payload.get("m", "simulador")
+        resultados = []
+        if modo == "campanhas":
+            ids = payload.get("ids", [])
+            campaigns = VestibularCampaign.objects.filter(id__in=ids).select_related('course').order_by('-start_date')
+            for camp in campaigns:
+                dados = preditor.extrair_andamento_campanha(camp)
+                res = preditor.projetar(
+                    nome_curso=f"{camp.course.name} — {camp.name}",
+                    periodo=None,
+                    inscritos_hoje=dados['inscritos_pagos'],
+                    dia_atual=max(1, dados['dia_atual']),
+                    total_dias=dados['dias_totais'],
+                    meta=camp.min_inscriptions,
+                    andamento_diario=dados['andamento_pagos'],
+                    num_registros_reais=dados['num_registros'],
+                    leads_boletos_pendentes=dados['boletos_pendentes'],
+                    leads_em_negociacao=dados['em_negociacao'],
+                )
+                res.pop('_curva_aprendida_grid', None)
+                resultados.append(res)
+        else:
+            dia_atual = int(payload.get("d", 38))
+            total_dias = int(payload.get("td", 54))
+            cursos = payload.get("c", [])
+            for c in cursos:
+                andamento_parsed = VestibularMLPredictorView._parse_andamento_str(c.get("a", ""))
+                res = preditor.projetar(
+                    nome_curso=c.get("n", "Curso"),
+                    periodo=c.get("p", "N"),
+                    inscritos_hoje=float(c.get("i", 0)),
+                    dia_atual=dia_atual,
+                    total_dias=total_dias,
+                    meta=int(c.get("mt", 60)),
+                    andamento_diario=andamento_parsed,
+                    num_registros_reais=len(andamento_parsed) if andamento_parsed else 0,
+                )
+                res.pop('_curva_aprendida_grid', None)
+                resultados.append(res)
+        return resultados
+
+    def get(self, request, token, *args, **kwargs):
+        from .ml_vestibular import PreditorVestibularOdin
+
+        try:
+            payload = signing.loads(token)
+        except signing.BadSignature:
+            return HttpResponse(
+                "<h3>Link de Painel Executivo inválido ou corrompido. Solicite um novo link à coordenação.</h3>",
+                status=400,
+            )
+
+        preditor = PreditorVestibularOdin()
+        resultados = self.reconstruir_resultados_token(preditor, payload)
+        titulo = payload.get("t", "Painel Executivo de Decisão — Vestibular")
+        modo = payload.get("m", "simulador")
+        subtitulo = (
+            "Dados em Tempo Real das Campanhas Ativas do Odin · Simulador 'E se?' e Plano Tático"
+            if modo == "campanhas"
+            else "Cenário Estratégico Compartilhado · Simulador 'E se?' e Recomendações de Decisão"
+        )
+
+        exec_ctx = _build_executive_dashboard_context(
+            preditor,
+            resultados,
+            titulo=titulo,
+            subtitulo=subtitulo,
+        )
+
+        if request.GET.get('download') == '1':
+            html_str = render_to_string('odin/executive_decision_dashboard.html', exec_ctx, request=request)
+            response = HttpResponse(html_str, content_type='text/html; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="Dashboard_Executivo_Vestibular.html"'
+            return response
+
+        return render(request, 'odin/executive_decision_dashboard.html', exec_ctx)

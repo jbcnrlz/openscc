@@ -31,9 +31,9 @@
         <button type="button" class="btn btn-outline-dark fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#qrCodeModal">
             <i class="bi bi-qr-code me-1"></i> QR Code
         </button>
-        <a href="{% url 'odin:campaign_public_progress' campaign.id %}" target="_blank" class="btn btn-outline-info text-dark fw-bold shadow-sm">
-            <i class="bi bi-share me-1"></i> Link de Acompanhamento
-        </a>
+        <button type="button" class="btn btn-info text-dark fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#shareExecutiveModal">
+            <i class="bi bi-send-check-fill me-1"></i> Enviar Dashboard de Decisão
+        </button>
         <a href="?export=xlsx{% if periodo_selecionado %}&periodo={{ periodo_selecionado }}{% endif %}" class="btn btn-outline-success fw-bold shadow-sm" title="Baixar planilha Excel com projeção ML e gráfico">
             <i class="bi bi-file-earmark-excel me-1"></i> Planilha ML (.xlsx)
         </a>
@@ -488,6 +488,110 @@
     </div>
 </div>
 
+<!-- Modal de Compartilhamento do Painel Executivo de Decisão -->
+<div class="modal fade" id="shareExecutiveModal" tabindex="-1" aria-labelledby="shareExecutiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="shareExecutiveModalLabel">
+                    <i class="bi bi-send-check-fill text-info me-2"></i>Enviar Dashboard Executivo de Decisão (Externo)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-info border-0 bg-info bg-opacity-10 text-dark small mb-4">
+                    <i class="bi bi-shield-lock-fill text-primary me-1"></i>
+                    <strong>Privacidade Garantida:</strong> O Painel Executivo externo contém todas as projeções de Machine Learning, simulador interativo <em>"E se?"</em>, matriz de decisão e recomendações táticas, mas <strong>oculta automaticamente</strong> nomes/telefones de candidatos e dados financeiros de patrocínio.
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <!-- Opção 1: Link Público Interativo -->
+                    <div class="col-md-6">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <h6 class="fw-bold text-dark mb-1">
+                                <i class="bi bi-globe2 text-primary me-1"></i> 1. Link Público Interativo (Sem Login)
+                            </h6>
+                            <p class="text-muted small mb-2">Qualquer pessoa com o link acessa o painel atualizado em tempo real pelo navegador.</p>
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="text" id="inputPublicUrlCamp" class="form-control" value="{{ url_painel_publico }}" readonly>
+                                <button class="btn btn-outline-primary fw-bold" type="button" onclick="copiarTextoElemento('inputPublicUrlCamp', this)">
+                                    <i class="bi bi-clipboard"></i> Copiar
+                                </button>
+                            </div>
+                            <a href="{{ url_painel_publico }}" target="_blank" class="btn btn-sm btn-primary w-100 fw-semibold">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> Abrir Painel Executivo em Nova Aba
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Opção 2: Arquivo HTML Interativo Autocontido -->
+                    <div class="col-md-6">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <h6 class="fw-bold text-dark mb-1">
+                                <i class="bi bi-filetype-html text-success me-1"></i> 2. Arquivo Dashboard Interativo (.html)
+                            </h6>
+                            <p class="text-muted small mb-2">Baixe um único arquivo autocontido com gráficos e simulador <em>"E se?"</em> para enviar no WhatsApp ou E-mail.</p>
+                            <div class="d-grid gap-2 mt-3">
+                                <a href="?export=html_dashboard{% if periodo_selecionado %}&periodo={{ periodo_selecionado }}{% endif %}" class="btn btn-sm btn-success fw-bold">
+                                    <i class="bi bi-download me-1"></i> Baixar Dashboard Interativo (.html)
+                                </a>
+                                <a href="?export=pdf{% if periodo_selecionado %}&periodo={{ periodo_selecionado }}{% endif %}" class="btn btn-sm btn-outline-danger fw-semibold">
+                                    <i class="bi bi-file-earmark-pdf me-1"></i> Baixar Versão PDF Estática
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opção 3: Resumo Executivo para WhatsApp -->
+                <div class="border rounded-3 p-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="bi bi-whatsapp text-success me-1"></i> 3. Relatório Executivo Formatado para WhatsApp
+                        </h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" onclick="copiarTextoElemento('textareaWhatsAppCamp', this)">
+                                <i class="bi bi-clipboard me-1"></i> Copiar Texto
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success fw-bold" onclick="enviarWhatsAppTexto('textareaWhatsAppCamp')">
+                                <i class="bi bi-whatsapp me-1"></i> Enviar no WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="textareaWhatsAppCamp" class="form-control form-control-sm font-monospace bg-light" rows="6" readonly>{{ resumo_executivo_texto }}</textarea>
+                </div>
+
+                <!-- Opção 4: Enviar Diretamente por E-mail com Anexo HTML -->
+                <div class="border rounded-3 p-3 bg-light">
+                    <h6 class="fw-bold text-dark mb-2">
+                        <i class="bi bi-envelope-paper-fill text-primary me-1"></i> 4. Enviar por E-mail (com Dashboard .html em Anexo)
+                    </h6>
+                    <form method="post" action="{% url 'odin:campaign_dashboard' campaign.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="enviar_email_dashboard">
+                        <input type="hidden" name="periodo" value="{{ periodo_selecionado }}">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold mb-1">E-mails dos Destinatários (separados por vírgula)</label>
+                                <input type="text" name="destinatarios" class="form-control form-control-sm" placeholder="direcao@fatec.sp.gov.br, coordenacao@..." required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold mb-1">Observação / Mensagem Adicional (Opcional)</label>
+                                <input type="text" name="mensagem_extra" class="form-control form-control-sm" placeholder="Ex: Segue projeção atualizada para reunião de hoje">
+                            </div>
+                            <div class="col-12 text-end mt-2">
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
+                                    <i class="bi bi-send-fill me-1"></i> Enviar Dashboard por E-mail
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal e Scripts já existentes do QR Code e Gráfico (Mantidos intactos) -->
 <div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -512,6 +616,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    function copiarTextoElemento(elId, btn) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        navigator.clipboard.writeText(el.value).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2"></i> Copiado!';
+            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        });
+    }
+
+    function enviarWhatsAppTexto(elId) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(el.value);
+        window.open(url, '_blank');
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         const canvasElement = document.getElementById('yieldChart');
         if (canvasElement) {
