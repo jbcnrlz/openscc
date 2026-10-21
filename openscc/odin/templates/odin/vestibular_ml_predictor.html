@@ -1,0 +1,663 @@
+{% extends 'base.html' %}
+
+{% block title %}Preditor ML & Simulador de Vestibular - Odin{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-2">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'odin:campaign_list' %}" class="text-decoration-none">Captação (Vestibular)</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Preditor ML & Simulador</li>
+            </ol>
+        </nav>
+        <h3 class="fw-bold text-dark mb-0">
+            <i class="bi bi-cpu text-primary me-2"></i>Inteligência Preditiva & Simulador do Vestibular
+        </h3>
+        <p class="text-muted mb-0 small">
+            Ensemble de Aprendizado de Máquina calibrado por curvas históricas de turno (<code>vestibular.csv</code>) e pelo andamento diário real das campanhas no Odin.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="?export=csv_historico" class="btn btn-outline-secondary btn-sm fw-semibold shadow-sm">
+            <i class="bi bi-filetype-csv me-1"></i> Baixar vestibular.csv
+        </a>
+        {% if campanhas_proj %}
+        <a href="?export=xlsx_campanhas" class="btn btn-success btn-sm fw-bold shadow-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Exportar Campanhas Odin (.xlsx)
+        </a>
+        {% endif %}
+        <a href="{% url 'odin:campaign_list' %}" class="btn btn-outline-dark btn-sm fw-semibold shadow-sm">
+            <i class="bi bi-arrow-left me-1"></i> Voltar às Campanhas
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm border-0" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<!-- NAVEGAÇÃO EM ABAS -->
+<ul class="nav nav-pills mb-4 gap-2" id="mlTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold {% if aba_ativa == 'campanhas' %}active{% endif %}" id="tab-campanhas-btn" data-bs-toggle="pill" data-bs-target="#pane-campanhas" type="button" role="tab">
+            <i class="bi bi-speedometer2 me-1"></i> 1. Campanhas Ativas no Odin ({{ campanhas_proj|length }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold {% if aba_ativa == 'simulador' %}active{% endif %}" id="tab-simulador-btn" data-bs-toggle="pill" data-bs-target="#pane-simulador" type="button" role="tab">
+            <i class="bi bi-sliders me-1"></i> 2. Simulador de Cursos & Gerador Excel
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold {% if aba_ativa == 'historico' %}active{% endif %}" id="tab-historico-btn" data-bs-toggle="pill" data-bs-target="#pane-historico" type="button" role="tab">
+            <i class="bi bi-database-check me-1"></i> 3. Base Histórica (vestibular.csv) & Curvas Aprendidas
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="mlTabsContent">
+
+    <!-- ====================================================================== -->
+    <!-- ABA 1: PROJEÇÃO ML CONSOLIDADA DAS CAMPANHAS ATIVAS NO ODIN            -->
+    <!-- ====================================================================== -->
+    <div class="tab-pane fade {% if aba_ativa == 'campanhas' %}show active{% endif %}" id="pane-campanhas" role="tabpanel">
+        {% if campanhas_proj %}
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-dark">
+                    <div class="card-body p-3 text-center">
+                        <small class="text-muted text-uppercase fw-bold">Inscritos Pagos Hoje</small>
+                        <h2 class="fw-bolder text-dark mb-0 mt-1">{{ total_inscritos_campanhas }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary bg-primary bg-opacity-10">
+                    <div class="card-body p-3 text-center">
+                        <small class="text-primary text-uppercase fw-bold">Projeção ML Consolidada</small>
+                        <h2 class="fw-bolder text-primary mb-0 mt-1">{{ total_projecao_ml_campanhas }}</h2>
+                        <small class="text-muted">Pess: {{ total_pessimista_campanhas }} | Otim: {{ total_otimista_campanhas }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-secondary">
+                    <div class="card-body p-3 text-center">
+                        <small class="text-muted text-uppercase fw-bold">Meta Total de Inscritos</small>
+                        <h2 class="fw-bolder text-dark mb-0 mt-1">{{ total_meta_campanhas }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 {% if total_projecao_ml_campanhas >= total_meta_campanhas %}border-success{% else %}border-warning{% endif %}">
+                    <div class="card-body p-3 text-center">
+                        <small class="text-muted text-uppercase fw-bold">Status Global da Unidade</small>
+                        <h5 class="fw-bold mb-0 mt-2 {% if total_projecao_ml_campanhas >= total_meta_campanhas %}text-success{% else %}text-warning{% endif %}">
+                            {% if total_projecao_ml_campanhas >= total_meta_campanhas %}
+                                <i class="bi bi-check-circle-fill me-1"></i>Dentro da Tendência
+                            {% else %}
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Requer Aceleração
+                            {% endif %}
+                        </h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-table me-2"></i>Projeções Calibradas pelo Andamento de Cada Campanha</h6>
+                    <small class="text-muted">O modelo analisa os registros diários (<code>CampaignDailyRecord</code>) de cada campanha para ajustar o ritmo e encontrar a curva histórica mais próxima.</small>
+                </div>
+                <a href="?export=xlsx_campanhas" class="btn btn-sm btn-success fw-bold">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Baixar Planilha Consolidada (.xlsx)
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-center small">
+                            <tr>
+                                <th class="text-start ps-4">Curso / Campanha</th>
+                                <th>Turno</th>
+                                <th>Andamento</th>
+                                <th>Inscritos Hoje</th>
+                                <th>Ritmo Hist.</th>
+                                <th>Cen. Pessimista</th>
+                                <th class="bg-primary bg-opacity-10 text-primary">Projeção ML</th>
+                                <th>Cen. Otimista</th>
+                                <th>Meta</th>
+                                <th>Faltam</th>
+                                <th>Taxa (7d / Nec.)</th>
+                                <th>Curva Similar</th>
+                                <th>Diagnóstico</th>
+                                <th class="pe-3">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-center">
+                            {% for c in campanhas_proj %}
+                            <tr>
+                                <td class="text-start ps-4">
+                                    <div class="fw-bold text-dark">{{ c.course_name }}</div>
+                                    <small class="text-muted">{{ c.campaign_name }}</small>
+                                </td>
+                                <td><span class="badge bg-light text-dark border">{{ c.turno_extenso }}</span></td>
+                                <td>
+                                    <span class="fw-semibold">Dia {{ c.dia_atual }}/{{ c.total_dias }}</span><br>
+                                    <small class="text-muted">{{ c.num_registros }} reg(s)</small>
+                                </td>
+                                <td class="fw-bold text-dark">{{ c.inscritos_hoje }}</td>
+                                <td>{{ c.ritmo_medio_pct }}%</td>
+                                <td class="text-muted">{{ c.cenario_pessimista }}</td>
+                                <td class="bg-primary bg-opacity-10 fw-bolder text-primary fs-6">
+                                    {{ c.projecao_esperada }}
+                                    {% if c.usou_andamento_ml %}
+                                        <i class="bi bi-activity ms-1 text-primary" title="Ajustado pela trajetória real (Pontual seria {{ c.projecao_pontual }})"></i>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ c.cenario_otimista }}</td>
+                                <td class="fw-semibold">{{ c.meta }}</td>
+                                <td class="text-danger fw-semibold">{{ c.deficit_meta }}</td>
+                                <td>
+                                    <span class="fw-semibold {% if c.taxa_diaria_atual_7d >= c.taxa_diaria_necessaria %}text-success{% else %}text-warning{% endif %}">{{ c.taxa_diaria_atual_7d }}</span>
+                                    <span class="text-muted">/ {{ c.taxa_diaria_necessaria }}</span>
+                                </td>
+                                <td class="small">
+                                    <span class="d-block fw-medium text-dark">{{ c.curva_mais_similar }}</span>
+                                    <small class="text-muted">Conf: {{ c.confianca_modelo }}%</small>
+                                </td>
+                                <td>
+                                    {% if "Atingível" in c.status %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">{{ c.status }}</span>
+                                    {% elif "Atenção" in c.status %}
+                                        <span class="badge bg-info bg-opacity-10 text-dark border border-info">{{ c.status }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-25 text-dark border border-warning">{{ c.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="pe-3">
+                                    <a href="{% url 'odin:campaign_dashboard' c.campaign_id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card border-0 shadow-sm text-center py-5">
+            <div class="card-body">
+                <i class="bi bi-clipboard-data text-muted" style="font-size: 3rem;"></i>
+                <h5 class="fw-bold text-dark mt-3">Nenhuma campanha ativa vinculada ao seu perfil</h5>
+                <p class="text-muted">Você pode criar uma nova campanha de vestibular ou utilizar a aba <strong>2. Simulador de Cursos & Gerador Excel</strong> para projetar resultados de cursos novos ou em andamento.</p>
+                <a href="{% url 'odin:campaign_create' %}" class="btn btn-primary fw-bold">
+                    <i class="bi bi-plus-lg me-1"></i> Criar Campanha de Vestibular
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ====================================================================== -->
+    <!-- ABA 2: SIMULADOR INTERATIVO DE CURSOS (NOVOS OU EXISTENTES) + EXCEL    -->
+    <!-- ====================================================================== -->
+    <div class="tab-pane fade {% if aba_ativa == 'simulador' %}show active{% endif %}" id="pane-simulador" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="bi bi-calculator text-primary me-2"></i>Simulador de Projeção para Cursos (Inéditos ou Existentes)
+                            </h6>
+                            <small class="text-muted">
+                                Simule cenários informando apenas os inscritos atuais ou inclua a <strong>série de andamento</strong> (valores separados por vírgula) para ativar o casamento de trajetória ML.
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-semibold" id="btnCarregarExemplo">
+                                <i class="bi bi-magic me-1"></i> Carregar Exemplo (Novos Cursos)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" id="btnAddCurso">
+                                <i class="bi bi-plus-circle me-1"></i> Adicionar Curso
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" id="formSimulador">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" id="inputAcaoSimulador" value="simular">
+
+                            <div class="row g-3 mb-4 p-3 rounded-3 bg-light border">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold text-dark small mb-1">Dia Atual da Campanha (Posição)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="bi bi-calendar-check text-primary"></i></span>
+                                        <input type="number" name="dia_atual" id="simDiaAtual" class="form-control fw-bold" min="1" max="120" value="{{ dia_atual_sim }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold text-dark small mb-1">Duração Total Prevista (Dias)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="bi bi-calendar-range text-primary"></i></span>
+                                        <input type="number" name="total_dias" id="simTotalDias" class="form-control fw-bold" min="5" max="120" value="{{ total_dias_sim }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm fw-bold w-100 py-2" onclick="document.getElementById('inputAcaoSimulador').value='simular';">
+                                        <i class="bi bi-cpu me-1"></i> Projetar com Machine Learning
+                                    </button>
+                                    <button type="submit" class="btn btn-success btn-sm fw-bold w-100 py-2" onclick="document.getElementById('inputAcaoSimulador').value='exportar_excel_simulador';">
+                                        <i class="bi bi-file-earmark-excel me-1"></i> Gerar Excel (.xlsx)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0" id="tabelaInputsSimulador">
+                                    <thead class="table-light small text-center">
+                                        <tr>
+                                            <th style="width: 30%;">Nome do Curso</th>
+                                            <th style="width: 14%;">Turno</th>
+                                            <th style="width: 13%;">Inscritos Hoje</th>
+                                            <th style="width: 13%;">Meta</th>
+                                            <th style="width: 24%;">Andamento Diário Opcional (Ex: 0, 2, 5, 10, 15)</th>
+                                            <th style="width: 6%;">Remover</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in cursos_simulados %}
+                                        <tr>
+                                            <td>
+                                                <input type="text" name="curso_nome" class="form-control form-control-sm fw-semibold" value="{{ item.nome }}" required>
+                                            </td>
+                                            <td>
+                                                <select name="curso_periodo" class="form-select form-select-sm">
+                                                    <option value="M" {% if item.periodo == 'M' %}selected{% endif %}>Matutino (M)</option>
+                                                    <option value="N" {% if item.periodo == 'N' %}selected{% endif %}>Noturno (N)</option>
+                                                    <option value="G" {% if item.periodo == 'G' %}selected{% endif %}>Geral (Média)</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" name="curso_inscritos" class="form-control form-control-sm text-end fw-bold" min="0" value="{{ item.inscritos }}">
+                                            </td>
+                                            <td>
+                                                <input type="number" name="curso_meta" class="form-control form-control-sm text-end" min="1" value="{{ item.meta }}">
+                                            </td>
+                                            <td>
+                                                <input type="text" name="curso_andamento" class="form-control form-control-sm font-monospace" placeholder="Opcional: 0, 3, 7, 12, {{ item.inscritos }}" value="{{ item.andamento_str }}">
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-remove-row" title="Remover linha">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESULTADOS DA SIMULAÇÃO -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-navy text-white py-3 d-flex justify-content-between align-items-center" style="background-color: #1e3a8a;">
+                        <div>
+                            <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-line me-2"></i>Painel de Projeções: Posição Dia {{ dia_atual_sim }} de {{ total_dias_sim }}</h6>
+                            <small class="text-white-50">Dinâmica calibrada por aprendizado de turno histórico + trajetória de andamento</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light fw-bold text-primary" onclick="document.getElementById('inputAcaoSimulador').value='exportar_excel_simulador'; document.getElementById('formSimulador').submit();">
+                            <i class="bi bi-download me-1"></i> Baixar Planilha c/ Gráfico Embutido (.xlsx)
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th class="text-start ps-4">Curso Informado</th>
+                                        <th>Turno</th>
+                                        <th>Inscritos (D-{{ dia_atual_sim }})</th>
+                                        <th>Ritmo Histórico</th>
+                                        <th>Cenário Pessimista</th>
+                                        <th class="bg-primary bg-opacity-10 text-primary">Projeção ML Esperada</th>
+                                        <th>Cenário Otimista</th>
+                                        <th>Meta Definida</th>
+                                        <th>Faltam p/ Meta</th>
+                                        <th>Média Diária Nec.</th>
+                                        <th>Curva Similar / Modo</th>
+                                        <th class="pe-4">Diagnóstico Operacional</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in resultados_simulador %}
+                                    <tr>
+                                        <td class="text-start ps-4 fw-bold text-dark">{{ r.curso }}</td>
+                                        <td><span class="badge bg-light text-dark border">{{ r.turno_extenso }}</span></td>
+                                        <td class="fw-bold">{{ r.inscritos_hoje }}</td>
+                                        <td>{{ r.ritmo_medio_pct }}%</td>
+                                        <td class="text-secondary">{{ r.cenario_pessimista }}</td>
+                                        <td class="bg-primary bg-opacity-10 fw-bolder text-primary fs-5">
+                                            {{ r.projecao_esperada }}
+                                            {% if r.usou_andamento_ml %}
+                                                <span class="badge bg-primary ms-1" style="font-size: 0.65rem;" title="Projeção Pontual seria {{ r.projecao_pontual }}">Andamento ML</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-secondary">{{ r.cenario_otimista }}</td>
+                                        <td class="fw-semibold">{{ r.meta }}</td>
+                                        <td class="text-danger fw-semibold">{{ r.deficit_meta }}</td>
+                                        <td>{{ r.taxa_diaria_necessaria }} / dia</td>
+                                        <td class="small">
+                                            <span class="fw-medium text-dark">{{ r.curva_mais_similar }}</span><br>
+                                            <small class="text-muted">{{ r.aceleracao_label }}</small>
+                                        </td>
+                                        <td class="pe-4">
+                                            {% if "Atingível" in r.status %}
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1">{{ r.status }}</span>
+                                            {% elif "Atenção" in r.status %}
+                                                <span class="badge bg-info bg-opacity-10 text-dark border border-info px-2 py-1">{{ r.status }}</span>
+                                            {% else %}
+                                                <span class="badge bg-warning bg-opacity-25 text-dark border border-warning px-2 py-1">{{ r.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    <tr class="table-primary fw-bold">
+                                        <td class="text-start ps-4">TOTAL GERAL</td>
+                                        <td>-</td>
+                                        <td>{{ sim_total_inscritos }}</td>
+                                        <td>-</td>
+                                        <td>{{ sim_total_pessimista }}</td>
+                                        <td class="fs-5 text-primary">{{ sim_total_esperada }}</td>
+                                        <td>{{ sim_total_otimista }}</td>
+                                        <td>{{ sim_total_meta }}</td>
+                                        <td>{{ sim_total_deficit }}</td>
+                                        <td>-</td>
+                                        <td>Monitoramento ML</td>
+                                        <td class="pe-4">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRÁFICO COMPARATIVO DO SIMULADOR -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-bar-chart-fill text-primary me-2"></i>Comparativo Visual: Inscritos Atuais vs. Projeção ML Esperada vs. Meta
+                        </h6>
+                    </div>
+                    <div class="card-body" style="height: 360px; position: relative;">
+                        <canvas id="simuladorBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================== -->
+    <!-- ABA 3: BASE HISTÓRICA (vestibular.csv) & CURVAS APRENDIDAS             -->
+    <!-- ====================================================================== -->
+    <div class="tab-pane fade {% if aba_ativa == 'historico' %}show active{% endif %}" id="pane-historico" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-graph-up-arrow text-primary me-2"></i>Curvas Médias Ponderadas Aprendidas por Turno (Matutino vs. Noturno)
+                        </h6>
+                        <small class="text-muted">Percentual acumulado de inscrições ao longo do tempo normalizado da campanha (0% a 100% dos dias).</small>
+                    </div>
+                    <div class="card-body" style="height: 340px; position: relative;">
+                        <canvas id="historicoCurvasChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-cloud-arrow-up text-primary me-2"></i>Atualizar Base Histórica (<code>vestibular.csv</code>)
+                        </h6>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="small text-muted">
+                                O motor de Machine Learning utiliza <strong>{{ historico_info.total_series_completas }} séries históricas completas</strong> (e {{ historico_info.total_series_parciais }} parciais) com pesos de recência crescentes para calibrar as curvas funcionais.
+                            </p>
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="upload_csv">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold text-dark">Enviar novo arquivo <code>vestibular.csv</code></label>
+                                    <input type="file" name="arquivo_csv" accept=".csv" class="form-control form-control-sm" required>
+                                    <div class="form-text small">Formato esperado: <code>curso,período,0,1,2,...,63</code></div>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm fw-bold w-100">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Atualizar Base e Re-treinar Modelo
+                                </button>
+                            </form>
+                        </div>
+                        <div class="alert alert-light border small mb-0 mt-3">
+                            <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                            <strong>Como o andamento melhora a projeção?</strong><br>
+                            Em vez de dividir apenas o valor de hoje pela média histórica, o Odin avalia a forma completa da curva diária (distância funcional $L_2$) e a taxa de aceleração recente via <em>Kernel Trajectory Matching</em> + <em>Ridge Regression</em>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-table me-2"></i>Séries Temporais de Treino Carregadas de <code>vestibular.csv</code></h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start ps-4">Série / Edição</th>
+                                        <th>Curso</th>
+                                        <th>Turno</th>
+                                        <th>Duração (Dias)</th>
+                                        <th>Peso de Treino</th>
+                                        <th>25% do Tempo</th>
+                                        <th>50% do Tempo</th>
+                                        <th>75% do Tempo</th>
+                                        <th>90% do Tempo</th>
+                                        <th class="pe-4">Resultado Final</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ed in historico_info.edicoes %}
+                                    <tr>
+                                        <td class="text-start ps-4 fw-semibold">{{ ed.label }}</td>
+                                        <td><span class="badge bg-secondary">{{ ed.curso }}</span></td>
+                                        <td>{{ ed.periodo }}</td>
+                                        <td>{{ ed.dias_totais }} dias</td>
+                                        <td>{{ ed.peso }}x</td>
+                                        <td>{{ ed.p25 }}%</td>
+                                        <td>{{ ed.p50 }}%</td>
+                                        <td>{{ ed.p75 }}%</td>
+                                        <td>{{ ed.p90 }}%</td>
+                                        <td class="pe-4 fw-bold text-primary">{{ ed.inscritos_finais }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Gráfico de Barras do Simulador
+    const simCanvas = document.getElementById('simuladorBarChart');
+    if (simCanvas) {
+        const simData = JSON.parse('{{ sim_chart_json|escapejs }}');
+        new Chart(simCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: simData.labels,
+                datasets: [
+                    { label: 'Inscritos Hoje', data: simData.atual, backgroundColor: '#64748b' },
+                    { label: 'Cenário Pessimista', data: simData.pessimista, backgroundColor: '#f59e0b' },
+                    { label: 'Projeção ML (Esperada)', data: simData.esperada, backgroundColor: '#1e3a8a' },
+                    { label: 'Cenário Otimista', data: simData.otimista, backgroundColor: '#0ea5e9' },
+                    { label: 'Meta Definida', data: simData.meta, backgroundColor: '#16a34a' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    // 2. Gráfico das Curvas Aprendidas (vestibular.csv)
+    const histCanvas = document.getElementById('historicoCurvasChart');
+    if (histCanvas) {
+        const histData = JSON.parse('{{ historico_info.chart_curvas_json|escapejs }}');
+        new Chart(histCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: histData.labels,
+                datasets: [
+                    {
+                        label: 'Ritmo Aprendido - Turno Noturno (N)',
+                        data: histData.curva_noturno,
+                        borderColor: '#1e3a8a',
+                        backgroundColor: 'rgba(30, 58, 138, 0.08)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.35
+                    },
+                    {
+                        label: 'Ritmo Aprendido - Turno Matutino (M)',
+                        data: histData.curva_matutino,
+                        borderColor: '#ea580c',
+                        backgroundColor: 'rgba(234, 88, 12, 0.08)',
+                        borderWidth: 3,
+                        borderDash: [5, 4],
+                        fill: true,
+                        tension: 0.35
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, title: { display: true, text: '% do Total Final de Inscritos' } },
+                    x: { title: { display: true, text: '% do Tempo Decorrido do Vestibular' } }
+                }
+            }
+        });
+    }
+
+    // 3. Adicionar / Remover linhas na tabela do Simulador
+    const tbody = document.querySelector('#tabelaInputsSimulador tbody');
+    function bindRemoveButtons() {
+        document.querySelectorAll('.btn-remove-row').forEach(btn => {
+            btn.onclick = function() {
+                if (tbody.querySelectorAll('tr').length > 1) {
+                    this.closest('tr').remove();
+                }
+            };
+        });
+    }
+    bindRemoveButtons();
+
+    const btnAdd = document.getElementById('btnAddCurso');
+    if (btnAdd && tbody) {
+        btnAdd.addEventListener('click', function() {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" name="curso_nome" class="form-control form-control-sm fw-semibold" placeholder="Nome do Curso" required></td>
+                <td>
+                    <select name="curso_periodo" class="form-select form-select-sm">
+                        <option value="M">Matutino (M)</option>
+                        <option value="N" selected>Noturno (N)</option>
+                        <option value="G">Geral (Média)</option>
+                    </select>
+                </td>
+                <td><input type="number" name="curso_inscritos" class="form-control form-control-sm text-end fw-bold" min="0" value="15"></td>
+                <td><input type="number" name="curso_meta" class="form-control form-control-sm text-end" min="1" value="60"></td>
+                <td><input type="text" name="curso_andamento" class="form-control form-control-sm font-monospace" placeholder="Opcional: 0, 3, 7, 15"></td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-remove-row"><i class="bi bi-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            bindRemoveButtons();
+        });
+    }
+
+    const btnExemplo = document.getElementById('btnCarregarExemplo');
+    if (btnExemplo && tbody) {
+        btnExemplo.addEventListener('click', function() {
+            document.getElementById('simDiaAtual').value = 38;
+            document.getElementById('simTotalDias').value = 54;
+            const exemplos = [
+                { nome: "Tecnologia de Alimentos", per: "N", insc: 15, meta: 60, and: "0, 1, 2, 4, 6, 8, 11, 13, 15" },
+                { nome: "Desenvolvimento de Software Multiplataforma (DSM)", per: "M", insc: 19, meta: 60, and: "0, 1, 2, 3, 5, 8, 12, 16, 19" },
+                { nome: "Engenharia de Alimentos", per: "M", insc: 22, meta: 60, and: "0, 1, 3, 5, 7, 10, 14, 18, 22" },
+                { nome: "Gestão Comercial", per: "N", insc: 15, meta: 60, and: "0, 2, 4, 6, 8, 10, 12, 14, 15" }
+            ];
+            tbody.innerHTML = '';
+            exemplos.forEach(ex => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" name="curso_nome" class="form-control form-control-sm fw-semibold" value="${ex.nome}" required></td>
+                    <td>
+                        <select name="curso_periodo" class="form-select form-select-sm">
+                            <option value="M" ${ex.per === 'M' ? 'selected' : ''}>Matutino (M)</option>
+                            <option value="N" ${ex.per === 'N' ? 'selected' : ''}>Noturno (N)</option>
+                            <option value="G">Geral (Média)</option>
+                        </select>
+                    </td>
+                    <td><input type="number" name="curso_inscritos" class="form-control form-control-sm text-end fw-bold" min="0" value="${ex.insc}"></td>
+                    <td><input type="number" name="curso_meta" class="form-control form-control-sm text-end" min="1" value="${ex.meta}"></td>
+                    <td><input type="text" name="curso_andamento" class="form-control form-control-sm font-monospace" value="${ex.and}"></td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-row"><i class="bi bi-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            bindRemoveButtons();
+        });
+    }
+});
+</script>
+{% endblock %}
+

@@ -11,11 +11,16 @@
 <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
     <div>
         <h3 class="fw-bold text-dark mb-0">Gestão de Captação</h3>
-        <p class="text-muted mb-0">Gerencie campanhas de vestibular e predição de demanda</p>
+        <p class="text-muted mb-0">Gerencie campanhas de vestibular e predição de demanda por Aprendizado de Máquina</p>
     </div>
-    <a href="{% url 'odin:campaign_create' %}" class="btn btn-primary d-flex align-items-center fw-medium px-3 py-2">
-        <i class="bi bi-plus-lg me-2"></i> Nova Campanha
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{% url 'odin:vestibular_ml_predictor' %}" class="btn btn-outline-primary d-flex align-items-center fw-bold px-3 py-2 shadow-sm">
+            <i class="bi bi-cpu me-2"></i> Preditor ML & Simulador
+        </a>
+        <a href="{% url 'odin:campaign_create' %}" class="btn btn-primary d-flex align-items-center fw-medium px-3 py-2 shadow-sm">
+            <i class="bi bi-plus-lg me-2"></i> Nova Campanha
+        </a>
+    </div>
 </div>
 
 <div class="row g-4">
