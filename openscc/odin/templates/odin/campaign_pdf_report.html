@@ -64,14 +64,14 @@
         </p>
     </div>
 
-    <!-- BLOCO 1: OTIMIZAÇÃO E MATEMÁTICA (YIELD) -->
-    <h3>1. Projeções Matemáticas (Yield Management)</h3>
+    <!-- BLOCO 1: OTIMIZAÇÃO E APRENDIZADO DE MÁQUINA (YIELD & ML) -->
+    <h3>1. Projeções por Aprendizado de Máquina & Yield Management</h3>
     <div class="row">
         <div class="col-third">
             <div class="kpi-box">
-                <h4>Projeção Final</h4>
+                <h4>Projeção ML (Esperada)</h4>
                 <div class="value">{{ projections.projecao_final_pagantes }}</div>
-                <div class="subtext">Pagantes estimados</div>
+                <div class="subtext">Cenários: {{ projections.cenario_pessimista|default:0 }} a {{ projections.cenario_otimista|default:0 }}</div>
             </div>
         </div>
         <div class="spacer-third"></div>
@@ -87,14 +87,37 @@
         
         <div class="col-third">
             <div class="kpi-box" style="border-color: #b11116; background-color: #fff5f5;">
-                <h4 style="color: #b11116;">Status Atual da Curva</h4>
+                <h4 style="color: #b11116;">Ritmo Calibrado ({{ projections.turno_extenso|default:"Geral" }})</h4>
                 <div class="value">{{ projections.progresso_esperado_pct }}%</div>
-                <div class="subtext">Progresso decorrido do funil</div>
+                <div class="subtext">{{ projections.status|default:"Progresso decorrido do funil" }}</div>
             </div>
         </div>
     </div>
     <!-- Fim Float Fix -->
     <div style="clear: both;"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Cenário Pessimista</th>
+                <th>Projeção Pontual</th>
+                <th>Projeção ML (Andamento)</th>
+                <th>Cenário Otimista</th>
+                <th>Taxa Diária (Atual / Meta)</th>
+                <th>Curva Histórica Similar</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ projections.cenario_pessimista|default:0 }}</td>
+                <td>{{ projections.projecao_pontual|default:0 }}</td>
+                <td><strong>{{ projections.projecao_final_pagantes|default:0 }}</strong></td>
+                <td>{{ projections.cenario_otimista|default:0 }}</td>
+                <td>{{ projections.taxa_diaria_atual_7d|default:0 }} / {{ projections.taxa_diaria_necessaria|default:0 }} dia</td>
+                <td>{{ projections.curva_mais_similar|default:"-" }} ({{ projections.confianca_modelo|default:0 }}% conf.)</td>
+            </tr>
+        </tbody>
+    </table>
 
 
     <!-- BLOCO 2: FUNIL COMERCIAL -->
