@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ dashboard_title|default:"Painel Executivo de Decisão - Vestibular" }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        .exec-hero {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #b11116 100%);
+            color: #fff;
+            padding: 2.5rem 0;
+            border-bottom: 4px solid #b11116;
+        }
+        .card {
+            border-radius: 14px;
+            border: none;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+        }
+        .kpi-value {
+            font-size: 2.3rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        .badge-soft-success { background-color: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .badge-soft-warning { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-soft-danger  { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .badge-soft-primary { background-color: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .whatif-panel {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #cbd5e1 !important;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: #fff; }
+            .card { box-shadow: none; border: 1px solid #dee2e6 !important; break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO EXECUTIVO -->
+    <header class="exec-hero shadow-sm">
+        <div class="container">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-white text-dark fw-bold px-3 py-1">
+                            <i class="bi bi-cpu-fill text-primary me-1"></i>ODIN — INTELIGÊNCIA DE VESTIBULAR
+                        </span>
+                        <span class="badge bg-danger bg-opacity-75 fw-semibold px-3 py-1">
+                            Posição: Dia {{ dia_atual_ref }} de {{ total_dias_ref }} ({{ dias_restantes_ref }} dias restantes)
+                        </span>
+                    </div>
+                    <h1 class="h2 fw-bolder mb-1">{{ dashboard_title|default:"Painel Executivo de Decisão — Vestibular" }}</h1>
+                    <p class="mb-0 text-white-50 small">
+                        {{ dashboard_subtitle|default:"Projeções calibradas por Aprendizado de Máquina, histórico de turnos e andamento diário" }}
+                        • Emitido em {% now "d/m/Y \à\s H:i" %}
+                    </p>
+                </div>
+                <div class="d-flex gap-2 no-print">
+                    <button type="button" class="btn btn-light btn-sm fw-bold shadow-sm" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> Imprimir / Salvar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container py-4">
+
+        <!-- ================================================================== -->
+        <!-- 1. KPIs EXECUTIVOS CONSOLIDADOS                                    -->
+        <!-- ================================================================== -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card h-100 border-top border-4 border-dark">
+                    <div class="card-body p-3 text-center">
+                        <div class="text-muted small fw-bold text-uppercase mb-1">Inscritos Pagos Hoje</div>
+                        <div class="kpi-value text-dark">{{ kpi_total_inscritos }}</div>
+                        <span class="badge bg-light text-dark border mt-2">{{ kpi_progresso_meta_pct }}% da meta atual</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card h-100 border-top border-4 border-primary" style="background-color: #eff6ff;">
+                    <div class="card-body p-3 text-center">
+                        <div class="text-primary small fw-bold text-uppercase mb-1">
+                            <i class="bi bi-robot me-1"></i>Projeção Final ML
+                        </div>
+                        <div class="kpi-value text-primary" id="kpiProjecaoGlobal">{{ kpi_total_esperada }}</div>
+                        <div class="small fw-semibold text-secondary mt-2">
+                            Cenários: <strong>{{ kpi_total_pessimista }}</strong> (Pess.) a <strong>{{ kpi_total_otimista }}</strong> (Otim.)
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card h-100 border-top border-4 border-secondary">
+                    <div class="card-body p-3 text-center">
+                        <div class="text-muted small fw-bold text-uppercase mb-1">Meta Global Definida</div>
+                        <div class="kpi-value text-dark">{{ kpi_total_meta }}</div>
+                        <span class="badge {% if kpi_total_deficit == 0 %}badge-soft-success{% else %}badge-soft-warning{% endif %} mt-2">
+                            Faltam {{ kpi_total_deficit }} inscrições hoje
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card h-100 border-top border-4 {% if kpi_total_esperada >= kpi_total_meta %}border-success{% elif kpi_total_otimista >= kpi_total_meta %}border-warning{% else %}border-danger{% endif %}">
+                    <div class="card-body p-3 text-center">
+                        <div class="text-muted small fw-bold text-uppercase mb-1">Diagnóstico Estratégico</div>
+                        <div class="h4 fw-bolder mb-1 mt-2 {% if kpi_total_esperada >= kpi_total_meta %}text-success{% elif kpi_total_otimista >= kpi_total_meta %}text-warning{% else %}text-danger{% endif %}" id="kpiDiagnosticoGlobal">
+                            {% if kpi_total_esperada >= kpi_total_meta %}
+                                Dentro da Tendência
+                            {% elif kpi_total_otimista >= kpi_total_meta %}
+                                Atenção / Exige Impulso
+                            {% else %}
+                                Ação Imediata Necessária
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">Ritmo necessário: <strong>{{ kpi_taxa_necessaria_total }}/dia</strong></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- 2. SIMULADOR INTERATIVO DE TOMADA DE DECISÃO ("E SE? / WHAT-IF")    -->
+        <!-- ================================================================== -->
+        <div class="card whatif-panel mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-sliders2-vertical text-primary me-2"></i>Simulador Interativo para Tomada de Decisão ("E se?")
+                        </h5>
+                        <small class="text-muted">
+                            Teste o impacto de intensificar ações de divulgação/patrocínio nos <strong>{{ dias_restantes_ref }} dias restantes</strong> sobre o resultado final de cada curso.
+                        </small>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm no-print" id="btnResetWhatIf">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restaurar Projeção Base
+                    </button>
+                </div>
+
+                <div class="row g-4 align-items-center">
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold small text-dark d-flex justify-content-between">
+                            <span>1. Aceleração do Ritmo Diário (Novas Ações / Mídia):</span>
+                            <span class="badge bg-primary" id="lblBoostRitmo">+0% (Ritmo Atual)</span>
+                        </label>
+                        <input type="range" class="form-range" id="sliderBoostRitmo" min="-20" max="100" step="5" value="0">
+                        <div class="d-flex justify-content-between text-muted" style="font-size: 0.72rem;">
+                            <span>-20% (Queda)</span>
+                            <span>0% (Base ML)</span>
+                            <span>+50% (Intensivo)</span>
+                            <span>+100% (Força-Tarefa)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small text-dark d-flex justify-content-between">
+                            <span>2. Adicional Direto por Curso (Patrocínio/Bolsas):</span>
+                            <span class="badge bg-dark" id="lblExtraDireto">+0 inscritos/curso</span>
+                        </label>
+                        <input type="range" class="form-range" id="sliderExtraDireto" min="0" max="40" step="1" value="0">
+                        <div class="d-flex justify-content-between text-muted" style="font-size: 0.72rem;">
+                            <span>0</span>
+                            <span>+10</span>
+                            <span>+20</span>
+                            <span>+40 por curso</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary text-center">
+                            <div class="small fw-bold text-primary text-uppercase">Projeção Simulada</div>
+                            <div class="h2 fw-bolder text-primary mb-0" id="simWhatIfTotal">{{ kpi_total_esperada }}</div>
+                            <small class="fw-semibold" id="simWhatIfStatus">Meta Global: {{ kpi_total_meta }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- 3. GRÁFICOS DE TRAJETÓRIA E COMPARATIVO ENTRE CURSOS               -->
+        <!-- ================================================================== -->
+        <div class="row g-4 mb-4">
+            {% if single_campaign_chart_json %}
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-graph-up me-2 text-primary"></i>Evolução Diária Real vs. Cone de Projeção (Machine Learning)
+                        </h6>
+                        <small class="text-muted">Trajetória acumulada e cenários Pessimista, Esperado e Otimista até o encerramento.</small>
+                    </div>
+                    <div class="card-body p-3" style="height: 350px; position: relative;">
+                        <canvas id="execTrajectoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-bar-chart-steps me-2 text-primary"></i>Comparativo de Cenários vs. Meta
+                        </h6>
+                        <small class="text-muted">Posição atual frente aos cenários projetados pelo modelo.</small>
+                    </div>
+                    <div class="card-body p-3" style="height: 350px; position: relative;">
+                        <canvas id="execCoursesBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-bar-chart-fill me-2 text-primary"></i>Comparativo por Curso: Inscritos Hoje vs. Projeção ML vs. Meta
+                        </h6>
+                        <small class="text-muted">Visualização consolidada dos cenários Pessimista, Esperado (ML) e Otimista por curso.</small>
+                    </div>
+                    <div class="card-body p-3" style="height: 350px; position: relative;">
+                        <canvas id="execCoursesBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-clock-history me-2 text-primary"></i>Curvas Históricas por Turno
+                        </h6>
+                        <small class="text-muted">Ritmo médio aprendido (Matutino vs. Noturno).</small>
+                    </div>
+                    <div class="card-body p-3" style="height: 350px; position: relative;">
+                        <canvas id="execHistoricoChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- 4. TABELA ANALÍTICA DE PROJEÇÕES POR CURSO                         -->
+        <!-- ================================================================== -->
+        <div class="card mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-table me-2 text-primary"></i>Matriz de Projeção e Indicadores para Decisão
+                    </h5>
+                    <small class="text-muted">Calibrado pelo histórico de turnos e pelo andamento da captação.</small>
+                </div>
+                <span class="badge bg-primary bg-opacity-10 text-primary fw-bold px-3 py-2">
+                    {{ resultados|length }} Curso(s) Monitorado(s)
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 text-center">
+                        <thead class="table-light small">
+                            <tr>
+                                <th class="text-start ps-4">Curso / Campanha</th>
+                                <th>Turno</th>
+                                <th>Inscritos Hoje</th>
+                                <th>Ritmo Hist.</th>
+                                <th>Cen. Pessimista</th>
+                                <th class="bg-primary bg-opacity-10 text-primary">Projeção ML</th>
+                                <th class="bg-info bg-opacity-10 text-dark">Simulado ("E se?")</th>
+                                <th>Cen. Otimista</th>
+                                <th>Meta</th>
+                                <th>Faltam</th>
+                                <th>Ritmo (Atual / Nec.)</th>
+                                <th>Chance Meta</th>
+                                <th class="pe-4">Diagnóstico Operacional</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in resultados %}
+                            <tr class="course-row"
+                                data-hoje="{{ r.inscritos_hoje }}"
+                                data-esp="{{ r.projecao_esperada }}"
+                                data-meta="{{ r.meta }}">
+                                <td class="text-start ps-4">
+                                    <div class="fw-bold text-dark">{{ r.curso }}</div>
+                                    <small class="text-muted">Ref. similar: {{ r.curva_mais_similar }} ({{ r.confianca_modelo }}% conf.)</small>
+                                </td>
+                                <td><span class="badge bg-light text-dark border">{{ r.turno_extenso }}</span></td>
+                                <td class="fw-bold text-dark">{{ r.inscritos_hoje }}</td>
+                                <td>{{ r.ritmo_medio_pct }}%</td>
+                                <td class="text-secondary">{{ r.cenario_pessimista }}</td>
+                                <td class="bg-primary bg-opacity-10 fw-bolder text-primary fs-5">{{ r.projecao_esperada }}</td>
+                                <td class="bg-info bg-opacity-10 fw-bolder text-dark fs-5 cell-whatif">{{ r.projecao_esperada }}</td>
+                                <td class="text-secondary">{{ r.cenario_otimista }}</td>
+                                <td class="fw-semibold">{{ r.meta }}</td>
+                                <td class="text-danger fw-semibold">{{ r.deficit_meta }}</td>
+                                <td>
+                                    <span class="fw-bold {% if r.taxa_diaria_atual_7d >= r.taxa_diaria_necessaria %}text-success{% else %}text-warning{% endif %}">{{ r.taxa_diaria_atual_7d }}</span>
+                                    <span class="text-muted">/ {{ r.taxa_diaria_necessaria }} dia</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold {% if r.probabilidade_meta_pct >= 60 %}text-success{% elif r.probabilidade_meta_pct >= 30 %}text-warning{% else %}text-danger{% endif %}">
+                                        {{ r.probabilidade_meta_pct }}%
+                                    </div>
+                                </td>
+                                <td class="pe-4 cell-status">
+                                    {% if "Atingível" in r.status %}
+                                        <span class="badge badge-soft-success px-2 py-1">{{ r.status }}</span>
+                                    {% elif "Atenção" in r.status %}
+                                        <span class="badge badge-soft-warning px-2 py-1">{{ r.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-soft-danger px-2 py-1">{{ r.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- 5. RECOMENDAÇÕES TÁTICAS E PLANO DE AÇÃO PARA TOMADA DE DECISÃO    -->
+        <!-- ================================================================== -->
+        <h5 class="fw-bold text-dark mb-3">
+            <i class="bi bi-lightbulb-fill text-warning me-2"></i>Recomendações Táticas e Direcionamento para Decisão
+        </h5>
+        <div class="row g-3 mb-4">
+            {% for r in resultados %}
+            <div class="col-md-6">
+                <div class="card h-100 border-start border-4 {% if r.prioridade_decisao == 'CRÍTICA' %}border-danger{% elif r.prioridade_decisao == 'ATENÇÃO' %}border-warning{% else %}border-success{% endif %}">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">{{ r.curso }}</h6>
+                                <small class="text-muted">Turno: {{ r.turno_extenso }} • Andamento: {{ r.aceleracao_label }}</small>
+                            </div>
+                            <span class="badge {% if r.prioridade_decisao == 'CRÍTICA' %}badge-soft-danger{% elif r.prioridade_decisao == 'ATENÇÃO' %}badge-soft-warning{% else %}badge-soft-success{% endif %}">
+                                Prioridade: {{ r.prioridade_decisao }}
+                            </span>
+                        </div>
+
+                        {% for rec in r.recomendacoes %}
+                        <div class="d-flex align-items-start gap-2 mb-2 p-2 rounded-3 bg-light">
+                            <i class="bi {{ rec.icone }} text-{{ rec.nivel }} fs-5 mt-1"></i>
+                            <div class="small">
+                                <div class="fw-bold text-dark">{{ rec.titulo }}</div>
+                                <div class="text-secondary">{{ rec.acao }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- 6. DADOS DO FUNIL COMERCIAL E AÇÕES DE CAMPO (SE DISPONÍVEL)       -->
+        <!-- ================================================================== -->
+        {% if funil_resumo or acoes_campo %}
+        <div class="row g-4 mb-4">
+            {% if funil_resumo %}
+            <div class="col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-funnel-fill text-primary me-2"></i>Situação do Funil de Interessados (CRM)
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 text-center">
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 bg-light border">
+                                    <div class="h4 fw-bold text-dark mb-0">{{ funil_resumo.total_leads }}</div>
+                                    <small class="text-muted fw-semibold">Leads Captados</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 bg-warning bg-opacity-10 border border-warning">
+                                    <div class="h4 fw-bold text-dark mb-0">{{ funil_resumo.boletos_pendentes }}</div>
+                                    <small class="text-dark fw-semibold">Boletos Não Pagos</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 bg-info bg-opacity-10 border border-info">
+                                    <div class="h4 fw-bold text-dark mb-0">{{ funil_resumo.em_negociacao }}</div>
+                                    <small class="text-dark fw-semibold">Em Contato / Isenção</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success">
+                                    <div class="h4 fw-bold text-success mb-0">{{ funil_resumo.convertidos }}</div>
+                                    <small class="text-success fw-semibold">Inscrições Pagas (CRM)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if acoes_campo %}
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-geo-alt-fill text-danger me-2"></i>Ações de Divulgação e Eventos em Campo
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th class="ps-3">Ação / Evento</th>
+                                        <th>Data</th>
+                                        <th>Status</th>
+                                        <th class="text-center pe-3">Leads Captados</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="small">
+                                    {% for acao in acoes_campo %}
+                                    <tr>
+                                        <td class="ps-3">
+                                            <div class="fw-bold text-dark">{{ acao.title }}</div>
+                                            <span class="text-muted">{{ acao.location }}</span>
+                                        </td>
+                                        <td>{{ acao.scheduled_date|date:"d/m/Y" }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if acao.status == 'COMPLETED' %}success{% elif acao.status == 'EXECUTING' %}warning text-dark{% else %}secondary{% endif %}">
+                                                {{ acao.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center pe-3 fw-bold text-success">{{ acao.captured_leads.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <footer class="text-center text-muted small py-4 border-top mt-4">
+            <div><strong>Sistema Odin</strong> — Inteligência Acadêmica e Predição de Demanda por Aprendizado de Máquina</div>
+            <div>Relatório executivo gerado automaticamente para apoio à tomada de decisão estratégica do Vestibular.</div>
+        </footer>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Gráfico de Trajetória Individual (quando disponível)
+        const trajCanvas = document.getElementById('execTrajectoryChart');
+        if (trajCanvas) {
+            try {
+                const tData = JSON.parse('{{ single_campaign_chart_json|escapejs }}');
+                if (tData && tData.labels) {
+                    const ds = [
+                        { label: 'Inscritos Pagos (Real)', data: tData.real_pagantes, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.12)', borderWidth: 3, fill: true, tension: 0.35 },
+                        { label: 'Projeção Esperada (ML)', data: tData.projetada, borderColor: '#1e3a8a', borderDash: [6, 4], borderWidth: 2.5, fill: false, tension: 0.35, pointRadius: 0 }
+                    ];
+                    if (tData.cenario_otimista) {
+                        ds.push({ label: 'Cenário Otimista (ML)', data: tData.cenario_otimista, borderColor: '#0284c7', borderDash: [3, 3], borderWidth: 1.8, fill: false, tension: 0.35, pointRadius: 0 });
+                    }
+                    if (tData.cenario_pessimista) {
+                        ds.push({ label: 'Cenário Pessimista (ML)', data: tData.cenario_pessimista, borderColor: '#ea580c', borderDash: [3, 3], borderWidth: 1.8, fill: false, tension: 0.35, pointRadius: 0 });
+                    }
+                    new Chart(trajCanvas.getContext('2d'), {
+                        type: 'line',
+                        data: { labels: tData.labels, datasets: ds },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: { legend: { position: 'top' } },
+                            scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+                        }
+                    });
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // 2. Gráfico Comparativo de Colunas por Curso
+        let barChartInstance = null;
+        const barCanvas = document.getElementById('execCoursesBarChart');
+        if (barCanvas) {
+            try {
+                const bData = JSON.parse('{{ courses_bar_chart_json|escapejs }}');
+                barChartInstance = new Chart(barCanvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: bData.labels,
+                        datasets: [
+                            { label: 'Inscritos Hoje', data: bData.atual, backgroundColor: '#64748b' },
+                            { label: 'Cenário Pessimista', data: bData.pessimista, backgroundColor: '#f59e0b' },
+                            { label: 'Projeção ML (Esperada)', data: bData.esperada, backgroundColor: '#1e3a8a' },
+                            { label: 'Simulado ("E se?")', data: [...bData.esperada], backgroundColor: '#0284c7' },
+                            { label: 'Meta Definida', data: bData.meta, backgroundColor: '#16a34a' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        // 3. Gráfico das Curvas Históricas por Turno
+        const histCanvas = document.getElementById('execHistoricoChart');
+        if (histCanvas && '{{ historico_curvas_json|escapejs }}') {
+            try {
+                const hData = JSON.parse('{{ historico_curvas_json|escapejs }}');
+                new Chart(histCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: hData.labels,
+                        datasets: [
+                            { label: 'Noturno (N)', data: hData.curva_noturno, borderColor: '#1e3a8a', borderWidth: 2.5, tension: 0.35, pointRadius: 0 },
+                            { label: 'Matutino (M)', data: hData.curva_matutino, borderColor: '#ea580c', borderDash: [5, 4], borderWidth: 2.5, tension: 0.35, pointRadius: 0 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true, max: 100 } }
+                    }
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        // 4. Lógica do Simulador Interativo "E se?" (What-If)
+        const sliderBoost = document.getElementById('sliderBoostRitmo');
+        const sliderExtra = document.getElementById('sliderExtraDireto');
+        const lblBoost = document.getElementById('lblBoostRitmo');
+        const lblExtra = document.getElementById('lblExtraDireto');
+        const simTotalEl = document.getElementById('simWhatIfTotal');
+        const simStatusEl = document.getElementById('simWhatIfStatus');
+        const btnReset = document.getElementById('btnResetWhatIf');
+        const metaGlobal = {{ kpi_total_meta|default:0 }};
+
+        function updateWhatIf() {
+            const boostPct = parseFloat(sliderBoost.value || 0);
+            const extraDir = parseInt(sliderExtra.value || 0, 10);
+
+            lblBoost.textContent = (boostPct >= 0 ? '+' : '') + boostPct + '% sobre captação futura';
+            lblExtra.textContent = '+' + extraDir + ' inscritos/curso';
+
+            let totalSimulado = 0;
+            const novasBarrasSimuladas = [];
+
+            document.querySelectorAll('.course-row').forEach(row => {
+                const hoje = parseFloat(row.getAttribute('data-hoje') || 0);
+                const esp = parseFloat(row.getAttribute('data-esp') || 0);
+                const meta = parseFloat(row.getAttribute('data-meta') || 0);
+
+                const ganhoRestanteBase = Math.max(0, esp - hoje);
+                const novoProjetado = Math.round(hoje + ganhoRestanteBase * (1 + boostPct / 100.0) + extraDir);
+                totalSimulado += novoProjetado;
+                novasBarrasSimuladas.push(novoProjetado);
+
+                const cellWhatIf = row.querySelector('.cell-whatif');
+                if (cellWhatIf) {
+                    cellWhatIf.textContent = novoProjetado;
+                    cellWhatIf.className = 'bg-info bg-opacity-10 fw-bolder fs-5 cell-whatif ' + (novoProjetado >= meta ? 'text-success' : 'text-danger');
+                }
+            });
+
+            if (simTotalEl) simTotalEl.textContent = totalSimulado;
+            if (simStatusEl) {
+                if (totalSimulado >= metaGlobal) {
+                    simStatusEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Meta Global Atingida (+' + (totalSimulado - metaGlobal) + ')</span>';
+                } else {
+                    simStatusEl.innerHTML = '<span class="text-danger">Faltam ' + (metaGlobal - totalSimulado) + ' p/ Meta Global</span>';
+                }
+            }
+
+            if (barChartInstance && barChartInstance.data.datasets[3]) {
+                barChartInstance.data.datasets[3].data = novasBarrasSimuladas;
+                barChartInstance.update('none');
+            }
+        }
+
+        if (sliderBoost && sliderExtra) {
+            sliderBoost.addEventListener('input', updateWhatIf);
+            sliderExtra.addEventListener('input', updateWhatIf);
+        }
+        if (btnReset) {
+            btnReset.addEventListener('click', function() {
+                sliderBoost.value = 0;
+                sliderExtra.value = 0;
+                updateWhatIf();
+            });
+        }
+    });
+    </script>
+</body>
+</html>
+
