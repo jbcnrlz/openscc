@@ -1,0 +1,575 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container-fluid px-4 py-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-success px-3 py-1">
+                    <i class="fas fa-camera me-1"></i> Correção por Foto (OMR + Visão Computacional IA)
+                </span>
+                <span class="badge bg-dark px-3 py-1">{{ estrutura.modulo_nome }}</span>
+            </div>
+            <h2 class="fw-bold text-dark mb-0">{{ prova.titulo }}</h2>
+            <p class="text-muted small mb-0">
+                Tire uma foto da Folha de Respostas ou das páginas da prova para leitura automática das bolhas objetivas, transcrição das dissertativas e diagnóstico da sensação do aluno.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=folha_resposta" target="_blank" class="btn btn-outline-primary">
+                <i class="fas fa-qrcode me-1"></i> Imprimir Folha OMR/Foto
+            </a>
+            <a href="{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar à Estrutura da Prova
+            </a>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="formSalvarCorrecaoUnificada">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="salvar_correcao_unificada">
+
+        <div class="row g-4">
+            <!-- Coluna Esquerda: Captura de Foto, Seleção de Aluno e Diagnóstico por Assunto -->
+            <div class="col-lg-4">
+                <!-- 1. Seleção do Aluno -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-user-graduate text-primary me-2"></i>1. Aluno(a) Avaliado(a)
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <label class="form-label small fw-semibold">Selecionar Aluno Cadastrado</label>
+                        <select name="aluno_id" id="selectAlunoId" class="form-select mb-2"
+                                onchange="if(this.value) window.location.href='?aluno_id=' + this.value;">
+                            <option value="">-- Selecione um aluno ou cadastre abaixo --</option>
+                            {% for al in todos_alunos %}
+                            <option value="{{ al.id }}" {% if aluno_selecionado and aluno_selecionado.id == al.id %}selected{% endif %}>
+                                {{ al.get_full_name|default:al.username }} ({{ al.username }})
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="mt-2 pt-2 border-top">
+                            <label class="form-label small fw-semibold text-muted mb-1">
+                                Ou digite o nome do aluno (detectado na foto ou avulso):
+                            </label>
+                            <input type="text" name="novo_aluno_nome" id="inputNovoAlunoNome" class="form-control form-control-sm"
+                                   placeholder="Ex: Maria Clara Souza">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Captura de Foto / Webcam / Upload da Prova -->
+                <div class="card border-0 shadow-sm mb-4 border-top border-4 border-success">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-camera-retro text-success me-2"></i>2. Tirar ou Enviar Foto da Prova
+                        </h6>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">Multimodal IA</span>
+                    </div>
+                    <div class="card-body p-3">
+                        <p class="small text-muted mb-2">
+                            Envie 1 ou mais fotos da <strong>Folha de Respostas OMR</strong> e/ou das <strong>respostas dissertativas manuscritas</strong>:
+                        </p>
+
+                        <div class="mb-3">
+                            <input type="file" id="inputFotosProva" name="foto_comprovante"
+                                   accept="image/*" capture="environment" multiple
+                                   class="form-control form-control-sm"
+                                   onchange="previsualizarFotos(this)">
+                        </div>
+
+                        <!-- Botão para abrir câmera ao vivo no computador/celular -->
+                        <div class="d-flex gap-2 mb-3">
+                            <button type="button" class="btn btn-sm btn-outline-dark w-100" onclick="alternarCameraAoVivo()">
+                                <i class="fas fa-video me-1"></i> Usar Câmera / Webcam ao Vivo
+                            </button>
+                        </div>
+
+                        <!-- Área da Webcam ao vivo (oculta por padrão) -->
+                        <div id="areaWebcam" class="d-none mb-3 text-center border rounded p-2 bg-dark">
+                            <video id="videoWebcam" autoplay playsinline style="width: 100%; max-height: 240px; border-radius: 6px;"></video>
+                            <canvas id="canvasWebcam" class="d-none"></canvas>
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-warning fw-bold w-100" onclick="capturarFrameWebcam()">
+                                    <i class="fas fa-camera me-1"></i> Capturar Foto Agora
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-light" onclick="pararCameraAoVivo()">
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Miniaturas das fotos selecionadas -->
+                        <div id="previewFotosContainer" class="row g-2 mb-3 d-none"></div>
+
+                        <button type="button" id="btnProcessarFotoIA" class="btn btn-success w-100 fw-bold py-2 shadow-sm"
+                                onclick="executarCorrecaoPorFoto()">
+                            <i class="fas fa-magic me-1"></i> Ler Foto e Corrigir Prova Automaticamente
+                        </button>
+
+                        <div id="statusLeituraFoto" class="mt-3 d-none"></div>
+                    </div>
+                </div>
+
+                <!-- 3. Painel de Nota Acadêmica em Tempo Real & Diagnóstico por Assunto -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h6 class="mb-0 fw-bold">
+                            <i class="fas fa-chart-pie text-info me-2"></i>3. Nota e Desempenho por Matéria
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary-subtle text-center mb-3">
+                            <div class="small text-uppercase fw-bold text-primary">Nota Acadêmica Ponderada (0 a 10)</div>
+                            <div class="display-5 fw-bold text-dark" id="painelNotaFinal">
+                                {% if diagnostico_aluno %}{{ diagnostico_aluno.nota_academica_final|floatformat:2 }}{% else %}0.00{% endif %}
+                            </div>
+                            <div class="small text-muted">
+                                Acertos em Objetivas: <strong id="painelAcertosObj">
+                                    {% if diagnostico_aluno %}{{ diagnostico_aluno.acertos_objetivas }}/{{ diagnostico_aluno.total_objetivas_academicas }}{% else %}0/0{% endif %}
+                                </strong>
+                                <span class="d-block" style="font-size: 0.75rem;">(Questões de Sensação têm peso 0 e não alteram a nota)</span>
+                            </div>
+                        </div>
+
+                        {% if diagnostico_aluno %}
+                        <h6 class="fw-bold small text-uppercase text-secondary mb-2">Desempenho por Matéria (Assunto)</h6>
+                        <div class="list-group list-group-flush small mb-3">
+                            {% for nome_mat, dados_mat in diagnostico_aluno.por_materia.items %}
+                            <div class="list-group-item px-0 py-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <strong class="text-dark">{{ nome_mat }}</strong>
+                                    <span class="badge {% if dados_mat.media >= 6 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        Média: {{ dados_mat.media|floatformat:1 }} ({{ dados_mat.percentual }}%)
+                                    </span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar {% if dados_mat.media >= 6 %}bg-success{% else %}bg-warning{% endif %}"
+                                         style="width: {{ dados_mat.percentual }}%"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        {% if diagnostico_aluno.sensacao_respostas %}
+                        <h6 class="fw-bold small text-uppercase text-secondary mb-2">Sensação Registrada pelo Aluno</h6>
+                        <div class="p-2 rounded bg-light border small">
+                            {% for sr in diagnostico_aluno.sensacao_respostas %}
+                            <div class="mb-1 pb-1 {% if not forloop.last %}border-bottom{% endif %}">
+                                <span class="badge bg-secondary">Q{{ sr.numero|stringformat:"02d" }}</span>
+                                <strong>Escolha: {{ sr.resposta|default:"--" }}</strong>
+                                {% if sr.comentario %}<div class="text-muted">{{ sr.comentario }}</div>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-3 shadow-sm">
+                            <i class="fas fa-save me-1"></i> Salvar Correção Completa no Mimir
+                        </button>
+
+                        {% if prova_aluno %}
+                        <a href="{% url 'mimir:exportarCorrecaoPDF' prova_aluno.id %}" target="_blank"
+                           class="btn btn-outline-dark btn-sm w-100 mt-2">
+                            <i class="fas fa-file-pdf text-danger me-1"></i> Exportar Boletim de Correção em PDF
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna Direita: Folha de Correção Interativa Questão por Questão -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h5 class="mb-0 fw-bold text-dark">
+                                <i class="fas fa-tasks text-primary me-2"></i>Espelho de Correção Questão por Questão ({{ itens_correcao|length }} itens)
+                            </h5>
+                            <small class="text-muted">
+                                Clique nas bolhas (A-E) para marcar manualmente ou revise os dados preenchidos automaticamente pela foto.
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-primary fw-bold">
+                            <i class="fas fa-save me-1"></i> Salvar Correção
+                        </button>
+                    </div>
+
+                    <div class="card-body p-3">
+                        {% for item in itens_correcao %}
+                        <div class="border rounded-3 p-3 mb-3 {% if item.secao == 'sensacao_aluno' %}bg-light{% else %}bg-white{% endif %} item-correcao-card"
+                             id="card_questao_{{ item.pergunta.id }}"
+                             data-qid="{{ item.pergunta.id }}"
+                             data-numero="{{ item.numero }}"
+                             data-secao="{{ item.secao }}"
+                             data-is-dissertativa="{{ item.is_dissertativa|yesno:'1,0' }}"
+                             data-gabarito-letra="{{ item.letra_gabarito }}">
+
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge bg-dark fs-6">Q{{ item.numero|stringformat:"02d" }}</span>
+                                    <span class="badge {% if item.secao == 'cg_objetivas' %}bg-primary{% elif item.secao == 'cg_dissertativa' %}bg-info text-dark{% elif item.secao == 'materia_objetivas' %}bg-success{% elif item.secao == 'dissertativa_tecnica' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                        {{ item.secao_titulo }}
+                                    </span>
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="fas fa-book me-1"></i>{{ item.assunto_nome }}
+                                    </span>
+                                    {% if not item.is_dissertativa and item.secao != 'sensacao_aluno' and item.letra_gabarito %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">
+                                        Gabarito Oficial: <strong>{{ item.letra_gabarito }}</strong>
+                                    </span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2">
+                                    <span id="badge_status_{{ item.pergunta.id }}" class="badge d-none"></span>
+                                    <div class="input-group input-group-sm" style="width: 135px;">
+                                        <span class="input-group-text fw-semibold">Nota</span>
+                                        <input type="number" step="0.1" min="0" max="10"
+                                               name="nota_{{ item.pergunta.id }}"
+                                               id="input_nota_{{ item.pergunta.id }}"
+                                               value="{{ item.nota_atual }}"
+                                               class="form-control fw-bold text-center input-nota-questao"
+                                               oninput="recalcularNotaPainel()">
+                                    </div>
+                                    <div class="input-group input-group-sm" style="width: 105px;">
+                                        <span class="input-group-text">Peso</span>
+                                        <input type="number" min="0" max="10"
+                                               name="peso_{{ item.pergunta.id }}"
+                                               id="input_peso_{{ item.pergunta.id }}"
+                                               value="{{ item.peso_atual }}"
+                                               class="form-control text-center input-peso-questao"
+                                               {% if item.secao == 'sensacao_aluno' %}readonly{% endif %}
+                                               oninput="recalcularNotaPainel()">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Enunciado resumido expansível -->
+                            <div class="small text-secondary mb-2" style="white-space: pre-line;">{{ item.pergunta.get_texto_com_feedback|truncatechars:280 }}</div>
+
+                            {% if not item.is_dissertativa %}
+                            <!-- Seletor de Bolhas OMR Interativo (A, B, C, D, E) -->
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 rounded bg-light border mb-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small fw-bold text-dark me-1">Marcação do Aluno:</span>
+                                    {% for letra in "ABCDE" %}
+                                    <button type="button"
+                                            class="btn btn-sm rounded-circle fw-bold btn-bolha-omr btn-bolha-{{ item.pergunta.id }} {% if item.resposta_texto_atual|upper == letra %}btn-dark{% else %}btn-outline-dark{% endif %}"
+                                            style="width: 34px; height: 34px;"
+                                            data-letra="{{ letra }}"
+                                            onclick="selecionarBolhaOMR({{ item.pergunta.id }}, '{{ letra }}', '{{ item.letra_gabarito }}', '{{ item.secao }}')">
+                                        {{ letra }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                                <div style="min-width: 180px;">
+                                    <input type="text" name="resposta_texto_{{ item.pergunta.id }}"
+                                           id="input_resp_{{ item.pergunta.id }}"
+                                           value="{{ item.resposta_texto_atual }}"
+                                           class="form-control form-control-sm"
+                                           placeholder="Alternativa lida (A-E)">
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- Caixa de Transcrição da Resposta Dissertativa -->
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="fas fa-pen-nib text-primary me-1"></i>Resposta Manuscrita Transcrita / Texto do Aluno:
+                                </label>
+                                <textarea name="resposta_texto_{{ item.pergunta.id }}"
+                                          id="input_resp_{{ item.pergunta.id }}"
+                                          rows="3" class="form-control form-control-sm"
+                                          placeholder="A transcrição da foto ou resposta dissertativa do aluno aparecerá aqui...">{{ item.resposta_texto_atual }}</textarea>
+                                <div class="small text-muted mt-1">
+                                    <strong>Padrão de Resposta Esperado:</strong> {{ item.pergunta.get_gabarito_com_feedback|truncatechars:220 }}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Feedback / Justificativa da Correção -->
+                            <div>
+                                <input type="text" name="feedback_{{ item.pergunta.id }}"
+                                       id="input_feedback_{{ item.pergunta.id }}"
+                                       value="{{ item.feedback_atual }}"
+                                       class="form-control form-control-sm bg-light"
+                                       placeholder="Feedback da correção / justificativa da nota...">
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+let streamWebcam = null;
+let blobCameraCapturada = null;
+
+function selecionarBolhaOMR(qid, letra, gabaritoOficial, secao) {
+    const inputResp = document.getElementById(`input_resp_${qid}`);
+    const inputNota = document.getElementById(`input_nota_${qid}`);
+    const inputFeedback = document.getElementById(`input_feedback_${qid}`);
+    const badgeStatus = document.getElementById(`badge_status_${qid}`);
+
+    inputResp.value = letra;
+
+    document.querySelectorAll(`.btn-bolha-${qid}`).forEach(btn => {
+        if (btn.getAttribute('data-letra') === letra) {
+            btn.classList.remove('btn-outline-dark');
+            btn.classList.add('btn-dark');
+        } else {
+            btn.classList.remove('btn-dark');
+            btn.classList.add('btn-outline-dark');
+        }
+    });
+
+    if (secao === 'sensacao_aluno') {
+        inputNota.value = '10.0';
+        inputFeedback.value = `Percepção do aluno registrada: opção ${letra}.`;
+        badgeStatus.className = 'badge bg-secondary';
+        badgeStatus.textContent = `Sensação: ${letra}`;
+    } else if (gabaritoOficial) {
+        if (letra.toUpperCase() === gabaritoOficial.toUpperCase()) {
+            inputNota.value = '10.0';
+            inputFeedback.value = `Alternativa correta (${letra}).`;
+            badgeStatus.className = 'badge bg-success';
+            badgeStatus.textContent = 'Correta (10,0)';
+        } else {
+            inputNota.value = '0.0';
+            inputFeedback.value = `Marcou ${letra}; gabarito oficial é ${gabaritoOficial}.`;
+            badgeStatus.className = 'badge bg-danger';
+            badgeStatus.textContent = `Incorreta (Gabarito: ${gabaritoOficial})`;
+        }
+    }
+    recalcularNotaPainel();
+}
+
+function recalcularNotaPainel() {
+    let somaPonderada = 0;
+    let somaPesos = 0;
+    let acertosObj = 0;
+    let totalObj = 0;
+
+    document.querySelectorAll('.item-correcao-card').forEach(card => {
+        const qid = card.getAttribute('data-qid');
+        const secao = card.getAttribute('data-secao');
+        const isDiss = card.getAttribute('data-is-dissertativa') === '1';
+
+        const notaVal = parseFloat(document.getElementById(`input_nota_${qid}`)?.value || '');
+        const pesoVal = parseFloat(document.getElementById(`input_peso_${qid}`)?.value || '0');
+
+        if (secao !== 'sensacao_aluno' && !isNaN(notaVal) && pesoVal > 0) {
+            somaPonderada += notaVal * pesoVal;
+            somaPesos += pesoVal;
+        }
+        if (secao !== 'sensacao_aluno' && !isDiss) {
+            totalObj += 1;
+            if (!isNaN(notaVal) && notaVal >= 6.0) {
+                acertosObj += 1;
+            }
+        }
+    });
+
+    const media = somaPesos > 0 ? (somaPonderada / somaPesos) : 0;
+    document.getElementById('painelNotaFinal').textContent = media.toFixed(2);
+    document.getElementById('painelAcertosObj').textContent = `${acertosObj}/${totalObj}`;
+}
+
+function previsualizarFotos(input) {
+    const container = document.getElementById('previewFotosContainer');
+    container.innerHTML = '';
+    if (!input.files || input.files.length === 0) {
+        container.classList.add('d-none');
+        return;
+    }
+    container.classList.remove('d-none');
+    Array.from(input.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const col = document.createElement('div');
+            col.className = 'col-6';
+            col.innerHTML = `<img src="${e.target.result}" class="img-fluid rounded border shadow-xs" style="max-height: 120px; object-fit: cover; width: 100%;">`;
+            container.appendChild(col);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function alternarCameraAoVivo() {
+    const area = document.getElementById('areaWebcam');
+    const video = document.getElementById('videoWebcam');
+    if (!area.classList.contains('d-none')) {
+        pararCameraAoVivo();
+        return;
+    }
+    try {
+        streamWebcam = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        });
+        video.srcObject = streamWebcam;
+        area.classList.remove('d-none');
+    } catch (err) {
+        alert('Não foi possível acessar a câmera diretamente. Utilize o botão de selecionar/tirar foto acima.');
+    }
+}
+
+function pararCameraAoVivo() {
+    if (streamWebcam) {
+        streamWebcam.getTracks().forEach(t => t.stop());
+        streamWebcam = null;
+    }
+    document.getElementById('areaWebcam').classList.add('d-none');
+}
+
+function capturarFrameWebcam() {
+    const video = document.getElementById('videoWebcam');
+    const canvas = document.getElementById('canvasWebcam');
+    if (!video.videoWidth) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(blob => {
+        blobCameraCapturada = blob;
+        const url = URL.createObjectURL(blob);
+        const container = document.getElementById('previewFotosContainer');
+        container.classList.remove('d-none');
+        container.innerHTML = `
+            <div class="col-12">
+                <img src="${url}" class="img-fluid rounded border" style="max-height: 160px; width: 100%; object-fit: contain;">
+                <div class="small text-success fw-semibold mt-1"><i class="fas fa-check-circle me-1"></i>Foto capturada da câmera!</div>
+            </div>
+        `;
+        pararCameraAoVivo();
+    }, 'image/jpeg', 0.92);
+}
+
+async function executarCorrecaoPorFoto() {
+    const inputFotos = document.getElementById('inputFotosProva');
+    const statusDiv = document.getElementById('statusLeituraFoto');
+    const btn = document.getElementById('btnProcessarFotoIA');
+
+    const formData = new FormData();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrf);
+
+    let temArquivo = false;
+    if (inputFotos.files && inputFotos.files.length > 0) {
+        Array.from(inputFotos.files).forEach(f => {
+            formData.append('fotos_prova', f);
+            temArquivo = true;
+        });
+    }
+    if (blobCameraCapturada) {
+        formData.append('fotos_prova', blobCameraCapturada, 'captura_camera_prova.jpg');
+        temArquivo = true;
+    }
+
+    if (!temArquivo) {
+        statusDiv.className = 'mt-3 alert alert-warning small py-2';
+        statusDiv.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Selecione uma foto da prova ou capture pela câmera antes de iniciar a leitura automática.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Analisando Foto da Prova (OMR + Dissertativas)...';
+    statusDiv.className = 'mt-3 alert alert-info small py-2';
+    statusDiv.innerHTML = '<i class="fas fa-eye me-1"></i> Lendo marcações das bolhas, transcrevendo questões dissertativas e avaliando sensação do aluno...';
+
+    try {
+        const resp = await fetch("{% url 'mimir:processarFotoUnificadaAjax' prova.id %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            statusDiv.className = 'mt-3 alert alert-danger small py-2';
+            statusDiv.innerHTML = `<i class="fas fa-times-circle me-1"></i> ${data.message || 'Erro ao analisar foto.'}`;
+            return;
+        }
+
+        // Se detectou o nome do aluno no cabeçalho da foto
+        if (data.aluno_identificado) {
+            const inputNome = document.getElementById('inputNovoAlunoNome');
+            if (inputNome && !inputNome.value) {
+                inputNome.value = data.aluno_identificado;
+            }
+        }
+
+        // Preenche cada questão retornada pela leitura da foto
+        const itens = data.itens || [];
+        itens.forEach(item => {
+            const qid = item.pergunta_id;
+            const inputResp = document.getElementById(`input_resp_${qid}`);
+            const inputNota = document.getElementById(`input_nota_${qid}`);
+            const inputFeedback = document.getElementById(`input_feedback_${qid}`);
+            const badgeStatus = document.getElementById(`badge_status_${qid}`);
+
+            if (inputResp) inputResp.value = item.resposta_lida || '';
+            if (inputNota && item.nota_sugerida !== null && item.nota_sugerida !== undefined) {
+                inputNota.value = parseFloat(item.nota_sugerida).toFixed(1);
+            }
+            if (inputFeedback) inputFeedback.value = item.feedback || '';
+
+            // Atualiza botões de bolha caso seja objetiva
+            const letraLida = (item.resposta_lida || '').trim().toUpperCase();
+            document.querySelectorAll(`.btn-bolha-${qid}`).forEach(b => {
+                if (b.getAttribute('data-letra') === letraLida) {
+                    b.classList.remove('btn-outline-dark');
+                    b.classList.add('btn-dark');
+                } else {
+                    b.classList.remove('btn-dark');
+                    b.classList.add('btn-outline-dark');
+                }
+            });
+
+            if (badgeStatus) {
+                if (item.secao === 'sensacao_aluno') {
+                    badgeStatus.className = 'badge bg-secondary';
+                    badgeStatus.textContent = `Sensação: ${letraLida || '--'}`;
+                } else if (item.correta === true) {
+                    badgeStatus.className = 'badge bg-success';
+                    badgeStatus.textContent = 'Correta (Foto)';
+                } else if (item.correta === false) {
+                    badgeStatus.className = 'badge bg-danger';
+                    badgeStatus.textContent = 'Incorreta (Foto)';
+                } else {
+                    badgeStatus.className = 'badge bg-info text-dark';
+                    badgeStatus.textContent = `Avaliada: ${item.nota_sugerida}/10`;
+                }
+            }
+        });
+
+        recalcularNotaPainel();
+
+        statusDiv.className = 'mt-3 alert alert-success small py-2';
+        statusDiv.innerHTML = `
+            <i class="fas fa-check-circle me-1"></i>
+            <strong>Leitura concluída!</strong> Nota Acadêmica Calculada: <strong>${parseFloat(data.nota_academica_sugerida || 0).toFixed(2)} / 10,0</strong>.
+            ${data.resumo_sensacao ? '<br><span class="text-muted">Sensação do aluno: ' + data.resumo_sensacao + '</span>' : ''}
+            <br><span class="text-dark">Revise os campos ao lado e clique em <strong>Salvar Correção Completa</strong>.</span>
+        `;
+    } catch (err) {
+        statusDiv.className = 'mt-3 alert alert-danger small py-2';
+        statusDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i> Erro de comunicação: ${err}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic me-1"></i> Ler Foto e Corrigir Prova Automaticamente';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', recalcularNotaPainel);
+</script>
+{% endblock %}
+

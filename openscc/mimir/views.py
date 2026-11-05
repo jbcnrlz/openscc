@@ -314,6 +314,113 @@ def visualizarFontes(request):
 def addFonte(request):
     form = None
     if request.method == 'POST':
+        modo_pdf = request.POST.get('modo_pdf', 'completo')
+        arquivo_enviado = request.FILES.get('fonte')
+
+        # Se o usuário enviou um PDF e escolheu recortar ou fatiar em múltiplos capítulos
+        if arquivo_enviado and arquivo_enviado.name.lower().endswith('.pdf') and modo_pdf in ('recorte_unico', 'fatiar_capitulos'):
+            try:
+                from .pdf_fontes_studio import (
+                    inspecionar_pdf_estrutura,
+                    parse_intervalo_paginas,
+                    gerar_pdf_fatiado_bytes,
+                )
+
+                arquivo_enviado.seek(0)
+                pdf_bytes = arquivo_enviado.read()
+                info_pdf = inspecionar_pdf_estrutura(pdf_bytes, max_paginas_detalhe=10)
+                total_paginas = info_pdf['total_paginas']
+
+                nome_base = (request.POST.get('nome') or os.path.splitext(arquivo_enviado.name)[0]).strip()
+                descricao_base = (request.POST.get('descricao') or '').strip()
+
+                if modo_pdf == 'recorte_unico':
+                    intervalo_str = (request.POST.get('intervalo_unico') or '').strip()
+                    p_ini = request.POST.get('recorte_inicio')
+                    p_fim = request.POST.get('recorte_fim')
+                    paginas = parse_intervalo_paginas(intervalo_str, total_paginas, p_ini, p_fim)
+
+                    if not paginas:
+                        messages.error(request, f'Informe um intervalo de páginas válido entre 1 e {total_paginas}.')
+                        form = FontesForm(request.POST, request.FILES)
+                        return render(request, "mimir/cadastrarFonte.html", {"source": None, "form": form})
+
+                    fatia_bytes, ext = gerar_pdf_fatiado_bytes(pdf_bytes, paginas, titulo_fatia=nome_base)
+                    resumo_pags = f"p. {paginas[0]}-{paginas[-1]}" if len(paginas) > 1 else f"p. {paginas[0]}"
+                    nova_fonte = Fontes(
+                        nome=nome_base,
+                        descricao=descricao_base or f"Recorte extraído de '{arquivo_enviado.name}' ({resumo_pags}, {len(paginas)} página(s)).",
+                        user=request.user,
+                    )
+                    nome_arq = f"recorte_{slugify(nome_base)[:40]}_{paginas[0]}_{paginas[-1]}{ext}"
+                    nova_fonte.fonte.save(nome_arq, ContentFile(fatia_bytes))
+                    nova_fonte.save()
+                    messages.success(
+                        request,
+                        f"Fonte '{nova_fonte.nome}' criada com sucesso contendo {len(paginas)} página(s) selecionada(s) ({resumo_pags})!"
+                    )
+                    return redirect('mimir:visualizarFontes')
+
+                elif modo_pdf == 'fatiar_capitulos':
+                    fatias_json_str = request.POST.get('fatias_json', '[]')
+                    try:
+                        fatias_lista = json.loads(fatias_json_str)
+                    except Exception:
+                        fatias_lista = []
+
+                    # Se também pediu para salvar o livro completo original
+                    if request.POST.get('salvar_original_tambem') == 'on':
+                        fonte_orig = Fontes(
+                            nome=f"{nome_base} (Livro Completo)",
+                            descricao=descricao_base or f"Arquivo integral ({total_paginas} páginas).",
+                            user=request.user,
+                        )
+                        nome_orig = f"completo_{slugify(nome_base)[:40]}.pdf"
+                        fonte_orig.fonte.save(nome_orig, ContentFile(pdf_bytes))
+                        fonte_orig.save()
+
+                    criadas = 0
+                    for idx, fatia in enumerate(fatias_lista, 1):
+                        if not fatia.get('ativa', True):
+                            continue
+                        titulo_cap = (fatia.get('titulo') or f"{nome_base} - Parte {idx}").strip()
+                        intervalo_cap = (fatia.get('intervalo') or '').strip()
+                        ini_cap = fatia.get('inicio')
+                        fim_cap = fatia.get('fim')
+                        desc_cap = (fatia.get('descricao') or '').strip()
+
+                        paginas_cap = parse_intervalo_paginas(intervalo_cap, total_paginas, ini_cap, fim_cap)
+                        if not paginas_cap:
+                            continue
+
+                        fatia_bytes, ext = gerar_pdf_fatiado_bytes(pdf_bytes, paginas_cap, titulo_fatia=titulo_cap)
+                        resumo_pags = f"p. {paginas_cap[0]}-{paginas_cap[-1]}" if len(paginas_cap) > 1 else f"p. {paginas_cap[0]}"
+                        nova_f = Fontes(
+                            nome=titulo_cap[:200],
+                            descricao=desc_cap or f"Capítulo fatiado de '{nome_base}' ({resumo_pags} • {len(paginas_cap)} pág.).",
+                            user=request.user,
+                        )
+                        nome_arq = f"cap_{idx:02d}_{slugify(titulo_cap)[:40]}_{paginas_cap[0]}_{paginas_cap[-1]}{ext}"
+                        nova_f.fonte.save(nome_arq, ContentFile(fatia_bytes))
+                        nova_f.save()
+                        criadas += 1
+
+                    if criadas > 0:
+                        messages.success(
+                            request,
+                            f"Sucesso! O PDF foi fatiado e {criadas} capítulo(s)/fonte(s) independente(s) foram cadastrados no seu Banco de Fontes!"
+                        )
+                        return redirect('mimir:visualizarFontes')
+                    else:
+                        messages.error(request, 'Nenhuma fatia/capítulo válido foi selecionado para geração.')
+                        form = FontesForm(request.POST, request.FILES)
+                        return render(request, "mimir/cadastrarFonte.html", {"source": None, "form": form})
+
+            except Exception as e:
+                messages.error(request, f"Erro ao manipular/fatiar o PDF: {str(e)}")
+                form = FontesForm(request.POST, request.FILES)
+                return render(request, "mimir/cadastrarFonte.html", {"source": None, "form": form})
+
         form = FontesForm(request.POST, request.FILES)
         if form.is_valid():
             # Cria o objeto mas não salva ainda
@@ -784,6 +891,9 @@ def criarProva(request):
 @grupo_requerido('Professor')
 def editarProva(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
+    
+    if prova.is_unificada and not request.GET.get('modo_classico'):
+        return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
     
     # Verificar se o usuário tem permissão para editar
     if request.user != prova.user:
@@ -3699,3 +3809,779 @@ def restaurarVersaoParte(request, historico_id):
         
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Erro: {str(e)}'}, status=500)
+
+
+# ==============================================================================
+# AVALIAÇÃO UNIFICADA POR MÓDULO (CRIAÇÃO, IMPRESSÃO OMR/FOTO E CORREÇÃO POR FOTO)
+# ==============================================================================
+
+from .avaliacao_unificada import (
+    DEFAULT_QUOTAS,
+    SECOES_UNIFICADA,
+    QUESTOES_SENSACAO_PADRAO,
+    extrair_meta_unificada,
+    empacotar_meta_unificada,
+    construir_estrutura_unificada,
+    inserir_questoes_sensacao_padrao,
+    preencher_questoes_do_banco,
+    gerar_questoes_faltantes_unificada,
+    analisar_foto_prova_unificada_ia,
+    calcular_diagnostico_prova_aluno_unificada,
+    garantir_tipos_pergunta_unificada,
+    garantir_assunto_auxiliar,
+)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def criarAvaliacaoUnificada(request):
+    """
+    Cria uma Avaliação Unificada de Módulo:
+    - 3 questões de Conhecimentos Gerais objetivas (configurável)
+    - 1 questão dissertativa de Conhecimento Geral (configurável)
+    - 3 questões objetivas por Matéria (Assunto) do módulo do aluno (configurável)
+    - 1 questão dissertativa técnica (configurável)
+    - Questões sobre a Sensação do Aluno (configurável)
+    """
+    assuntos_professor = Assunto.objects.filter(user=request.user).order_by('nome')
+
+    if request.method == 'POST':
+        titulo = (request.POST.get('titulo') or '').strip()
+        modulo_nome = (request.POST.get('modulo_nome') or '').strip() or 'Módulo Integrado'
+        descricao_humana = (request.POST.get('descricao') or '').strip()
+        assuntos_ids_raw = request.POST.getlist('assuntos_ids')
+        novos_assuntos_raw = (request.POST.get('novos_assuntos') or '').strip()
+
+        # Se o professor informou novas matérias separadas por vírgula/linha, cria na hora
+        assuntos_ids = []
+        for aid in assuntos_ids_raw:
+            try:
+                assuntos_ids.append(int(aid))
+            except (ValueError, TypeError):
+                pass
+
+        if novos_assuntos_raw:
+            nomes_novos = [
+                n.strip()
+                for n in re.split(r'[,;\n]+', novos_assuntos_raw)
+                if n.strip()
+            ]
+            for nome_assunto in nomes_novos:
+                novo_assunto, _ = Assunto.objects.get_or_create(
+                    user=request.user,
+                    nome=nome_assunto,
+                    defaults={'layoutGuiaTutor': f'Disciplina/Matéria do módulo: {nome_assunto}'}
+                )
+                if novo_assunto.id not in assuntos_ids:
+                    assuntos_ids.append(novo_assunto.id)
+
+        if not titulo:
+            messages.error(request, 'Informe o título da Avaliação Unificada.')
+        elif not assuntos_ids:
+            messages.error(request, 'Selecione ou cadastre pelo menos 1 matéria (Assunto) do módulo do aluno.')
+        else:
+            def _int_quota(field, default):
+                try:
+                    return max(0, int(request.POST.get(field, default)))
+                except (ValueError, TypeError):
+                    return default
+
+            quotas = {
+                'cg_objetivas': _int_quota('cg_objetivas', DEFAULT_QUOTAS['cg_objetivas']),
+                'cg_dissertativa': _int_quota('cg_dissertativa', DEFAULT_QUOTAS['cg_dissertativa']),
+                'materia_objetivas': _int_quota('materia_objetivas', DEFAULT_QUOTAS['materia_objetivas']),
+                'dissertativa_tecnica': _int_quota('dissertativa_tecnica', DEFAULT_QUOTAS['dissertativa_tecnica']),
+                'sensacao_aluno': _int_quota('sensacao_aluno', DEFAULT_QUOTAS['sensacao_aluno']),
+            }
+
+            assunto_principal = Assunto.objects.filter(id=assuntos_ids[0]).first()
+            if not assunto_principal:
+                assunto_principal = Assunto.objects.filter(user=request.user).first()
+
+            if not descricao_humana:
+                descricao_humana = (
+                    f"Avaliação Unificada do {modulo_nome}. "
+                    f"Composta por Conhecimentos Gerais (Objetivas e Dissertativa), "
+                    f"Conhecimentos Específicos por Matéria do Módulo, Questão Dissertativa Técnica "
+                    f"e Pesquisa de Sensação do Aluno."
+                )
+
+            meta = {
+                'is_unificada': True,
+                'modulo_nome': modulo_nome,
+                'assuntos_ids': assuntos_ids,
+                'quotas': quotas,
+                'question_map': {},
+            }
+
+            prova = Prova.objects.create(
+                titulo=titulo,
+                descricao=empacotar_meta_unificada(descricao_humana, meta),
+                user=request.user,
+                assunto=assunto_principal,
+            )
+
+            # Opções automáticas marcadas na criação
+            incluir_sensacao = request.POST.get('incluir_sensacao_padrao') == 'on'
+            preencher_banco = request.POST.get('preencher_do_banco') == 'on'
+            gerar_ia = request.POST.get('gerar_faltantes_ia') == 'on'
+
+            msg_partes = [f"Avaliação Unificada '{prova.titulo}' criada com sucesso!"]
+
+            if incluir_sensacao and quotas['sensacao_aluno'] > 0:
+                qtd_sens = inserir_questoes_sensacao_padrao(prova, request.user)
+                if qtd_sens:
+                    msg_partes.append(f"{qtd_sens} questão(ões) de sensação do aluno incluída(s).")
+
+            if preencher_banco:
+                res_banco = preencher_questoes_do_banco(prova)
+                if res_banco.get('total', 0) > 0:
+                    msg_partes.append(f"{res_banco['total']} questão(ões) aproveitada(s) do banco de questões.")
+
+            if gerar_ia:
+                res_ia = gerar_questoes_faltantes_unificada(prova, request.user, secao_alvo='todas')
+                if res_ia.get('criadas', 0) > 0:
+                    msg_partes.append(f"{res_ia['criadas']} questão(ões) gerada(s) automaticamente para completar a estrutura.")
+
+            messages.success(request, " ".join(msg_partes))
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+    context = {
+        'assuntos': assuntos_professor,
+        'quotas_default': DEFAULT_QUOTAS,
+        'questoes_sensacao_padrao': QUESTOES_SENSACAO_PADRAO,
+    }
+    return render(request, 'mimir/criarAvaliacaoUnificada.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def gerenciarAvaliacaoUnificada(request, prova_id):
+    """
+    Painel completo para montar, parametrizar cotas, vincular matérias (Assuntos),
+    adicionar/gerar questões por seção e acionar impressão ou correção por foto.
+    """
+    prova = get_object_or_404(Prova, id=prova_id, user=request.user)
+    descricao_humana, meta = extrair_meta_unificada(prova.descricao)
+
+    # Se uma prova comum for aberta aqui, inicializa os metadados unificados nela
+    if not meta:
+        meta = {
+            'is_unificada': True,
+            'modulo_nome': f"Módulo - {prova.assunto.nome}",
+            'assuntos_ids': [prova.assunto_id],
+            'quotas': dict(DEFAULT_QUOTAS),
+            'question_map': {},
+        }
+        prova.descricao = empacotar_meta_unificada(descricao_humana or prova.titulo, meta)
+        prova.save(update_fields=['descricao'])
+
+    if request.method == 'POST':
+        acao = request.POST.get('acao', '')
+
+        if acao == 'salvar_config':
+            novo_titulo = (request.POST.get('titulo') or prova.titulo).strip()
+            modulo_nome = (request.POST.get('modulo_nome') or meta.get('modulo_nome') or 'Módulo').strip()
+            nova_desc = (request.POST.get('descricao') or descricao_humana).strip()
+            assuntos_ids_raw = request.POST.getlist('assuntos_ids')
+
+            assuntos_ids = []
+            for aid in assuntos_ids_raw:
+                try:
+                    assuntos_ids.append(int(aid))
+                except (ValueError, TypeError):
+                    pass
+
+            if not assuntos_ids:
+                assuntos_ids = meta.get('assuntos_ids') or [prova.assunto_id]
+
+            def _int_q(field, default):
+                try:
+                    return max(0, int(request.POST.get(field, default)))
+                except (ValueError, TypeError):
+                    return default
+
+            quotas = {
+                'cg_objetivas': _int_q('cg_objetivas', DEFAULT_QUOTAS['cg_objetivas']),
+                'cg_dissertativa': _int_q('cg_dissertativa', DEFAULT_QUOTAS['cg_dissertativa']),
+                'materia_objetivas': _int_q('materia_objetivas', DEFAULT_QUOTAS['materia_objetivas']),
+                'dissertativa_tecnica': _int_q('dissertativa_tecnica', DEFAULT_QUOTAS['dissertativa_tecnica']),
+                'sensacao_aluno': _int_q('sensacao_aluno', DEFAULT_QUOTAS['sensacao_aluno']),
+            }
+
+            meta['modulo_nome'] = modulo_nome
+            meta['assuntos_ids'] = assuntos_ids
+            meta['quotas'] = quotas
+            prova.titulo = novo_titulo
+            if assuntos_ids:
+                assunto_p = Assunto.objects.filter(id=assuntos_ids[0]).first()
+                if assunto_p:
+                    prova.assunto = assunto_p
+            prova.descricao = empacotar_meta_unificada(nova_desc, meta)
+            prova.save()
+            messages.success(request, 'Configurações de assuntos e limites de questões atualizadas!')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'criar_assunto_rapido':
+            nome_novo = (request.POST.get('nome_assunto') or '').strip()
+            if nome_novo:
+                novo_a, _ = Assunto.objects.get_or_create(
+                    user=request.user,
+                    nome=nome_novo,
+                    defaults={'layoutGuiaTutor': f'Matéria do módulo: {nome_novo}'}
+                )
+                aids = list(meta.get('assuntos_ids', []))
+                if novo_a.id not in aids:
+                    aids.append(novo_a.id)
+                meta['assuntos_ids'] = aids
+                prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+                prova.save(update_fields=['descricao'])
+                messages.success(request, f"Matéria '{novo_a.nome}' criada e vinculada ao módulo!")
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'adicionar_existente':
+            pergunta_id = request.POST.get('pergunta_id')
+            secao_destino = request.POST.get('secao_destino', 'materia_objetivas')
+            assunto_destino_id = request.POST.get('assunto_destino_id')
+            try:
+                pergunta = Pergunta.objects.get(id=pergunta_id)
+                prova.perguntas.add(pergunta)
+                q_map = dict(meta.get('question_map', {}))
+                q_map[str(pergunta.id)] = {
+                    'secao': secao_destino,
+                    'assunto_id': int(assunto_destino_id) if assunto_destino_id else pergunta.assunto_id,
+                }
+                meta['question_map'] = q_map
+                prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+                prova.save(update_fields=['descricao'])
+                messages.success(request, f"Questão #{pergunta.id} vinculada à seção '{SECOES_UNIFICADA.get(secao_destino, {}).get('titulo', secao_destino)}'!")
+            except Pergunta.DoesNotExist:
+                messages.error(request, 'Questão não encontrada no banco.')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'criar_pergunta_secao':
+            secao_destino = request.POST.get('secao_destino', 'materia_objetivas')
+            assunto_destino_id = request.POST.get('assunto_destino_id')
+            enunciado = (request.POST.get('pergunta_texto') or '').strip()
+            gabarito = (request.POST.get('gabarito_texto') or '').strip()
+
+            if not enunciado or not gabarito:
+                messages.error(request, 'Preencha o enunciado e o gabarito da questão.')
+            else:
+                tipos = garantir_tipos_pergunta_unificada()
+                if secao_destino in ('cg_dissertativa', 'dissertativa_tecnica'):
+                    tipo_obj = tipos['dissertativa']
+                elif secao_destino == 'sensacao_aluno':
+                    tipo_obj = tipos['sensacao']
+                else:
+                    tipo_obj = tipos['objetiva']
+
+                if secao_destino in ('cg_objetivas', 'cg_dissertativa'):
+                    assunto_obj = garantir_assunto_auxiliar(request.user, 'Conhecimentos Gerais')
+                elif secao_destino == 'sensacao_aluno':
+                    assunto_obj = garantir_assunto_auxiliar(request.user, 'Sensação e Autoavaliação do Aluno')
+                elif assunto_destino_id:
+                    assunto_obj = Assunto.objects.filter(id=assunto_destino_id).first() or prova.assunto
+                else:
+                    assunto_obj = prova.assunto
+
+                nova_p = Pergunta.objects.create(
+                    assunto=assunto_obj,
+                    pergunta=enunciado,
+                    gabarito=gabarito,
+                    tipoDePergunta=tipo_obj,
+                )
+                prova.perguntas.add(nova_p)
+                q_map = dict(meta.get('question_map', {}))
+                q_map[str(nova_p.id)] = {
+                    'secao': secao_destino,
+                    'assunto_id': assunto_obj.id,
+                }
+                meta['question_map'] = q_map
+                prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+                prova.save(update_fields=['descricao'])
+                messages.success(request, 'Nova questão criada e adicionada à Avaliação Unificada!')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'remover_pergunta':
+            pergunta_id = request.POST.get('pergunta_id')
+            if pergunta_id:
+                prova.perguntas.remove(pergunta_id)
+                q_map = dict(meta.get('question_map', {}))
+                q_map.pop(str(pergunta_id), None)
+                meta['question_map'] = q_map
+                prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+                prova.save(update_fields=['descricao'])
+                messages.info(request, 'Questão removida da prova.')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'preencher_banco':
+            res = preencher_questoes_do_banco(prova)
+            if res.get('total', 0) > 0:
+                messages.success(request, f"{res['total']} questão(ões) do banco adicionada(s) automaticamente respeitando os limites!")
+            else:
+                messages.info(request, 'Nenhuma questão adicional compatível encontrada no banco (ou todas as cotas já estão completas).')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'gerar_faltantes_ia':
+            secao_alvo = request.POST.get('secao_alvo', 'todas')
+            res = gerar_questoes_faltantes_unificada(prova, request.user, secao_alvo=secao_alvo)
+            if res.get('criadas', 0) > 0:
+                messages.success(request, f"{res['criadas']} questão(ões) gerada(s) com sucesso para completar a estrutura da prova!")
+            else:
+                messages.info(request, 'Todas as cotas desta seção já estão preenchidas!')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'inserir_sensacao':
+            qtd = inserir_questoes_sensacao_padrao(prova, request.user)
+            if qtd > 0:
+                messages.success(request, f"{qtd} questão(ões) sobre a Sensação do Aluno inserida(s)!")
+            else:
+                messages.info(request, 'A cota de questões de sensação do aluno já está preenchida.')
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+    estrutura = construir_estrutura_unificada(prova)
+    assuntos_professor = Assunto.objects.filter(user=request.user).order_by('nome')
+
+    # Questões disponíveis no banco para adição manual
+    perguntas_na_prova_ids = prova.perguntas.values_list('id', flat=True)
+    perguntas_banco = (
+        Pergunta.objects.filter(assunto__user=request.user)
+        .exclude(id__in=perguntas_na_prova_ids)
+        .select_related('assunto', 'tipoDePergunta')
+        .order_by('assunto__nome', '-id')[:120]
+    )
+
+    # Estatísticas de correções realizadas para esta prova
+    provas_alunos = (
+        ProvaAluno.objects.filter(aplicacao_prova__prova=prova)
+        .select_related('aluno', 'aplicacao_prova')
+        .order_by('-data_conclusao', '-id')
+    )
+
+    context = {
+        'prova': prova,
+        'estrutura': estrutura,
+        'assuntos_professor': assuntos_professor,
+        'perguntas_banco': perguntas_banco,
+        'provas_alunos': provas_alunos,
+    }
+    return render(request, 'mimir/gerenciarAvaliacaoUnificada.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def imprimirAvaliacaoUnificada(request, prova_id):
+    """
+    Renderiza ou exporta em PDF:
+    - ?tipo=prova : Caderno completo da Avaliação Unificada organizado nas 5 seções e por matéria
+    - ?tipo=folha_resposta : Folha de Respostas OMR/Foto otimizada para leitura por foto/câmera
+    - ?tipo=gabarito : Gabarito oficial estruturado por seção e matéria
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    tipo = request.GET.get('tipo', 'prova')
+    if tipo not in ('prova', 'folha_resposta', 'gabarito'):
+        tipo = 'prova'
+
+    estrutura = construir_estrutura_unificada(prova)
+
+    # Separa itens para facilitar renderização da Folha OMR/Foto
+    itens_objetivos = [
+        item for item in estrutura['questoes_numeradas']
+        if item['is_objetiva'] and item['secao'] != 'sensacao_aluno'
+    ]
+    itens_dissertativos = [
+        item for item in estrutura['questoes_numeradas']
+        if item['is_dissertativa'] and item['secao'] != 'sensacao_aluno'
+    ]
+    itens_sensacao = [
+        item for item in estrutura['questoes_numeradas']
+        if item['secao'] == 'sensacao_aluno'
+    ]
+
+    context = {
+        'prova': prova,
+        'estrutura': estrutura,
+        'tipo_documento': tipo,
+        'itens_objetivos': itens_objetivos,
+        'itens_dissertativos': itens_dissertativos,
+        'itens_sensacao': itens_sensacao,
+        'alternativas': ['A', 'B', 'C', 'D', 'E'],
+        'linhas_dissertativa': range(1, 13),
+        'data_impressao': timezone.now(),
+    }
+
+    if request.GET.get('pdf'):
+        html_string = render_to_string('mimir/imprimirAvaliacaoUnificada.html', context)
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf_file = html.write_pdf()
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        filename = f"avaliacao_unificada_{tipo}_{prova.id}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        return response
+
+    return render(request, 'mimir/imprimirAvaliacaoUnificada.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def corrigirAvaliacaoUnificadaFoto(request, prova_id):
+    """
+    Interface para corrigir a Avaliação Unificada (incluindo envio/captura de foto da prova
+    ou folha de respostas e correção assistida por Visão Computacional / Gemini Multimodal).
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    estrutura = construir_estrutura_unificada(prova)
+
+    # Garante que exista uma AplicacaoProva padrão para registrar correções presenciais/impressas
+    aplicacao = AplicacaoProva.objects.filter(prova=prova).order_by('-criado_em').first()
+    if not aplicacao:
+        agora = timezone.now()
+        aplicacao = AplicacaoProva.objects.create(
+            prova=prova,
+            data_disponivel=agora,
+            data_limite=agora + datetime.timedelta(days=365),
+            tempo_limite=datetime.timedelta(hours=4),
+            disponivel=True,
+        )
+
+    # Lista de alunos vinculados aos assuntos do módulo (ou todos os alunos ativos)
+    assuntos_ids = estrutura.get('assuntos_ids', [prova.assunto_id])
+    alunos_modulo = User.objects.filter(
+        vinculos_assuntos__assunto_id__in=assuntos_ids,
+        vinculos_assuntos__ativo=True
+    ).distinct().order_by('first_name', 'username')
+
+    todos_alunos = User.objects.filter(
+        Q(groups__name='Aluno') | Q(id__in=alunos_modulo.values_list('id', flat=True))
+    ).distinct().order_by('first_name', 'username')
+
+    if not todos_alunos.exists():
+        todos_alunos = User.objects.filter(is_active=True).order_by('first_name', 'username')
+
+    aluno_selecionado_id = request.GET.get('aluno_id') or request.POST.get('aluno_id')
+    aluno_selecionado = None
+    prova_aluno = None
+
+    if aluno_selecionado_id:
+        aluno_selecionado = User.objects.filter(id=aluno_selecionado_id).first()
+        if aluno_selecionado:
+            prova_aluno, _ = ProvaAluno.objects.get_or_create(
+                aplicacao_prova=aplicacao,
+                aluno=aluno_selecionado,
+                defaults={'status': 'concluida', 'data_conclusao': timezone.now()}
+            )
+
+    if request.method == 'POST' and request.POST.get('acao') == 'salvar_correcao_unificada':
+        # Caso o professor tenha informado um novo nome de aluno rápido sem cadastro prévio
+        novo_aluno_nome = (request.POST.get('novo_aluno_nome') or '').strip()
+        if not aluno_selecionado and novo_aluno_nome:
+            username_base = slugify(novo_aluno_nome).replace('-', '.')[:25] or f"aluno.{timezone.now().strftime('%H%M%S')}"
+            username_final = username_base
+            idx = 1
+            while User.objects.filter(username=username_final).exists():
+                idx += 1
+                username_final = f"{username_base}{idx}"
+            partes_nome = novo_aluno_nome.split(' ', 1)
+            aluno_selecionado = User.objects.create(
+                username=username_final,
+                first_name=partes_nome[0],
+                last_name=partes_nome[1] if len(partes_nome) > 1 else '',
+            )
+            grupo_aluno, _ = Group.objects.get_or_create(name='Aluno')
+            aluno_selecionado.groups.add(grupo_aluno)
+
+        if not aluno_selecionado:
+            messages.error(request, 'Selecione um aluno ou informe o nome do aluno para salvar a correção.')
+        else:
+            prova_aluno, _ = ProvaAluno.objects.get_or_create(
+                aplicacao_prova=aplicacao,
+                aluno=aluno_selecionado,
+                defaults={'status': 'corrigida', 'data_conclusao': timezone.now()}
+            )
+
+            foto_anexo = request.FILES.get('foto_comprovante')
+
+            for item in estrutura['questoes_numeradas']:
+                q = item['pergunta']
+                qid = q.id
+                resp_texto = (request.POST.get(f'resposta_texto_{qid}') or '').strip()
+                nota_raw = request.POST.get(f'nota_{qid}', '')
+                peso_raw = request.POST.get(f'peso_{qid}', str(item['peso_sugerido']))
+                feedback_prof = (request.POST.get(f'feedback_{qid}') or '').strip()
+
+                try:
+                    nota_val = float(str(nota_raw).replace(',', '.')) if nota_raw != '' else None
+                except (ValueError, TypeError):
+                    nota_val = None
+
+                try:
+                    peso_val = max(0, int(peso_raw))
+                except (ValueError, TypeError):
+                    peso_val = item['peso_sugerido']
+
+                if item['secao'] == 'sensacao_aluno':
+                    peso_val = 0
+                    if nota_val is None:
+                        nota_val = 10.0
+
+                defaults_resp = {
+                    'resposta_texto': resp_texto,
+                    'nota': nota_val,
+                    'peso': peso_val,
+                    'feedback_professor': feedback_prof,
+                }
+                resp_obj, _ = RespostaAluno.objects.update_or_create(
+                    aluno=aluno_selecionado,
+                    pergunta=q,
+                    prova_aluno=prova_aluno,
+                    defaults=defaults_resp,
+                )
+                if foto_anexo and item['numero'] == 1:
+                    resp_obj.arquivo_resposta = foto_anexo
+                    resp_obj.save()
+
+            diag = calcular_diagnostico_prova_aluno_unificada(prova_aluno)
+            prova_aluno.nota_final = diag['nota_academica_final']
+            prova_aluno.status = 'corrigida'
+            if not prova_aluno.data_conclusao:
+                prova_aluno.data_conclusao = timezone.now()
+            prova_aluno.save()
+
+            messages.success(
+                request,
+                f"Correção da Avaliação Unificada de {aluno_selecionado.get_full_name() or aluno_selecionado.username} "
+                f"salva com sucesso! Nota Acadêmica Final: {diag['nota_academica_final']:.2f} / 10,00."
+            )
+            return redirect(f"{request.path}?aluno_id={aluno_selecionado.id}")
+
+    # Mapeia respostas existentes se houver aluno selecionado
+    respostas_map = {}
+    diagnostico_aluno = None
+    if prova_aluno:
+        for r in prova_aluno.respostas.all():
+            respostas_map[r.pergunta_id] = r
+        if prova_aluno.respostas.exists():
+            diagnostico_aluno = calcular_diagnostico_prova_aluno_unificada(prova_aluno)
+
+    itens_correcao = []
+    for item in estrutura['questoes_numeradas']:
+        q = item['pergunta']
+        resp = respostas_map.get(q.id)
+        itens_correcao.append({
+            **item,
+            'resposta_obj': resp,
+            'resposta_texto_atual': resp.resposta_texto if resp and resp.resposta_texto else '',
+            'nota_atual': float(resp.nota) if resp and resp.nota is not None else '',
+            'peso_atual': resp.peso if resp is not None else item['peso_sugerido'],
+            'feedback_atual': resp.feedback_professor if resp and resp.feedback_professor else '',
+        })
+
+    historico_correcoes = (
+        ProvaAluno.objects.filter(aplicacao_prova__prova=prova, status='corrigida')
+        .select_related('aluno')
+        .order_by('-data_conclusao', '-id')
+    )
+
+    context = {
+        'prova': prova,
+        'aplicacao': aplicacao,
+        'estrutura': estrutura,
+        'todos_alunos': todos_alunos,
+        'aluno_selecionado': aluno_selecionado,
+        'prova_aluno': prova_aluno,
+        'itens_correcao': itens_correcao,
+        'diagnostico_aluno': diagnostico_aluno,
+        'historico_correcoes': historico_correcoes,
+    }
+    return render(request, 'mimir/corrigirAvaliacaoUnificadaFoto.html', context)
+
+
+@login_required
+@require_POST
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def processarFotoUnificadaAjax(request, prova_id):
+    """
+    Endpoint AJAX que recebe uma ou mais fotos da Avaliação Unificada (folha de respostas
+    e/ou páginas de respostas dissertativas), executa leitura óptica + transcrição e avaliação
+    via Gemini Vision Multimodal e retorna o JSON estruturado questão a questão.
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    arquivos = request.FILES.getlist('fotos_prova')
+    if not arquivos and request.FILES.get('foto_prova'):
+        arquivos = [request.FILES.get('foto_prova')]
+
+    if not arquivos:
+        return JsonResponse({
+            'success': False,
+            'message': 'Nenhuma foto da prova foi enviada. Selecione ou tire uma foto para corrigir.'
+        }, status=400)
+
+    resultado = analisar_foto_prova_unificada_ia(prova, arquivos, user=request.user)
+    return JsonResponse(resultado)
+
+
+# ==============================================================================
+# ESTÚDIO DE MANIPULAÇÃO E FATIAMENTO DE PDF PARA FONTES (CAPÍTULOS / INTERVALOS)
+# ==============================================================================
+
+from .pdf_fontes_studio import (
+    inspecionar_pdf_estrutura,
+    extrair_texto_pagina_especifica,
+    parse_intervalo_paginas,
+    gerar_pdf_fatiado_bytes,
+)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def inspecionarPdfFonteAjax(request):
+    """
+    Endpoint AJAX que analisa um PDF enviado no formulário de upload (ou uma Fonte já cadastrada)
+    e retorna:
+      - total_paginas
+      - capitulos_detectados (Sumário digital / Bookmarks do PDF ou títulos de capítulos detectados)
+      - paginas_resumo (título/primeira linha e prévia de cada página)
+    """
+    try:
+        fonte_id = request.POST.get('fonte_id') or request.GET.get('fonte_id')
+        arquivo = request.FILES.get('arquivo_pdf') or request.FILES.get('fonte')
+
+        if arquivo:
+            if not arquivo.name.lower().endswith('.pdf'):
+                return JsonResponse({
+                    'success': False,
+                    'message': 'O arquivo selecionado não é um documento PDF.'
+                }, status=400)
+            arquivo.seek(0)
+            pdf_bytes = arquivo.read()
+            nome_base = os.path.splitext(arquivo.name)[0]
+        elif fonte_id:
+            fonte_obj = get_object_or_404(Fontes, id=fonte_id, user=request.user)
+            with open(fonte_obj.fonte.path, 'rb') as f:
+                pdf_bytes = f.read()
+            nome_base = fonte_obj.nome
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Envie um arquivo PDF ou informe uma fonte existente para inspecionar.'
+            }, status=400)
+
+        estrutura = inspecionar_pdf_estrutura(pdf_bytes)
+        return JsonResponse({
+            'success': True,
+            'nome_sugerido': nome_base,
+            **estrutura,
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Erro ao analisar estrutura do PDF: {str(e)}'
+        }, status=500)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def lerPaginaPdfFonteAjax(request):
+    """
+    Endpoint AJAX para ler o texto integral de uma página específica do PDF durante o fatiamento.
+    """
+    try:
+        pagina_num = int(request.POST.get('pagina') or request.GET.get('pagina') or 1)
+        fonte_id = request.POST.get('fonte_id') or request.GET.get('fonte_id')
+        arquivo = request.FILES.get('arquivo_pdf') or request.FILES.get('fonte')
+
+        if arquivo:
+            arquivo.seek(0)
+            pdf_bytes = arquivo.read()
+        elif fonte_id:
+            fonte_obj = get_object_or_404(Fontes, id=fonte_id, user=request.user)
+            with open(fonte_obj.fonte.path, 'rb') as f:
+                pdf_bytes = f.read()
+        else:
+            return JsonResponse({'success': False, 'message': 'PDF não informado.'}, status=400)
+
+        dados = extrair_texto_pagina_especifica(pdf_bytes, pagina_num)
+        return JsonResponse(dados)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def fatiarFonteExistente(request, fonte_id):
+    """
+    Permite abrir um arquivo PDF que já está no Banco de Fontes e fatiá-lo em capítulos
+    ou extrair intervalos de páginas como novas Fontes independentes.
+    """
+    fonte_origem = get_object_or_404(Fontes, id=fonte_id, user=request.user)
+
+    if not fonte_origem.fonte.name.lower().endswith('.pdf'):
+        messages.warning(request, 'Apenas fontes em formato PDF podem ser fatiadas por capítulos/páginas.')
+        return redirect('mimir:visualizarFontes')
+
+    with open(fonte_origem.fonte.path, 'rb') as f:
+        pdf_bytes = f.read()
+
+    info_pdf = inspecionar_pdf_estrutura(pdf_bytes)
+    total_paginas = info_pdf['total_paginas']
+
+    if request.method == 'POST':
+        fatias_json_str = request.POST.get('fatias_json', '[]')
+        try:
+            fatias_lista = json.loads(fatias_json_str)
+        except Exception:
+            fatias_lista = []
+
+        criadas = 0
+        for idx, fatia in enumerate(fatias_lista, 1):
+            if not fatia.get('ativa', True):
+                continue
+            titulo_cap = (fatia.get('titulo') or f"{fonte_origem.nome} - Parte {idx}").strip()
+            intervalo_cap = (fatia.get('intervalo') or '').strip()
+            ini_cap = fatia.get('inicio')
+            fim_cap = fatia.get('fim')
+            desc_cap = (fatia.get('descricao') or '').strip()
+
+            paginas_cap = parse_intervalo_paginas(intervalo_cap, total_paginas, ini_cap, fim_cap)
+            if not paginas_cap:
+                continue
+
+            fatia_bytes, ext = gerar_pdf_fatiado_bytes(pdf_bytes, paginas_cap, titulo_fatia=titulo_cap)
+            resumo_pags = f"p. {paginas_cap[0]}-{paginas_cap[-1]}" if len(paginas_cap) > 1 else f"p. {paginas_cap[0]}"
+            nova_f = Fontes(
+                nome=titulo_cap[:200],
+                descricao=desc_cap or f"Capítulo extraído de '{fonte_origem.nome}' ({resumo_pags} • {len(paginas_cap)} pág.).",
+                user=request.user,
+            )
+            nome_arq = f"cap_{idx:02d}_{slugify(titulo_cap)[:40]}_{paginas_cap[0]}_{paginas_cap[-1]}{ext}"
+            nova_f.fonte.save(nome_arq, ContentFile(fatia_bytes))
+            nova_f.save()
+            criadas += 1
+
+        if criadas > 0:
+            messages.success(
+                request,
+                f"{criadas} novo(s) capítulo(s)/fonte(s) extraído(s) com sucesso a partir de '{fonte_origem.nome}'!"
+            )
+            return redirect('mimir:visualizarFontes')
+        else:
+            messages.error(request, 'Selecione ao menos um capítulo ou intervalo de páginas válido para extrair.')
+
+    context = {
+        'source': None,
+        'fonte_origem': fonte_origem,
+        'info_pdf_json': json.dumps(info_pdf, ensure_ascii=False),
+        'info_pdf': info_pdf,
+        'modo_fatiar_existente': True,
+    }
+    return render(request, 'mimir/cadastrarFonte.html', context)
+

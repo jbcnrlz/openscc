@@ -147,5 +147,15 @@ urlpatterns = [
      path('pdi/projeto/parecer/cadastrar/', views.cadastrarParecerHistorico, name='cadastrarParecerHistorico'),
      path('pdi/projeto/<int:projeto_id>/analise-preditiva/', views.analisePreditivaProjeto, name='analisePreditivaProjeto'),
      path('pbl/parte/historico/<int:historico_id>/restaurar/', views.restaurarVersaoParte, name='restaurarVersaoParte'),
-     path('pergunta/<int:pergunta_id>/feedback/solicitar/', views.solicitarFeedbackPerguntaDireto, name='solicitarFeedbackPerguntaDireto')
+     path('pergunta/<int:pergunta_id>/feedback/solicitar/', views.solicitarFeedbackPerguntaDireto, name='solicitarFeedbackPerguntaDireto'),
+     # Avaliação Unificada de Módulo (Criação, Gestão de Assuntos/Cotas, Impressão OMR/Foto e Correção por Foto)
+     path('avaliacao-unificada/criar/', views.criarAvaliacaoUnificada, name='criarAvaliacaoUnificada'),
+     path('avaliacao-unificada/<int:prova_id>/gerenciar/', views.gerenciarAvaliacaoUnificada, name='gerenciarAvaliacaoUnificada'),
+     path('avaliacao-unificada/<int:prova_id>/imprimir/', views.imprimirAvaliacaoUnificada, name='imprimirAvaliacaoUnificada'),
+     path('avaliacao-unificada/<int:prova_id>/corrigir-foto/', views.corrigirAvaliacaoUnificadaFoto, name='corrigirAvaliacaoUnificadaFoto'),
+     path('avaliacao-unificada/<int:prova_id>/processar-foto-ajax/', views.processarFotoUnificadaAjax, name='processarFotoUnificadaAjax'),
+     # Estúdio de Manipulação e Fatiamento de PDF para Fontes (Capítulos / Intervalos)
+     path('fontes/inspecionar-pdf-ajax/', views.inspecionarPdfFonteAjax, name='inspecionarPdfFonteAjax'),
+     path('fontes/ler-pagina-pdf-ajax/', views.lerPaginaPdfFonteAjax, name='lerPaginaPdfFonteAjax'),
+     path('fontes/<int:fonte_id>/fatiar/', views.fatiarFonteExistente, name='fatiarFonteExistente'),
 ]
