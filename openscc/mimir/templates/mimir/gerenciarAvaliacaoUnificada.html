@@ -1,0 +1,563 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container-fluid px-4 py-4">
+    <!-- Cabeçalho e Barra de Ações Principais -->
+    <div class="card border-0 shadow-sm mb-4 bg-white">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-primary px-3 py-1">
+                            <i class="fas fa-layer-group me-1"></i> Avaliação Unificada
+                        </span>
+                        <span class="badge bg-dark px-3 py-1">
+                            <i class="fas fa-cubes me-1"></i> {{ estrutura.modulo_nome }}
+                        </span>
+                        {% if estrutura.completa %}
+                        <span class="badge bg-success px-3 py-1">
+                            <i class="fas fa-check-circle me-1"></i> Estrutura Completa ({{ estrutura.total_atual }}/{{ estrutura.total_meta }})
+                        </span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark px-3 py-1">
+                            <i class="fas fa-hourglass-half me-1"></i> Em Montagem ({{ estrutura.total_atual }}/{{ estrutura.total_meta }} questões)
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h2 class="fw-bold text-dark mb-1">{{ prova.titulo }}</h2>
+                    <p class="text-muted mb-0 small">{{ estrutura.descricao_limpa }}</p>
+                </div>
+
+                <!-- Botões de Impressão e Correção por Foto -->
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-success fw-bold shadow-sm">
+                        <i class="fas fa-camera me-1"></i> Corrigir por Foto / OMR
+                    </a>
+
+                    <div class="btn-group shadow-sm">
+                        <a href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank" class="btn btn-primary fw-semibold">
+                            <i class="fas fa-print me-1"></i> Imprimir Caderno
+                        </a>
+                        <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="visually-hidden">Opções de Impressão</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                            <li><h6 class="dropdown-header">Visualização para Impressão</h6></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank">
+                                    <i class="fas fa-book-open text-primary me-2"></i> Caderno de Prova Unificada
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=folha_resposta" target="_blank">
+                                    <i class="fas fa-qrcode text-success me-2"></i> Folha de Respostas OMR / Foto
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=gabarito" target="_blank">
+                                    <i class="fas fa-check-double text-info me-2"></i> Gabarito Oficial Unificado
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Exportação Direta em PDF</h6></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova&pdf=1" target="_blank">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i> Baixar PDF do Caderno de Prova
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=folha_resposta&pdf=1" target="_blank">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i> Baixar PDF da Folha de Respostas (Foto)
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=gabarito&pdf=1" target="_blank">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i> Baixar PDF do Gabarito
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <button type="button" class="btn btn-outline-dark" data-bs-toggle="collapse" data-bs-target="#collapseConfigUnificada">
+                        <i class="fas fa-sliders-h me-1"></i> Configurar Assuntos / Limites
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barra de Progresso das 5 Partes -->
+            <div class="row g-3 mt-3 pt-3 border-top">
+                <div class="col-md-2 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <div class="small text-muted">1. CG Objetivas</div>
+                        <div class="fw-bold {% if estrutura.secoes.cg_objetivas.completa %}text-success{% else %}text-primary{% endif %}">
+                            {{ estrutura.secoes.cg_objetivas.atual }} / {{ estrutura.secoes.cg_objetivas.meta }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <div class="small text-muted">2. CG Dissertativa</div>
+                        <div class="fw-bold {% if estrutura.secoes.cg_dissertativa.completa %}text-success{% else %}text-primary{% endif %}">
+                            {{ estrutura.secoes.cg_dissertativa.atual }} / {{ estrutura.secoes.cg_dissertativa.meta }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <div class="small text-muted">3. Matérias ({{ estrutura.assuntos|length }} assunto(s))</div>
+                        <div class="fw-bold {% if estrutura.secoes.materia_objetivas.completa %}text-success{% else %}text-primary{% endif %}">
+                            {{ estrutura.secoes.materia_objetivas.atual }} / {{ estrutura.secoes.materia_objetivas.meta }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <div class="small text-muted">4. Diss. Técnica</div>
+                        <div class="fw-bold {% if estrutura.secoes.dissertativa_tecnica.completa %}text-success{% else %}text-primary{% endif %}">
+                            {{ estrutura.secoes.dissertativa_tecnica.atual }} / {{ estrutura.secoes.dissertativa_tecnica.meta }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-12">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <div class="small text-muted">5. Sensação do Aluno</div>
+                        <div class="fw-bold {% if estrutura.secoes.sensacao_aluno.completa %}text-success{% else %}text-secondary{% endif %}">
+                            {{ estrutura.secoes.sensacao_aluno.atual }} / {{ estrutura.secoes.sensacao_aluno.meta }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painel Retrátil: Configuração de Assuntos e Quantidade por Tipo -->
+    <div class="collapse mb-4" id="collapseConfigUnificada">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-cogs me-2"></i>Configurar Matérias (Assuntos) e Quantidades por Tipo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-toggle="collapse" data-bs-target="#collapseConfigUnificada"></button>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="salvar_config">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Título da Avaliação</label>
+                            <input type="text" name="titulo" class="form-control" value="{{ prova.titulo }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Nome do Módulo</label>
+                            <input type="text" name="modulo_nome" class="form-control" value="{{ estrutura.modulo_nome }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Descrição / Instruções</label>
+                            <input type="text" name="descricao" class="form-control" value="{{ estrutura.descricao_limpa }}">
+                        </div>
+
+                        <div class="col-12 mt-3">
+                            <label class="form-label fw-bold text-dark">Assuntos (Matérias) Vinculados a este Módulo:</label>
+                            <div class="row g-2">
+                                {% for a in assuntos_professor %}
+                                <div class="col-md-3 col-sm-6">
+                                    <label class="border rounded p-2 d-flex align-items-center gap-2 bg-light">
+                                        <input type="checkbox" name="assuntos_ids" value="{{ a.id }}" class="form-check-input m-0"
+                                               {% if a.id in estrutura.assuntos_ids %}checked{% endif %}>
+                                        <span class="small fw-semibold text-truncate">{{ a.nome }}</span>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-3">
+                            <label class="form-label fw-bold text-dark">Delimitação de Questões por Tipo:</label>
+                            <div class="row g-2">
+                                <div class="col-md-2 col-6">
+                                    <label class="form-label small text-muted mb-1">CG Objetivas</label>
+                                    <input type="number" name="cg_objetivas" min="0" max="30" class="form-control" value="{{ estrutura.quotas.cg_objetivas }}">
+                                </div>
+                                <div class="col-md-2 col-6">
+                                    <label class="form-label small text-muted mb-1">CG Dissertativa</label>
+                                    <input type="number" name="cg_dissertativa" min="0" max="10" class="form-control" value="{{ estrutura.quotas.cg_dissertativa }}">
+                                </div>
+                                <div class="col-md-3 col-6">
+                                    <label class="form-label small text-muted mb-1">Objetivas por Matéria</label>
+                                    <input type="number" name="materia_objetivas" min="0" max="20" class="form-control" value="{{ estrutura.quotas.materia_objetivas }}">
+                                </div>
+                                <div class="col-md-2 col-6">
+                                    <label class="form-label small text-muted mb-1">Dissertativa Técnica</label>
+                                    <input type="number" name="dissertativa_tecnica" min="0" max="10" class="form-control" value="{{ estrutura.quotas.dissertativa_tecnica }}">
+                                </div>
+                                <div class="col-md-3 col-12">
+                                    <label class="form-label small text-muted mb-1">Sensação do Aluno</label>
+                                    <input type="number" name="sensacao_aluno" min="0" max="10" class="form-control" value="{{ estrutura.quotas.sensacao_aluno }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary fw-bold">
+                                <i class="fas fa-save me-1"></i> Salvar Configurações da Avaliação
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Criar novo assunto rápido -->
+                <form method="post" class="mt-3 pt-3 border-top d-flex gap-2 align-items-center">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="criar_assunto_rapido">
+                    <span class="small fw-semibold text-muted">Nova matéria rápida:</span>
+                    <input type="text" name="nome_assunto" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Nome da nova disciplina..." required>
+                    <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-plus me-1"></i> Criar e Vincular ao Módulo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Coluna Esquerda: As 5 Seções da Avaliação Unificada -->
+        <div class="col-lg-8">
+            <!-- Barra de Automação Rápida -->
+            <div class="card border-0 shadow-sm mb-4 bg-primary bg-opacity-10 border-start border-4 border-primary">
+                <div class="card-body py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-robot text-primary me-2"></i>Assistente de Montagem Inteligente</h6>
+                        <small class="text-muted">Preencha automaticamente as cotas faltantes de cada parte da prova:</small>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="preencher_banco">
+                            <button type="submit" class="btn btn-sm btn-outline-primary bg-white fw-semibold">
+                                <i class="fas fa-database me-1"></i> Puxar do Banco
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="inserir_sensacao">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary bg-white fw-semibold">
+                                <i class="fas fa-smile me-1"></i> Inserir Sensação do Aluno
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="gerar_faltantes_ia">
+                            <input type="hidden" name="secao_alvo" value="todas">
+                            <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                                <i class="fas fa-magic me-1"></i> Completar Faltantes (IA)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE I: Conhecimentos Gerais (Objetivas) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <span class="badge bg-primary me-2">Parte I</span>
+                        <strong class="text-dark">Conhecimentos Gerais (Objetivas)</strong>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if estrutura.secoes.cg_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            {{ estrutura.secoes.cg_objetivas.atual }} / {{ estrutura.secoes.cg_objetivas.meta }} questões
+                        </span>
+                        <button class="btn btn-sm btn-outline-primary" type="button"
+                                onclick="abrirModalNovaQuestao('cg_objetivas', '', 'Parte I - Conhecimentos Gerais (Objetiva)', true)">
+                            <i class="fas fa-plus me-1"></i> Nova Questão
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    {% for item in estrutura.secoes.cg_objetivas.perguntas %}
+                        {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
+                    {% empty %}
+                        <p class="text-muted small mb-0 text-center py-3">Nenhuma questão de Conhecimento Geral Objetiva adicionada ainda.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PARTE II: Questão Dissertativa (Conhecimento Geral) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <span class="badge bg-info text-dark me-2">Parte II</span>
+                        <strong class="text-dark">Questão Dissertativa (Conhecimento Geral)</strong>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if estrutura.secoes.cg_dissertativa.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            {{ estrutura.secoes.cg_dissertativa.atual }} / {{ estrutura.secoes.cg_dissertativa.meta }} questão(ões)
+                        </span>
+                        <button class="btn btn-sm btn-outline-primary" type="button"
+                                onclick="abrirModalNovaQuestao('cg_dissertativa', '', 'Parte II - Dissertativa de Conhecimento Geral', false)">
+                            <i class="fas fa-plus me-1"></i> Nova Dissertativa
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    {% for item in estrutura.secoes.cg_dissertativa.perguntas %}
+                        {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
+                    {% empty %}
+                        <p class="text-muted small mb-0 text-center py-3">Nenhuma questão Dissertativa de Conhecimento Geral adicionada ainda.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PARTE III: Questões Objetivas por Matéria do Módulo (Assunto) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <span class="badge bg-success me-2">Parte III</span>
+                        <strong class="text-dark">Questões Objetivas por Matéria do Módulo ({{ estrutura.quotas.materia_objetivas }} por Assunto)</strong>
+                    </div>
+                    <span class="badge {% if estrutura.secoes.materia_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                        Total: {{ estrutura.secoes.materia_objetivas.atual }} / {{ estrutura.secoes.materia_objetivas.meta }} questões
+                    </span>
+                </div>
+                <div class="card-body p-3">
+                    {% for mat in estrutura.secoes.materia_objetivas.por_materia %}
+                    <div class="border rounded-3 p-3 mb-3 bg-light bg-opacity-50">
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <i class="fas fa-book text-success me-1"></i>
+                                <strong class="text-dark">{{ mat.assunto.nome }}</strong>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge {% if mat.completa %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ mat.atual }} / {{ mat.meta }}
+                                </span>
+                                <button class="btn btn-sm btn-outline-success" type="button"
+                                        onclick="abrirModalNovaQuestao('materia_objetivas', '{{ mat.assunto.id }}', 'Matéria: {{ mat.assunto.nome|escapejs }}', true)">
+                                    <i class="fas fa-plus me-1"></i> Adicionar em {{ mat.assunto.nome|truncatechars:18 }}
+                                </button>
+                            </div>
+                        </div>
+                        {% for item in mat.perguntas %}
+                            {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
+                        {% empty %}
+                            <p class="text-muted small mb-0 text-center py-2">Nenhuma questão vinculada para {{ mat.assunto.nome }}.</p>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PARTE IV: Questão Dissertativa Técnica -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <span class="badge bg-warning text-dark me-2">Parte IV</span>
+                        <strong class="text-dark">Questão Dissertativa Técnica</strong>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if estrutura.secoes.dissertativa_tecnica.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            {{ estrutura.secoes.dissertativa_tecnica.atual }} / {{ estrutura.secoes.dissertativa_tecnica.meta }} questão(ões)
+                        </span>
+                        <button class="btn btn-sm btn-outline-primary" type="button"
+                                onclick="abrirModalNovaQuestao('dissertativa_tecnica', '{{ prova.assunto_id }}', 'Parte IV - Dissertativa Técnica do Módulo', false)">
+                            <i class="fas fa-plus me-1"></i> Nova Dissertativa Técnica
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    {% for item in estrutura.secoes.dissertativa_tecnica.perguntas %}
+                        {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
+                    {% empty %}
+                        <p class="text-muted small mb-0 text-center py-3">Nenhuma questão Dissertativa Técnica adicionada ainda.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PARTE V: Sensação do Aluno -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <span class="badge bg-secondary me-2">Parte V</span>
+                        <strong class="text-dark">Questões sobre a Sensação do Aluno (Autoavaliação / Percepção)</strong>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if estrutura.secoes.sensacao_aluno.completa %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ estrutura.secoes.sensacao_aluno.atual }} / {{ estrutura.secoes.sensacao_aluno.meta }} questões
+                        </span>
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                onclick="abrirModalNovaQuestao('sensacao_aluno', '', 'Parte V - Sensação do Aluno', true)">
+                            <i class="fas fa-plus me-1"></i> Nova Pergunta de Sensação
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    {% for item in estrutura.secoes.sensacao_aluno.perguntas %}
+                        {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
+                    {% empty %}
+                        <div class="text-center py-3">
+                            <p class="text-muted small mb-2">Nenhuma questão de sensação do aluno vinculada.</p>
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="inserir_sensacao">
+                                <button type="submit" class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-magic me-1"></i> Inserir Questões Padrão de Sensação do Aluno
+                                </button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: Banco de Questões e Correções Recentes -->
+        <div class="col-lg-4">
+            <!-- Vincular Questão Existente do Banco -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-search-plus text-primary me-2"></i>Vincular Questão Existente do Banco
+                    </h6>
+                </div>
+                <div class="card-body p-3">
+                    {% if perguntas_banco %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="adicionar_existente">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Escolher Questão do Banco</label>
+                            <select name="pergunta_id" class="form-select form-select-sm" required>
+                                {% for pb in perguntas_banco %}
+                                <option value="{{ pb.id }}">
+                                    [{{ pb.assunto.nome|truncatechars:18 }}] #{{ pb.id }} - {{ pb.pergunta|striptags|truncatechars:55 }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-7">
+                                <label class="form-label small fw-semibold">Seção de Destino</label>
+                                <select name="secao_destino" class="form-select form-select-sm">
+                                    <option value="materia_objetivas">Parte III - Matéria do Módulo</option>
+                                    <option value="cg_objetivas">Parte I - CG Objetiva</option>
+                                    <option value="cg_dissertativa">Parte II - CG Dissertativa</option>
+                                    <option value="dissertativa_tecnica">Parte IV - Dissertativa Técnica</option>
+                                    <option value="sensacao_aluno">Parte V - Sensação do Aluno</option>
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small fw-semibold">Matéria (Parte III)</label>
+                                <select name="assunto_destino_id" class="form-select form-select-sm">
+                                    {% for a in estrutura.assuntos %}
+                                    <option value="{{ a.id }}">{{ a.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary w-100 fw-semibold">
+                            <i class="fas fa-link me-1"></i> Adicionar Questão Selecionada
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted small mb-0">Todas as questões disponíveis já foram adicionadas ou o banco está vazio.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Correções Realizadas / Acesso Rápido à Correção por Foto -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-camera-retro text-warning me-2"></i>Correções desta Avaliação
+                    </h6>
+                    <span class="badge bg-light text-dark">{{ provas_alunos|length }}</span>
+                </div>
+                <div class="card-body p-3">
+                    <p class="small text-muted mb-3">
+                        Tire uma foto da Folha de Respostas ou das páginas da prova impressa para que o Mimir leia as marcações e corrija automaticamente.
+                    </p>
+                    <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-success w-100 fw-bold mb-3">
+                        <i class="fas fa-camera me-1"></i> Abrir Corretor por Foto (OMR + IA)
+                    </a>
+
+                    {% if provas_alunos %}
+                    <div class="list-group list-group-flush small">
+                        {% for pa in provas_alunos|slice:":8" %}
+                        <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}?aluno_id={{ pa.aluno.id }}"
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-2">
+                            <div>
+                                <i class="fas fa-user-graduate text-secondary me-1"></i>
+                                <strong>{{ pa.aluno.get_full_name|default:pa.aluno.username }}</strong>
+                                <span class="text-muted d-block" style="font-size: 0.75rem;">Status: {{ pa.get_status_display }}</span>
+                            </div>
+                            <span class="badge {% if pa.nota_final >= 6 %}bg-success{% elif pa.nota_final != None %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6">
+                                {% if pa.nota_final != None %}{{ pa.nota_final|floatformat:1 }}{% else %}--{% endif %}
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted small py-2">
+                        Nenhuma prova de aluno corrigida ainda.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Criar Nova Questão Direto na Seção -->
+<div class="modal fade" id="modalNovaQuestaoSecao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="criar_pergunta_secao">
+                <input type="hidden" name="secao_destino" id="modal_secao_destino">
+                <input type="hidden" name="assunto_destino_id" id="modal_assunto_destino_id">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="modal_titulo_secao">Adicionar Nova Questão</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Enunciado da Questão (com alternativas A-E se for objetiva)</label>
+                        <textarea name="pergunta_texto" id="modal_pergunta_texto" rows="7" class="form-control" required></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Gabarito / Critério de Correção</label>
+                        <textarea name="gabarito_texto" id="modal_gabarito_texto" rows="2" class="form-control" required
+                                  placeholder="Ex: C (para objetiva) ou os critérios esperados na resposta dissertativa..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="fas fa-check me-1"></i> Salvar e Vincular à Avaliação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalNovaQuestao(secao, assuntoId, tituloSecao, isObjetiva) {
+    document.getElementById('modal_secao_destino').value = secao;
+    document.getElementById('modal_assunto_destino_id').value = assuntoId || '';
+    document.getElementById('modal_titulo_secao').textContent = 'Nova Questão • ' + tituloSecao;
+
+    const txtPergunta = document.getElementById('modal_pergunta_texto');
+    const txtGabarito = document.getElementById('modal_gabarito_texto');
+    if (isObjetiva) {
+        txtPergunta.placeholder = "Digite o enunciado da questão...\n\nA) Alternativa A\nB) Alternativa B\nC) Alternativa C\nD) Alternativa D\nE) Alternativa E";
+        txtGabarito.placeholder = "Ex: Letra C — Justificativa...";
+    } else {
+        txtPergunta.placeholder = "Digite o caso ou enunciado da questão dissertativa...";
+        txtGabarito.placeholder = "Descreva o padrão de resposta esperado e critérios de pontuação...";
+    }
+    const modal = new bootstrap.Modal(document.getElementById('modalNovaQuestaoSecao'));
+    modal.show();
+}
+</script>
+{% endblock %}
+

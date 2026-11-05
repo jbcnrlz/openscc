@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ prova.titulo }} - {% if tipo_documento == 'folha_resposta' %}Folha de Respostas OMR/Foto{% elif tipo_documento == 'gabarito' %}Gabarito Oficial{% else %}Caderno de Prova Unificada{% endif %}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 14mm 14mm 16mm 14mm;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10.5pt;
+            line-height: 1.45;
+            color: #111827;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+        .no-print-bar {
+            background: #1e293b;
+            color: #fff;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            margin-bottom: 18px;
+        }
+        .no-print-bar a, .no-print-bar button {
+            color: #fff;
+            text-decoration: none;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 9.5pt;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+        .no-print-bar a.active, .no-print-bar button.primary {
+            background: #2563eb;
+            border-color: #3b82f6;
+        }
+        .page-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 4mm;
+            position: relative;
+        }
+        /* Marcadores fiduciais nos 4 cantos para leitura por Foto / Visão Computacional */
+        .fiducial-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .fiducial-mark {
+            width: 18px;
+            height: 18px;
+            background: #000;
+            display: inline-block;
+            border: 2px solid #000;
+        }
+        .header-box {
+            border: 2px solid #111827;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1.5px solid #111827;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+        .exam-title {
+            font-size: 14pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin: 0 0 2px 0;
+        }
+        .exam-subtitle {
+            font-size: 9.5pt;
+            color: #374151;
+            margin: 0;
+        }
+        .code-box {
+            text-align: right;
+            font-family: monospace;
+            font-size: 9.5pt;
+            border: 1.5px solid #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        .student-fields {
+            display: table;
+            width: 100%;
+            font-size: 9.5pt;
+        }
+        .student-row {
+            display: table-row;
+        }
+        .student-cell {
+            display: table-cell;
+            padding: 5px 6px;
+            border-bottom: 1px dashed #9ca3af;
+        }
+        .section-banner {
+            background: #111827;
+            color: #ffffff;
+            padding: 6px 12px;
+            font-weight: 700;
+            font-size: 10.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin: 16px 0 10px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .subject-subbanner {
+            background: #f3f4f6;
+            border-left: 4px solid #111827;
+            padding: 5px 10px;
+            font-weight: 700;
+            font-size: 10pt;
+            margin: 10px 0 8px 0;
+            color: #111827;
+        }
+        .question-block {
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+        }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            font-size: 9pt;
+            font-weight: 700;
+        }
+        .question-body {
+            white-space: pre-line;
+            font-size: 10pt;
+        }
+        .essay-box {
+            border: 2px solid #000;
+            border-radius: 4px;
+            padding: 6px 10px;
+            margin-top: 8px;
+            background: #fff;
+        }
+        .essay-box-header {
+            font-size: 8.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #111827;
+            border-bottom: 1px solid #000;
+            padding-bottom: 3px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .essay-line {
+            height: 22px;
+            border-bottom: 1px solid #9ca3af;
+            font-size: 8pt;
+            color: #9ca3af;
+            padding-top: 4px;
+        }
+        /* Estilos da Folha OMR / Foto */
+        .omr-grid {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+        .omr-row {
+            display: table-row;
+            border-bottom: 1px solid #d1d5db;
+        }
+        .omr-row:nth-child(even) {
+            background: #f9fafb;
+        }
+        .omr-cell-num {
+            display: table-cell;
+            padding: 6px 8px;
+            font-weight: 800;
+            width: 58px;
+            border: 1px solid #111827;
+            text-align: center;
+            font-size: 10pt;
+        }
+        .omr-cell-meta {
+            display: table-cell;
+            padding: 6px 8px;
+            border: 1px solid #111827;
+            font-size: 8.5pt;
+            color: #374151;
+            width: 36%;
+        }
+        .omr-cell-bubbles {
+            display: table-cell;
+            padding: 5px 10px;
+            border: 1px solid #111827;
+            text-align: center;
+        }
+        .bubble {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 21px;
+            border: 2px solid #000;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: 800;
+            font-size: 9.5pt;
+            margin: 0 6px;
+            color: #000;
+            background: #fff;
+        }
+        .bubble-filled {
+            background: #111827;
+            color: #fff;
+        }
+        @media print {
+            .no-print-bar {
+                display: none !important;
+            }
+            .page-container {
+                padding: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="no-print-bar">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <strong>Mimir • Impressão Unificada:</strong>
+        <a href="?tipo=prova" class="{% if tipo_documento == 'prova' %}active{% endif %}">1. Caderno de Prova</a>
+        <a href="?tipo=folha_resposta" class="{% if tipo_documento == 'folha_resposta' %}active{% endif %}">2. Folha de Respostas (Foto/OMR)</a>
+        <a href="?tipo=gabarito" class="{% if tipo_documento == 'gabarito' %}active{% endif %}">3. Gabarito Oficial</a>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <a href="?tipo={{ tipo_documento }}&pdf=1" target="_blank">Baixar PDF</a>
+        <button type="button" class="primary" onclick="window.print()">Imprimir Agora</button>
+        <a href="{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}">Voltar ao Painel</a>
+    </div>
+</div>
+
+<div class="page-container">
+    <!-- Marcadores Fiduciais Superiores -->
+    <div class="fiducial-row">
+        <span class="fiducial-mark"></span>
+        <span style="font-family: monospace; font-size: 8.5pt; font-weight: bold;">
+            [MIMIR-UNIFICADA-ID:{{ prova.id }} | MODULO:{{ estrutura.modulo_nome|upper }} | DOC:{{ tipo_documento|upper }}]
+        </span>
+        <span class="fiducial-mark"></span>
+    </div>
+
+    <!-- Cabeçalho Institucional Padronizado -->
+    <div class="header-box">
+        <div class="header-top">
+            <div>
+                <div class="exam-title">{{ prova.titulo }}</div>
+                <div class="exam-subtitle">
+                    <strong>{{ estrutura.modulo_nome }}</strong> •
+                    Matérias Integradas:
+                    {% for a in estrutura.assuntos %}{{ a.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </div>
+            </div>
+            <div class="code-box">
+                <div><strong>PROVA #{{ prova.id }}</strong></div>
+                <div>Itens: {{ estrutura.total_atual }}</div>
+                <div>{{ data_impressao|date:"d/m/Y" }}</div>
+            </div>
+        </div>
+
+        {% if tipo_documento != 'gabarito' %}
+        <div class="student-fields">
+            <div class="student-row">
+                <div class="student-cell" style="width: 58%;"><strong>NOME DO(A) ALUNO(A):</strong> ______________________________________________________</div>
+                <div class="student-cell" style="width: 22%;"><strong>RA / MATRÍCULA:</strong> _______________</div>
+                <div class="student-cell" style="width: 20%;"><strong>TURMA:</strong> ___________</div>
+            </div>
+            <div class="student-row">
+                <div class="student-cell"><strong>ASSINATURA:</strong> ___________________________________________________________</div>
+                <div class="student-cell"><strong>DATA:</strong> ____/____/202___</div>
+                <div class="student-cell"><strong>NOTA:</strong> ______ / 10,0</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if tipo_documento == 'folha_resposta' %}
+        <!-- =================================================================== -->
+        <!-- MODO 2: FOLHA DE RESPOSTAS OMR / FOTO PARA CORREÇÃO AUTOMÁTICA     -->
+        <!-- =================================================================== -->
+        <div style="border: 1.5px solid #111827; background: #f8fafc; padding: 8px 12px; border-radius: 5px; font-size: 9pt; margin-bottom: 12px;">
+            <strong>INSTRUÇÕES PARA LEITURA POR FOTO (Mimir OMR + Visão Computacional):</strong>
+            1. Preencha completamente o círculo da alternativa escolhida com caneta azul ou preta.
+            2. Redija as respostas dissertativas exclusivamente dentro das caixas delimitadas abaixo.
+            3. Ao fotografar esta folha para correção no Mimir, enquadre os 4 quadrados pretos dos cantos.
+        </div>
+
+        <!-- Grade de Questões Objetivas (Partes I e III) -->
+        <div class="section-banner">
+            <span>BLOCO 1 • QUESTÕES OBJETIVAS (CONHECIMENTOS GERAIS E MATÉRIAS DO MÓDULO)</span>
+            <span>MARQUE APENAS 1 OPÇÃO POR QUESTÃO</span>
+        </div>
+
+        <div class="omr-grid">
+            {% for item in itens_objetivos %}
+            <div class="omr-row">
+                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                <div class="omr-cell-meta">
+                    <strong>{{ item.assunto_nome }}</strong><br>
+                    <span>{{ item.secao_titulo }}</span>
+                </div>
+                <div class="omr-cell-bubbles">
+                    {% for letra in alternativas %}
+                        <span class="bubble">{{ letra }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Caixas Delimitadas para as Questões Dissertativas (Partes II e IV) -->
+        {% if itens_dissertativos %}
+        <div class="section-banner">
+            <span>BLOCO 2 • QUESTÕES DISSERTATIVAS (TRANSCRIÇÃO E AVALIAÇÃO POR FOTO)</span>
+            <span>ESCREVA COM LETRA LEGÍVEL DENTRO DO QUADRO</span>
+        </div>
+
+        {% for item in itens_dissertativos %}
+        <div class="essay-box" style="margin-bottom: 12px; page-break-inside: avoid;">
+            <div class="essay-box-header">
+                <span>[QUESTÃO Q{{ item.numero|stringformat:"02d" }} • {{ item.secao_titulo|upper }}]</span>
+                <span>MATÉRIA/EIXO: {{ item.assunto_nome|upper }}</span>
+            </div>
+            <div style="font-size: 8.5pt; color: #374151; margin-bottom: 4px;">
+                {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:220 }}
+            </div>
+            {% for linha in linhas_dissertativa %}
+                <div class="essay-line">{{ linha }}</div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Bloco 3: Sensação do Aluno (Parte V) -->
+        {% if itens_sensacao %}
+        <div class="section-banner" style="background: #374151;">
+            <span>BLOCO 3 • SENSAÇÃO DO ALUNO SOBRE A AVALIAÇÃO (AUTOAVALIAÇÃO / PESO ZERO)</span>
+            <span>DIAGNÓSTICO PEDAGÓGICO</span>
+        </div>
+        <div class="omr-grid">
+            {% for item in itens_sensacao %}
+            <div class="omr-row">
+                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                <div class="omr-cell-meta">
+                    {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:110 }}
+                </div>
+                <div class="omr-cell-bubbles">
+                    {% for letra in alternativas %}
+                        <span class="bubble">{{ letra }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    {% elif tipo_documento == 'gabarito' %}
+        <!-- =================================================================== -->
+        <!-- MODO 3: GABARITO OFICIAL E CRITÉRIOS DE CORREÇÃO                    -->
+        <!-- =================================================================== -->
+        <div class="section-banner">
+            <span>GABARITO OFICIAL E MATRIZ DE CORREÇÃO • {{ prova.titulo }}</span>
+            <span>TOTAL: {{ estrutura.total_atual }} ITENS</span>
+        </div>
+
+        <div class="omr-grid">
+            {% for item in estrutura.questoes_numeradas %}
+            <div class="omr-row">
+                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                <div class="omr-cell-meta">
+                    <strong>{{ item.secao_titulo }}</strong><br>
+                    Matéria: {{ item.assunto_nome }} • Peso sugerido: {{ item.peso_sugerido }}
+                </div>
+                <div class="omr-cell-bubbles" style="text-align: left;">
+                    {% if item.is_dissertativa %}
+                        <strong>Critério Dissertativo:</strong> {{ item.pergunta.get_gabarito_com_feedback }}
+                    {% elif item.secao == 'sensacao_aluno' %}
+                        <em>Questão Diagnóstica (Sensação do Aluno) — Qualquer alternativa válida (A-E), Peso 0 na nota.</em>
+                    {% else %}
+                        {% for letra in alternativas %}
+                            <span class="bubble {% if item.letra_gabarito == letra %}bubble-filled{% endif %}">{{ letra }}</span>
+                        {% endfor %}
+                        <div style="font-size: 8.5pt; margin-top: 4px; color: #374151;">
+                            <strong>Gabarito:</strong> {{ item.pergunta.get_gabarito_com_feedback }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    {% else %}
+        <!-- =================================================================== -->
+        <!-- MODO 1: CADERNO COMPLETO DA AVALIAÇÃO UNIFICADA (5 PARTES)          -->
+        <!-- =================================================================== -->
+        {% if estrutura.descricao_limpa %}
+        <div style="border: 1px solid #d1d5db; background: #f9fafb; padding: 8px 12px; border-radius: 5px; font-size: 9.5pt; margin-bottom: 14px;">
+            <strong>Instruções Gerais:</strong> {{ estrutura.descricao_limpa }}
+        </div>
+        {% endif %}
+
+        <!-- PARTE I: Conhecimentos Gerais (Objetivas) -->
+        {% if estrutura.secoes.cg_objetivas.perguntas %}
+        <div class="section-banner">
+            <span>PARTE I — CONHECIMENTOS GERAIS (QUESTÕES OBJETIVAS)</span>
+            <span>{{ estrutura.secoes.cg_objetivas.atual }} QUESTÃO(ÕES)</span>
+        </div>
+        {% for item in estrutura.secoes.cg_objetivas.perguntas %}
+        <div class="question-block">
+            <div class="question-header">
+                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • CONHECIMENTOS GERAIS</span>
+                <span>MÚLTIPLA ESCOLHA</span>
+            </div>
+            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- PARTE II: Questão Dissertativa (Conhecimento Geral) -->
+        {% if estrutura.secoes.cg_dissertativa.perguntas %}
+        <div class="section-banner">
+            <span>PARTE II — QUESTÃO DISSERTATIVA (CONHECIMENTO GERAL)</span>
+            <span>{{ estrutura.secoes.cg_dissertativa.atual }} QUESTÃO(ÕES)</span>
+        </div>
+        {% for item in estrutura.secoes.cg_dissertativa.perguntas %}
+        <div class="question-block">
+            <div class="question-header">
+                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA DE CONHECIMENTO GERAL</span>
+                <span>RESPOSTA ARGUMENTATIVA</span>
+            </div>
+            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="essay-box">
+                <div class="essay-box-header">
+                    <span>ESPAÇO PARA RESPOSTA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
+                    <span>[DISSERTATIVA Q{{ item.numero|stringformat:"02d" }}]</span>
+                </div>
+                {% for linha in linhas_dissertativa %}
+                <div class="essay-line">{{ linha }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- PARTE III: Questões Objetivas por Matéria do Módulo -->
+        <div class="section-banner">
+            <span>PARTE III — CONHECIMENTOS ESPECÍFICOS POR MATÉRIA DO MÓDULO</span>
+            <span>{{ estrutura.secoes.materia_objetivas.atual }} QUESTÃO(ÕES)</span>
+        </div>
+        {% for mat in estrutura.secoes.materia_objetivas.por_materia %}
+            {% if mat.perguntas %}
+            <div class="subject-subbanner">
+                DISCIPLINA / ASSUNTO: {{ mat.assunto.nome|upper }} ({{ mat.atual }} questão(ões))
+            </div>
+            {% for item in mat.perguntas %}
+            <div class="question-block">
+                <div class="question-header">
+                    <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • {{ mat.assunto.nome|upper }}</span>
+                    <span>MÚLTIPLA ESCOLHA</span>
+                </div>
+                <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        {% endfor %}
+
+        <!-- PARTE IV: Questão Dissertativa Técnica -->
+        {% if estrutura.secoes.dissertativa_tecnica.perguntas %}
+        <div class="section-banner">
+            <span>PARTE IV — QUESTÃO DISSERTATIVA TÉCNICA DO MÓDULO</span>
+            <span>{{ estrutura.secoes.dissertativa_tecnica.atual }} QUESTÃO(ÕES)</span>
+        </div>
+        {% for item in estrutura.secoes.dissertativa_tecnica.perguntas %}
+        <div class="question-block">
+            <div class="question-header">
+                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA TÉCNICA ({{ item.assunto_nome|upper }})</span>
+                <span>RESPOSTA TÉCNICA</span>
+            </div>
+            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="essay-box">
+                <div class="essay-box-header">
+                    <span>ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
+                    <span>[DISSERTATIVA Q{{ item.numero|stringformat:"02d" }}]</span>
+                </div>
+                {% for linha in linhas_dissertativa %}
+                <div class="essay-line">{{ linha }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- PARTE V: Questões sobre a Sensação do Aluno -->
+        {% if estrutura.secoes.sensacao_aluno.perguntas %}
+        <div class="section-banner" style="background: #374151;">
+            <span>PARTE V — SENSAÇÃO DO ALUNO SOBRE A PROVA (AUTOAVALIAÇÃO • PESO ZERO)</span>
+            <span>{{ estrutura.secoes.sensacao_aluno.atual }} ITEM(NS)</span>
+        </div>
+        {% for item in estrutura.secoes.sensacao_aluno.perguntas %}
+        <div class="question-block">
+            <div class="question-header">
+                <span>ITEM {{ item.numero|stringformat:"02d" }} • PERCEPÇÃO E AUTOAVALIAÇÃO DO ESTUDANTE</span>
+                <span>NÃO PENALIZA A NOTA</span>
+            </div>
+            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    {% endif %}
+
+    <!-- Marcadores Fiduciais Inferiores -->
+    <div class="fiducial-row" style="margin-top: 14px;">
+        <span class="fiducial-mark"></span>
+        <span style="font-family: monospace; font-size: 8pt; color: #4b5563;">
+            Gerado pelo Mimir (OpenSCC) • Suporte a Correção por Foto e Visão Computacional
+        </span>
+        <span class="fiducial-mark"></span>
+    </div>
+</div>
+
+</body>
+</html>
+

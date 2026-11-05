@@ -9,7 +9,7 @@
         </h2>
         <div>
             <a href="{% url 'mimir:addFontes' %}" class="btn btn-primary btn-sm shadow-sm fw-bold">
-                <i class="fas fa-plus me-1"></i> Adicionar Nova Fonte
+                <i class="fas fa-cut me-1"></i> Adicionar / Fatiar Fonte (PDF)
             </a>
         </div>
     </div>
@@ -90,6 +90,11 @@
                                     <a href="{{ source.fonte.url }}" target="_blank" class="btn btn-outline-primary" title="Abrir Arquivo">
                                         <i class="fas fa-external-link-alt"></i>
                                     </a>
+                                    {% if source.fonte.name|lower|slice:"-4:" == ".pdf" %}
+                                    <a href="{% url 'mimir:fatiarFonteExistente' source.id %}" class="btn btn-outline-warning text-dark fw-semibold" title="Fatiar PDF em Capítulos / Intervalos">
+                                        <i class="fas fa-cut"></i> Fatiar
+                                    </a>
+                                    {% endif %}
                                     <a href="{% url 'mimir:updateFonte' source.id %}" class="btn btn-outline-secondary" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>

@@ -3,13 +3,16 @@
 {% block mainContent %}
 <div class="container mt-4">
     <!-- Cabeçalho Principal -->
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom gap-2">
         <h2 class="h4 mb-0 text-dark fw-bold">
-            <i class="fas fa-clipboard-list me-2 text-purple"></i> Banco de Provas
+            <i class="fas fa-clipboard-list me-2 text-purple"></i> Banco de Provas e Avaliações Unificadas
         </h2>
-        <div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mimir:criarAvaliacaoUnificada' %}" class="btn btn-primary btn-sm fw-bold shadow-sm">
+                <i class="fas fa-layer-group me-1"></i> Criar Avaliação Unificada (Módulo)
+            </a>
             <a href="{% url 'mimir:criarProva' %}" class="btn btn-purple btn-sm fw-bold shadow-sm text-white">
-                <i class="fas fa-plus me-1"></i> Criar Nova Prova
+                <i class="fas fa-plus me-1"></i> Criar Prova Simples
             </a>
         </div>
     </div>
@@ -42,15 +45,28 @@
                             {% for prova in provas %}
                             <tr>
                                 <td class="ps-4">
-                                    <span class="d-block text-dark fw-bold mb-1">{{ prova.titulo }}</span>
-                                    <small class="text-muted d-block text-truncate-2" title="{{ prova.descricao }}">
-                                        {{ prova.descricao|default:"<em>Nenhuma descrição fornecida</em>"|safe }}
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="text-dark fw-bold">{{ prova.titulo }}</span>
+                                        {% if prova.is_unificada %}
+                                        <span class="badge bg-primary"><i class="fas fa-layer-group me-1"></i>Unificada</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted d-block text-truncate-2" title="{{ prova.descricao_limpa }}">
+                                        {{ prova.descricao_limpa|default:"<em>Nenhuma descrição fornecida</em>"|safe }}
                                     </small>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-secondary border px-2 py-1">
-                                        <i class="fas fa-book me-1"></i> {{ prova.assunto.nome }}
-                                    </span>
+                                    {% if prova.is_unificada %}
+                                        {% for a in prova.assuntos_modulo %}
+                                        <span class="badge bg-light text-dark border px-2 py-1 mb-1">
+                                            <i class="fas fa-book text-primary me-1"></i> {{ a.nome }}
+                                        </span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="badge bg-light text-secondary border px-2 py-1">
+                                            <i class="fas fa-book me-1"></i> {{ prova.assunto.nome }}
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <small class="text-muted d-block mb-1">
@@ -61,13 +77,28 @@
                                     </small>
                                 </td>
                                 <td class="text-end pe-4">
+                                    {% if prova.is_unificada %}
+                                    <a href="{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}" class="btn btn-outline-primary btn-sm me-1" title="Gerenciar Estrutura Unificada e Assuntos">
+                                        <i class="fas fa-sliders-h"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank" class="btn btn-outline-dark btn-sm me-1" title="Imprimir Caderno / Folha OMR / Gabarito">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                    <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-success btn-sm me-1" title="Corrigir Prova por Foto (OMR + IA)">
+                                        <i class="fas fa-camera"></i>
+                                    </a>
+                                    {% else %}
                                     <a href="{% url 'mimir:editarProva' prova.id %}" class="btn btn-outline-primary btn-sm me-1" title="Visualizar / Editar Prova">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <a href="{% url 'mimir:opcoesImpressao' prova.id %}" class="btn btn-outline-secondary btn-sm me-1" title="Imprimir PDFs">
                                         <i class="fas fa-print"></i>
                                     </a>
-                                    <a href="{% url 'mimir:criarAplicacaoProva' prova.id %}" class="btn btn-outline-success btn-sm" title="Aplicar Prova a uma Turma">
+                                    <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-outline-success btn-sm me-1" title="Corrigir por Foto">
+                                        <i class="fas fa-camera"></i>
+                                    </a>
+                                    {% endif %}
+                                    <a href="{% url 'mimir:criarAplicacaoProva' prova.id %}" class="btn btn-outline-info btn-sm" title="Aplicar Prova Online a uma Turma">
                                         <i class="fas fa-paper-plane"></i>
                                     </a>
                                 </td>

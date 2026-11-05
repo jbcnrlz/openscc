@@ -1,0 +1,328 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-3 py-1 mb-2 fw-semibold">
+                <i class="fas fa-layer-group me-1"></i> Avaliação Modular Integrada
+            </span>
+            <h2 class="fw-bold text-dark mb-1">Criar Avaliação Unificada</h2>
+            <p class="text-muted mb-0">
+                Configure os assuntos (disciplinas) do módulo, delimite a quantidade de questões por tipo e prepare para impressão e correção por foto.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mimir:listarProvas' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar para Provas
+            </a>
+        </div>
+    </div>
+
+    <form method="post" id="formCriarUnificada">
+        {% csrf_token %}
+        <div class="row g-4">
+            <!-- Coluna Principal -->
+            <div class="col-lg-8">
+                <!-- 1. Identificação do Módulo e da Prova -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-id-card-alt text-primary me-2"></i>1. Identificação da Avaliação e Módulo
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-7">
+                                <label class="form-label fw-semibold">Título da Avaliação Unificada <span class="text-danger">*</span></label>
+                                <input type="text" name="titulo" class="form-control" required
+                                       placeholder="Ex: Avaliação Unificada - Módulo I (2026/1)"
+                                       value="{{ request.POST.titulo|default:'' }}">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-semibold">Identificação do Módulo <span class="text-danger">*</span></label>
+                                <input type="text" name="modulo_nome" class="form-control" required
+                                       placeholder="Ex: Módulo 1 - Fundamentos e Clínica"
+                                       value="{{ request.POST.modulo_nome|default:'Módulo Integrado I' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Instruções / Descrição para o Caderno de Prova</label>
+                                <textarea name="descricao" rows="2" class="form-control"
+                                          placeholder="Instruções gerais que aparecerão na capa/cabeçalho da prova (opcional)...">{{ request.POST.descricao|default:'' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Vínculo dos Assuntos (Disciplinas do Módulo do Aluno) -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-book-reader text-success me-2"></i>2. Matérias do Módulo (Assuntos Vinculados)
+                        </h5>
+                        <span class="badge bg-success" id="badgeTotalAssuntos">0 matéria(s) selecionada(s)</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small mb-3">
+                            No Mimir, cada disciplina do módulo é modelada como um <strong>Assunto</strong>. Selecione abaixo todas as disciplinas que compõem o módulo do aluno:
+                        </p>
+
+                        {% if assuntos %}
+                        <div class="mb-3 d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selecionarTodosAssuntos(true)">
+                                <i class="fas fa-check-double me-1"></i> Selecionar Todos
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosAssuntos(false)">
+                                <i class="fas fa-eraser me-1"></i> Limpar Seleção
+                            </button>
+                        </div>
+
+                        <div class="row g-2 mb-3" style="max-height: 260px; overflow-y: auto;">
+                            {% for assunto in assuntos %}
+                            <div class="col-md-6">
+                                <label class="border rounded-3 p-2 d-flex align-items-center gap-2 w-100 cursor-pointer bg-light bg-opacity-50 hover-shadow">
+                                    <input type="checkbox" name="assuntos_ids" value="{{ assunto.id }}"
+                                           class="form-check-input m-0 chk-assunto"
+                                           onchange="atualizarResumoQuotas()"
+                                           {% if forloop.counter <= 3 %}checked{% endif %}>
+                                    <span class="fw-semibold text-dark small text-truncate" title="{{ assunto.nome }}">{{ assunto.nome }}</span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning small">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Você ainda não possui Assuntos cadastrados. Digite abaixo os nomes das disciplinas do módulo para criá-las automaticamente!
+                        </div>
+                        {% endif %}
+
+                        <div class="mt-3 pt-3 border-top">
+                            <label class="form-label fw-semibold small text-secondary">
+                                <i class="fas fa-plus-circle text-primary me-1"></i>Adicionar Novas Matérias (Assuntos) Agora (opcional):
+                            </label>
+                            <input type="text" name="novos_assuntos" id="inputNovosAssuntos" class="form-control form-control-sm"
+                                   placeholder="Separe por vírgula. Ex: Anatomia Humana, Fisiologia Médica, Bioética"
+                                   oninput="atualizarResumoQuotas()">
+                            <div class="form-text">
+                                Caso informe matérias novas aqui, o Mimir criará os Assuntos automaticamente e já os vinculará a esta Avaliação Unificada.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Delimitação da Quantidade de Questões por Tipo / Parte -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-sliders-h text-indigo me-2" style="color: #4f46e5;"></i>3. Delimitação de Questões por Tipo e Parte
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <!-- Parte I -->
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-3 bg-light h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-primary mb-1">Parte I • Objetiva</span>
+                                            <h6 class="fw-bold mb-0">Conhecimentos Gerais (Objetivas)</h6>
+                                        </div>
+                                        <input type="number" name="cg_objetivas" id="q_cg_obj" min="0" max="30"
+                                               value="{{ quotas_default.cg_objetivas }}"
+                                               class="form-control form-control-sm text-center fw-bold" style="width: 75px;"
+                                               oninput="atualizarResumoQuotas()">
+                                    </div>
+                                    <small class="text-muted d-block">Padrão sugerido: <strong>3 questões</strong> de múltipla escolha (A-E).</small>
+                                </div>
+                            </div>
+
+                            <!-- Parte II -->
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-3 bg-light h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-info text-dark mb-1">Parte II • Dissertativa</span>
+                                            <h6 class="fw-bold mb-0">Questão Dissertativa (Conhecimento Geral)</h6>
+                                        </div>
+                                        <input type="number" name="cg_dissertativa" id="q_cg_diss" min="0" max="10"
+                                               value="{{ quotas_default.cg_dissertativa }}"
+                                               class="form-control form-control-sm text-center fw-bold" style="width: 75px;"
+                                               oninput="atualizarResumoQuotas()">
+                                    </div>
+                                    <small class="text-muted d-block">Padrão sugerido: <strong>1 questão</strong> dissertativa argumentativa.</small>
+                                </div>
+                            </div>
+
+                            <!-- Parte III -->
+                            <div class="col-md-6">
+                                <div class="p-3 border border-success border-opacity-50 rounded-3 bg-success bg-opacity-10 h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-success mb-1">Parte III • Por Assunto</span>
+                                            <h6 class="fw-bold mb-0">Objetivas por Matéria do Módulo</h6>
+                                        </div>
+                                        <input type="number" name="materia_objetivas" id="q_mat_obj" min="0" max="20"
+                                               value="{{ quotas_default.materia_objetivas }}"
+                                               class="form-control form-control-sm text-center fw-bold" style="width: 75px;"
+                                               oninput="atualizarResumoQuotas()">
+                                    </div>
+                                    <small class="text-muted d-block">
+                                        Padrão: <strong>3 questões por matéria</strong> (<span id="lblMultiplicadorMaterias">3 x N</span> questões no total).
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Parte IV -->
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-3 bg-light h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-warning text-dark mb-1">Parte IV • Dissertativa Técnica</span>
+                                            <h6 class="fw-bold mb-0">Questão Dissertativa Técnica</h6>
+                                        </div>
+                                        <input type="number" name="dissertativa_tecnica" id="q_diss_tec" min="0" max="10"
+                                               value="{{ quotas_default.dissertativa_tecnica }}"
+                                               class="form-control form-control-sm text-center fw-bold" style="width: 75px;"
+                                               oninput="atualizarResumoQuotas()">
+                                    </div>
+                                    <small class="text-muted d-block">Padrão sugerido: <strong>1 questão</strong> técnica integradora do módulo.</small>
+                                </div>
+                            </div>
+
+                            <!-- Parte V -->
+                            <div class="col-12">
+                                <div class="p-3 border border-secondary border-opacity-25 rounded-3 bg-white">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <div>
+                                            <span class="badge bg-secondary mb-1">Parte V • Percepção / Diagnóstico (Peso 0 na Nota)</span>
+                                            <h6 class="fw-bold mb-0">Questões sobre a Sensação do Aluno</h6>
+                                        </div>
+                                        <input type="number" name="sensacao_aluno" id="q_sensacao" min="0" max="10"
+                                               value="{{ quotas_default.sensacao_aluno }}"
+                                               class="form-control form-control-sm text-center fw-bold" style="width: 75px;"
+                                               oninput="atualizarResumoQuotas()">
+                                    </div>
+                                    <small class="text-muted d-block">
+                                        Avalia percepção de dificuldade, tempo de prova, confiança e preparo. Não penaliza a nota acadêmica do estudante.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna Lateral: Resumo Estrutural e Automação -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm sticky-top" style="top: 1.5rem;">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="fas fa-clipboard-check me-2 text-info"></i>Resumo da Estrutura
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <ul class="list-group list-group-flush mb-3 small">
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>1. Conhecimentos Gerais (Obj.)</span>
+                                <span class="badge bg-primary rounded-pill" id="res_cg_obj">3</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>2. Dissertativa Geral</span>
+                                <span class="badge bg-info text-dark rounded-pill" id="res_cg_diss">1</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>3. Objetivas das Matérias (<span id="res_qtd_mat">0</span> mat.)</span>
+                                <span class="badge bg-success rounded-pill" id="res_mat_total">0</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>4. Dissertativa Técnica</span>
+                                <span class="badge bg-warning text-dark rounded-pill" id="res_diss_tec">1</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>5. Sensação do Aluno</span>
+                                <span class="badge bg-secondary rounded-pill" id="res_sensacao">3</span>
+                            </li>
+                        </ul>
+
+                        <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary-subtle text-center mb-4">
+                            <div class="text-uppercase small fw-bold text-primary">Total de Itens no Caderno</div>
+                            <div class="display-6 fw-bold text-dark" id="res_total_geral">8</div>
+                            <div class="small text-muted">
+                                Sendo <strong id="res_total_academicas">5</strong> questões avaliativas
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-dark mb-2">
+                            <i class="fas fa-magic text-primary me-1"></i> Preenchimento Inicial
+                        </h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="incluir_sensacao_padrao" id="chkSensacao" checked>
+                            <label class="form-check-label small" for="chkSensacao">
+                                Inserir questões padrão de <strong>Sensação do Aluno</strong> automaticamente
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="preencher_do_banco" id="chkBanco" checked>
+                            <label class="form-check-label small" for="chkBanco">
+                                Aproveitar questões já existentes no <strong>Banco de Questões</strong> dos assuntos selecionados
+                            </label>
+                        </div>
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" name="gerar_faltantes_ia" id="chkGerarIA" checked>
+                            <label class="form-check-label small" for="chkGerarIA">
+                                Gerar questões faltantes com <strong>IA / Modelo Estruturado</strong> para já abrir a prova completa
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                            <i class="fas fa-check-circle me-1"></i> Criar e Estruturar Avaliação Unificada
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function selecionarTodosAssuntos(marcar) {
+    document.querySelectorAll('.chk-assunto').forEach(chk => {
+        chk.checked = marcar;
+    });
+    atualizarResumoQuotas();
+}
+
+function atualizarResumoQuotas() {
+    const chks = document.querySelectorAll('.chk-assunto:checked').length;
+    const novosRaw = (document.getElementById('inputNovosAssuntos')?.value || '').trim();
+    const novosCount = novosRaw ? novosRaw.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).length : 0;
+    const totalMaterias = chks + novosCount;
+
+    const cgObj = parseInt(document.getElementById('q_cg_obj').value || '0', 10) || 0;
+    const cgDiss = parseInt(document.getElementById('q_cg_diss').value || '0', 10) || 0;
+    const matObj = parseInt(document.getElementById('q_mat_obj').value || '0', 10) || 0;
+    const dissTec = parseInt(document.getElementById('q_diss_tec').value || '0', 10) || 0;
+    const sens = parseInt(document.getElementById('q_sensacao').value || '0', 10) || 0;
+
+    const totalMatObj = totalMaterias * matObj;
+    const totalAcademicas = cgObj + cgDiss + totalMatObj + dissTec;
+    const totalGeral = totalAcademicas + sens;
+
+    document.getElementById('badgeTotalAssuntos').textContent = `${totalMaterias} matéria(s) selecionada(s)`;
+    document.getElementById('lblMultiplicadorMaterias').textContent = `${matObj} × ${totalMaterias} matéria(s) = ${totalMatObj}`;
+    document.getElementById('res_cg_obj').textContent = cgObj;
+    document.getElementById('res_cg_diss').textContent = cgDiss;
+    document.getElementById('res_qtd_mat').textContent = totalMaterias;
+    document.getElementById('res_mat_total').textContent = totalMatObj;
+    document.getElementById('res_diss_tec').textContent = dissTec;
+    document.getElementById('res_sensacao').textContent = sens;
+    document.getElementById('res_total_geral').textContent = totalGeral;
+    document.getElementById('res_total_academicas').textContent = totalAcademicas;
+}
+
+document.addEventListener('DOMContentLoaded', atualizarResumoQuotas);
+</script>
+{% endblock %}
+

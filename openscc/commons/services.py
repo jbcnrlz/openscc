@@ -648,8 +648,17 @@ def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_perg
 
 def extrair_texto_pdf(caminho_arquivo):
     try:
+        if isinstance(caminho_arquivo, (list, tuple)) and len(caminho_arquivo) > 0:
+            caminho_arquivo = caminho_arquivo[0]
+
+        caminho_str = str(caminho_arquivo)
+        if caminho_str.lower().endswith(('.txt', '.md')):
+            with open(caminho_str, 'r', encoding='utf-8', errors='replace') as f:
+                conteudo = f.read().strip()
+            return [conteudo] if conteudo else ["Nenhum texto extraído do arquivo"]
+
         texto = []
-        with pdfplumber.open(caminho_arquivo) as pdf:
+        with pdfplumber.open(caminho_str) as pdf:
             for i, pagina in enumerate(pdf.pages, 1):
                 try:
                     texto_pagina = pagina.extract_text()
