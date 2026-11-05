@@ -1,46 +1,1101 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        {% if source.pk %}
-                            Editar fonte
-                        {% else %}
-                            Adicionar nova fonte
-                        {% endif %}
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        
-                        {% for field in form %}
-                        <div class="mb-3">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.help_text %}
-                                <small class="form-text text-muted">{{ field.help_text }}</small>
-                            {% endif %}
-                            {% if field.errors %}
-                                <div class="alert alert-danger mt-1">
-                                    {{ field.errors }}
-                                </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
+<!-- PDF.js para renderização direta e instantânea das páginas do PDF no Canvas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
-                        <div class="btn-group">
-                            <button type="submit" class="btn btn-primary">Save</button>
-                            <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-secondary">Cancelar</a>
+<div class="container-fluid px-4 py-3">
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-3 py-1 mb-1 fw-semibold">
+                <i class="fas fa-book-open me-1"></i> Visualizador & Fatiador Direto de PDF
+            </span>
+            <h3 class="fw-bold text-dark mb-0">
+                {% if modo_fatiar_existente %}
+                    Separar em Blocos: {{ fonte_origem.nome }}
+                {% elif source.pk %}
+                    Editar Fonte: {{ source.nome }}
+                {% else %}
+                    Adicionar Fonte / Separar PDF em Blocos
+                {% endif %}
+            </h3>
+        </div>
+        <div class="d-flex gap-2">
+            {% if source.pk and source.fonte.name|lower|slice:"-4:" == ".pdf" %}
+            <a href="{% url 'mimir:fatiarFonteExistente' source.id %}" class="btn btn-outline-primary btn-sm fw-semibold">
+                <i class="fas fa-cut me-1"></i> Abrir Fatiador Visual deste PDF
+            </a>
+            {% endif %}
+            <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Voltar para Fontes
+            </a>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="formFonteStudio" onsubmit="return prepararSubmissaoFatias()">
+        {% csrf_token %}
+        <input type="hidden" name="modo_pdf" id="inputModoPdf" value="{% if modo_fatiar_existente %}fatiar_capitulos{% else %}completo{% endif %}">
+        <input type="hidden" name="fatias_json" id="inputFatiasJson" value="[]">
+
+        {% if not modo_fatiar_existente %}
+        <!-- Barra Superior Compacta: Upload do Arquivo + Nome Base + Escolha de Modo -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+                <div class="row g-3 align-items-center">
+                    <div class="col-lg-4">
+                        <label class="form-label small fw-bold text-dark mb-1">
+                            <i class="fas fa-file-upload text-primary me-1"></i>1. Arquivo da Fonte (PDF, TXT, MD) <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" name="fonte" id="id_fonte" class="form-control form-control-sm"
+                               {% if not source.pk %}required{% endif %}
+                               onchange="aoSelecionarArquivoFonte(this)">
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label small fw-bold text-dark mb-1">2. Nome Base do Livro / Fonte <span class="text-danger">*</span></label>
+                        <input type="text" name="nome" id="id_nome" class="form-control form-control-sm" required
+                               placeholder="Ex: Tratado de Fisiologia - Guyton"
+                               value="{{ form.nome.value|default:'' }}">
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label small fw-bold text-dark mb-1">3. Descrição Geral (opcional)</label>
+                        <input type="text" name="descricao" id="id_descricao" class="form-control form-control-sm"
+                               placeholder="Observações sobre o material..."
+                               value="{{ form.descricao.value|default:'' }}">
+                    </div>
+                </div>
+
+                <!-- Seletor de Modo quando é PDF -->
+                <div id="barraEscolhaModoPdf" class="d-none mt-3 pt-3 border-top d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small fw-bold text-dark me-1"><i class="fas fa-Sliders-h text-primary me-1"></i>Modo de Uso do PDF:</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-primary" id="btnModo_completo" onclick="selecionarModoPdf('completo')">
+                                <i class="fas fa-file-pdf me-1"></i> Subir PDF Inteiro (Sem cortes)
+                            </button>
+                            <button type="button" class="btn btn-primary fw-bold" id="btnModo_fatiar_capitulos" onclick="selecionarModoPdf('fatiar_capitulos')">
+                                <i class="fas fa-cut me-1"></i> Separar em Blocos / Capítulos Direto no PDF
+                            </button>
                         </div>
-                    </form>
+                    </div>
+                    <div class="small text-muted" id="subtituloInspecaoPdf"></div>
                 </div>
             </div>
         </div>
-    </div>
+        {% endif %}
+
+        <!-- ========================================================================= -->
+        <!-- WORKSPACE VISUAL DE SEPARAÇÃO DIRETA NO PDF                               -->
+        <!-- ========================================================================= -->
+        <div id="workspaceVisualPdf" class="{% if not modo_fatiar_existente %}d-none{% endif %}">
+            <!-- Fita / Linha do Tempo Visual das Páginas do Documento -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1 gap-2">
+                        <div class="small fw-bold text-dark">
+                            <i class="fas fa-stream text-primary me-1"></i>
+                            Mapa Visual do Documento (<span id="lblTotalPaginasMapa">0</span> páginas) —
+                            <span class="text-muted fw-normal">Clique em qualquer página para ir até ela; as cores mostram os blocos já delimitados:</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 small" onclick="alternarGradeMiniaturas()">
+                                <i class="fas fa-th me-1"></i> Expandir / Recolher Miniaturas
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Fita horizontal de páginas numeradas e coloridas por bloco -->
+                    <div id="fitaPaginasPdf" class="d-flex gap-1 py-2 px-1 overflow-auto border rounded bg-light" style="max-height: 74px;">
+                        <!-- Preenchido via JS -->
+                    </div>
+
+                    <!-- Grade Expansível de Miniaturas Visuais (Mesa de Luz) -->
+                    <div id="gradeMiniaturasContainer" class="d-none mt-2 pt-2 border-top">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-bold text-secondary">
+                                <i class="fas fa-th-large me-1"></i> Mesa de Luz: Clique em <strong>[Início]</strong> na página onde começa o capítulo e em <strong>[Fim]</strong> onde termina
+                            </span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="mudarLoteMiniaturas(-1)">◀ Ant.</button>
+                                <span class="btn btn-light py-0 px-2 disabled small" id="lblLoteMiniaturas">Págs. 1-24</span>
+                                <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="mudarLoteMiniaturas(1)">Próx. ▶</button>
+                            </div>
+                        </div>
+                        <div id="gradeMiniaturasGrid" class="row g-2" style="max-height: 360px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- COLUNA ESQUERDA/CENTRAL (7 col): VISUALIZADOR DIRETO DA PÁGINA DO PDF + BOTÕES DE MARCAÇÃO -->
+                <div class="col-lg-7">
+                    <div class="card border-0 shadow-sm h-100">
+                        <!-- Barra de Controle de Navegação e Marcação Direta na Página -->
+                        <div class="card-header bg-dark text-white p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <!-- Navegação de Página -->
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-light" onclick="irParaPagina(1)" title="Primeira página">
+                                        <i class="fas fa-step-backward"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="navegarPagina(-1)">
+                                        <i class="fas fa-chevron-left me-1"></i> Anterior
+                                    </button>
+                                    <div class="input-group input-group-sm mx-1" style="width: 145px;">
+                                        <span class="input-group-text bg-secondary text-white border-0">Pág.</span>
+                                        <input type="number" id="inputPaginaAtual" value="1" min="1"
+                                               class="form-control text-center fw-bold"
+                                               onchange="irParaPagina(this.value)">
+                                        <span class="input-group-text bg-secondary text-white border-0" id="lblDeTotalPaginas">/ 1</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="navegarPagina(1)">
+                                        Próxima <i class="fas fa-chevron-right ms-1"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-light" onclick="irParaPagina(totalPaginasGlobal)" title="Última página">
+                                        <i class="fas fa-step-forward"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Zoom e Busca Rápida -->
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-light" onclick="ajustarZoom(-0.2)" title="Diminuir Zoom">
+                                        <i class="fas fa-search-minus"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-light" onclick="ajustarZoom(0.2)" title="Aumentar Zoom">
+                                        <i class="fas fa-search-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Slider rápido de página -->
+                            <input type="range" class="form-range mb-2" id="sliderPaginaPdf" min="1" max="1" value="1"
+                                   oninput="irParaPagina(this.value)">
+
+                            <!-- BARRA DE MARCAÇÃO DIRETA DE INÍCIO E FIM DE BLOCO NA PÁGINA ATUAL -->
+                            <div class="p-2 rounded-3 bg-white text-dark d-flex flex-wrap justify-content-between align-items-center gap-2 shadow-sm">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-dark fs-6" id="badgePaginaNoMarcador">Pág. 1</span>
+                                    <div id="statusMarcacaoDireta" class="small fw-semibold text-secondary">
+                                        Navegue até a página onde começa o capítulo e clique em <strong>Marcar Início</strong>.
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" id="btnMarcarInicioAqui"
+                                            class="btn btn-sm btn-success fw-bold px-3 shadow-xs"
+                                            onclick="marcarInicioBlocoNaPaginaAtual()">
+                                        <i class="fas fa-flag me-1"></i> Marcar INÍCIO Aqui (Pág. <span class="num-pag-atual">1</span>)
+                                    </button>
+
+                                    <button type="button" id="btnMarcarFimAqui"
+                                            class="btn btn-sm btn-danger fw-bold px-3 shadow-xs"
+                                            onclick="marcarFimBlocoNaPaginaAtual()">
+                                        <i class="fas fa-flag-checkered me-1"></i> Marcar FIM Aqui (Pág. <span class="num-pag-atual">1</span>)
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn btn-sm btn-warning text-dark fw-bold px-2"
+                                            title="Fecha o bloco anterior na página anterior e já começa um novo bloco nesta página!"
+                                            onclick="cortarEDividirNestaPagina()">
+                                        <i class="fas fa-cut me-1"></i> Dividir Aqui
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Corpo do Visualizador Direto da Página do PDF -->
+                        <div class="card-body p-3 bg-secondary bg-opacity-10 text-center position-relative"
+                             style="min-height: 620px; max-height: 740px; overflow: auto;">
+
+                            <!-- Banner indicando se a página atual pertence a algum bloco -->
+                            <div id="bannerBlocoDaPaginaAtual" class="d-none mb-2 py-1 px-3 rounded-pill d-inline-block fw-bold small shadow-xs"></div>
+
+                            <!-- Canvas PDF.js (Renderização Direta do PDF) -->
+                            <div class="d-flex justify-content-center align-items-start">
+                                <canvas id="canvasPdfPage" class="shadow bg-white rounded border" style="max-width: 100%;"></canvas>
+                                <img id="imgFallbackPdfPage" class="shadow bg-white rounded border d-none" style="max-width: 100%;" alt="Página do PDF">
+                            </div>
+
+                            <!-- Prévia rápida da 1ª linha/título detectado na página -->
+                            <div class="mt-2 small text-muted" id="rodapeTextoDetectadoPagina"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUNA DIREITA (5 col): BLOCOS DELIMITADOS + BUSCA DE PÁGINAS -->
+                <div class="col-lg-5">
+                    <!-- Card de Blocos / Capítulos Delimitados -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark">
+                                    <i class="fas fa-layer-group text-primary me-1"></i>
+                                    Blocos Delimitados (<span id="contadorBlocos">0</span>)
+                                </h6>
+                                <small class="text-muted">Cada bloco marcado abaixo virará uma Fonte separada:</small>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 small"
+                                        onclick="carregarCapitulosDetectados()"
+                                        title="Preenche com os capítulos identificados no sumário do PDF">
+                                    <i class="fas fa-magic me-1"></i> Sugerir Capítulos
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 small"
+                                        onclick="limparTodosBlocos()"
+                                        title="Apagar todos os blocos e começar do zero">
+                                    <i class="fas fa-trash-alt me-1"></i> Limpar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card-body p-3">
+                            <!-- Container Visual de Blocos -->
+                            <div id="listaBlocosVisuais" style="max-height: 410px; overflow-y: auto;">
+                                <!-- Renderizado via JS -->
+                            </div>
+
+                            <button type="button" class="btn btn-sm btn-outline-success w-100 fw-semibold mt-2"
+                                    onclick="criarBlocoManualNaPaginaAtual()">
+                                <i class="fas fa-plus-circle me-1"></i> Adicionar Novo Bloco a partir da Página Atual (Pág. <span class="num-pag-atual">1</span>)
+                            </button>
+
+                            {% if not modo_fatiar_existente %}
+                            <div class="form-check mt-3 pt-2 border-top">
+                                <input class="form-check-input" type="checkbox" name="salvar_original_tambem" id="chkSalvarOriginal">
+                                <label class="form-check-label small text-muted" for="chkSalvarOriginal">
+                                    Também salvar o <strong>PDF completo original</strong> como uma fonte
+                                </label>
+                            </div>
+                            {% endif %}
+
+                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-3 shadow-sm" id="btnSalvarBlocos">
+                                <i class="fas fa-check-circle me-1"></i>
+                                Fatiar PDF e Salvar Blocos como Fontes
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Buscador Rápido de Títulos/Termos nas Páginas do PDF -->
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold text-secondary">
+                                <i class="fas fa-search me-1"></i> Localizar Capítulo / Termo nas Páginas
+                            </span>
+                            <span class="badge bg-secondary" id="badgePaginasEncontradas">0</span>
+                        </div>
+                        <div class="card-body p-2">
+                            <input type="text" id="inputFiltroPaginas" class="form-control form-control-sm mb-2"
+                                   placeholder="Digite ex: 'Capítulo', 'Sumário', 'Fisiologia' para achar a página..."
+                                   oninput="renderizarBuscaPaginas()">
+                            <div id="listaBuscaPaginas" style="max-height: 195px; overflow-y: auto;" class="small">
+                                <div class="text-center text-muted py-3">
+                                    Selecione um PDF para listar os títulos detectados em cada página.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão de Salvar quando for upload simples (sem fatiar) -->
+        {% if not modo_fatiar_existente %}
+        <div id="rodapeSalvarSimples" class="card border-0 shadow-sm mt-3">
+            <div class="card-body p-3 d-flex justify-content-end gap-2">
+                <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary fw-bold px-4">
+                    <i class="fas fa-save me-1"></i> Salvar Fonte Completa
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </form>
 </div>
+
+<style>
+.pag-pill {
+    min-width: 38px;
+    height: 46px;
+    border-radius: 6px;
+    border: 1.5px solid #cbd5e1;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    user-select: none;
+    transition: all 0.12s ease;
+    flex-shrink: 0;
+    position: relative;
+}
+.pag-pill:hover {
+    transform: translateY(-2px);
+    border-color: #2563eb;
+}
+.pag-pill.pagina-atual-ativa {
+    outline: 3px solid #111827;
+    z-index: 2;
+}
+.bloco-card-item {
+    border-left-width: 6px !important;
+    transition: all 0.15s ease;
+}
+.thumb-card {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.thumb-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+</style>
+
+<script>
+// Configura o Worker do PDF.js
+if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// Paleta de cores distintas para identificar visualmente cada bloco no PDF
+const CORES_BLOCOS = [
+    { bg: '#dbeafe', border: '#2563eb', text: '#1e40af', badge: 'bg-primary', nome: 'Azul' },
+    { bg: '#dcfce7', border: '#16a34a', text: '#166534', badge: 'bg-success', nome: 'Verde' },
+    { bg: '#fef3c7', border: '#d97706', text: '#92400e', badge: 'bg-warning text-dark', nome: 'Âmbar' },
+    { bg: '#f3e8ff', border: '#9333ea', text: '#6b21a8', badge: 'bg-purple', nome: 'Roxo' },
+    { bg: '#ffe4e6', border: '#e11d48', text: '#9f1239', badge: 'bg-danger', nome: ' Coral' },
+    { bg: '#ccfbf1', border: '#0d9488', text: '#115e59', badge: 'bg-info text-dark', nome: 'Turquesa' }
+];
+
+let pdfDocJs = null;
+let totalPaginasGlobal = {% if modo_fatiar_existente %}{{ info_pdf.total_paginas|default:0 }}{% else %}0{% endif %};
+let paginaAtual = 1;
+let zoomAtual = 1.35;
+let inicioBlocoPendente = null; // Guarda a página onde o usuário clicou em "Marcar INÍCIO"
+let blocosMarcados = []; // [{ id, titulo, inicio, fim, ativa, origem }]
+let capitulosDetectadosGlobal = [];
+let paginasResumoGlobal = [];
+let fonteIdExistente = "{% if modo_fatiar_existente %}{{ fonte_origem.id }}{% endif %}";
+let urlPdfExistente = "{% if modo_fatiar_existente %}{{ fonte_origem.fonte.url }}{% endif %}";
+let loteMiniaturaAtual = 0;
+const TAMANHO_LOTE_MINIATURAS = 18;
+
+{% if modo_fatiar_existente and info_pdf_json %}
+try {
+    const dadosIniciais = {{ info_pdf_json|safe }};
+    totalPaginasGlobal = dadosIniciais.total_paginas || 0;
+    capitulosDetectadosGlobal = dadosIniciais.capitulos_detectados || [];
+    paginasResumoGlobal = dadosIniciais.paginas_resumo || [];
+} catch (e) {}
+{% endif %}
+
+function selecionarModoPdf(modo) {
+    document.getElementById('inputModoPdf').value = modo;
+    const ws = document.getElementById('workspaceVisualPdf');
+    const rodapeSimples = document.getElementById('rodapeSalvarSimples');
+    const btnCompleto = document.getElementById('btnModo_completo');
+    const btnFatiar = document.getElementById('btnModo_fatiar_capitulos');
+
+    if (modo === 'fatiar_capitulos') {
+        if (ws) ws.classList.remove('d-none');
+        if (rodapeSimples) rodapeSimples.classList.add('d-none');
+        if (btnFatiar) { btnFatiar.className = 'btn btn-primary fw-bold'; }
+        if (btnCompleto) { btnCompleto.className = 'btn btn-outline-primary'; }
+    } else {
+        if (ws) ws.classList.add('d-none');
+        if (rodapeSimples) rodapeSimples.classList.remove('d-none');
+        if (btnCompleto) { btnCompleto.className = 'btn btn-primary fw-bold'; }
+        if (btnFatiar) { btnFatiar.className = 'btn btn-outline-primary'; }
+    }
+}
+
+async function aoSelecionarArquivoFonte(input) {
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const nomeSemExt = file.name.replace(/\.[^/.]+$/, '');
+    const inputNome = document.getElementById('id_nome');
+    if (inputNome && !inputNome.value.trim()) {
+        inputNome.value = nomeSemExt;
+    }
+
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    const barraModo = document.getElementById('barraEscolhaModoPdf');
+
+    if (!isPdf) {
+        if (barraModo) barraModo.classList.add('d-none');
+        selecionarModoPdf('completo');
+        return;
+    }
+
+    if (barraModo) barraModo.classList.remove('d-none');
+    // Abre direto no visualizador de separação em blocos para facilitar
+    selecionarModoPdf('fatiar_capitulos');
+
+    // 1. Carrega o PDF diretamente no navegador via PDF.js para visualização imediata
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        if (window.pdfjsLib) {
+            pdfDocJs = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            totalPaginasGlobal = pdfDocJs.numPages;
+            inicializarControlesPaginas(totalPaginasGlobal);
+            await irParaPagina(1);
+        }
+    } catch (err) {
+        console.warn('Fallback para renderização via servidor:', err);
+    }
+
+    // 2. Em paralelo, busca os títulos das páginas e sugestões de capítulos no servidor
+    const subtitulo = document.getElementById('subtituloInspecaoPdf');
+    if (subtitulo) subtitulo.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Extraindo títulos das páginas...';
+
+    const formData = new FormData();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrf);
+    formData.append('arquivo_pdf', file);
+
+    try {
+        const resp = await fetch("{% url 'mimir:inspecionarPdfFonteAjax' %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.success) {
+            totalPaginasGlobal = data.total_paginas || totalPaginasGlobal || 1;
+            capitulosDetectadosGlobal = data.capitulos_detectados || [];
+            paginasResumoGlobal = data.paginas_resumo || [];
+
+            inicializarControlesPaginas(totalPaginasGlobal);
+            if (subtitulo) {
+                subtitulo.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i> <strong>${totalPaginasGlobal} páginas</strong> carregadas.`;
+            }
+            renderizarBuscaPaginas();
+            renderizarFitaPaginas();
+            atualizarRodapeTextoPagina(paginaAtual);
+        }
+    } catch (e) {
+        if (subtitulo) subtitulo.textContent = '';
+    }
+}
+
+function inicializarControlesPaginas(total) {
+    document.getElementById('lblTotalPaginasMapa').textContent = total;
+    document.getElementById('lblDeTotalPaginas').textContent = `/ ${total}`;
+    const inp = document.getElementById('inputPaginaAtual');
+    const slider = document.getElementById('sliderPaginaPdf');
+    if (inp) inp.max = total;
+    if (slider) slider.max = total;
+    renderizarFitaPaginas();
+    renderizarBlocosVisuais();
+}
+
+async function irParaPagina(num) {
+    const p = Math.max(1, Math.min(totalPaginasGlobal || 1, parseInt(num || '1', 10) || 1));
+    paginaAtual = p;
+
+    document.getElementById('inputPaginaAtual').value = p;
+    document.getElementById('sliderPaginaPdf').value = p;
+    document.getElementById('badgePaginaNoMarcador').textContent = `Pág. ${p}`;
+    document.querySelectorAll('.num-pag-atual').forEach(el => { el.textContent = p; });
+
+    atualizarBannerBlocoDaPagina(p);
+    atualizarRodapeTextoPagina(p);
+    renderizarFitaPaginas();
+
+    // Renderiza a página visualmente via PDF.js (ou fallback via endpoint do servidor)
+    const canvas = document.getElementById('canvasPdfPage');
+    const imgFallback = document.getElementById('imgFallbackPdfPage');
+
+    if (pdfDocJs) {
+        try {
+            canvas.classList.remove('d-none');
+            imgFallback.classList.add('d-none');
+            const page = await pdfDocJs.getPage(p);
+            const viewport = page.getViewport({ scale: zoomAtual });
+            const ctx = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            return;
+        } catch (err) {
+            console.warn('Erro ao renderizar no canvas PDF.js, usando servidor:', err);
+        }
+    }
+
+    // Fallback via servidor (pypdfium2 / pdfplumber)
+    const formData = new FormData();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrf);
+    formData.append('pagina', p);
+    const inputArq = document.getElementById('id_fonte');
+    if (inputArq && inputArq.files && inputArq.files.length > 0) {
+        formData.append('arquivo_pdf', inputArq.files[0]);
+    } else if (fonteIdExistente) {
+        formData.append('fonte_id', fonteIdExistente);
+    } else {
+        return;
+    }
+
+    try {
+        const resp = await fetch("{% url 'mimir:lerPaginaPdfFonteAjax' %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.success && data.imagem_base64) {
+            canvas.classList.add('d-none');
+            imgFallback.classList.remove('d-none');
+            imgFallback.src = data.imagem_base64;
+        }
+    } catch (e) {}
+}
+
+function navegarPagina(delta) {
+    irParaPagina(paginaAtual + delta);
+}
+
+function ajustarZoom(delta) {
+    zoomAtual = Math.max(0.6, Math.min(2.6, zoomAtual + delta));
+    irParaPagina(paginaAtual);
+}
+
+function obterTituloSugeridoDaPagina(p) {
+    const info = paginasResumoGlobal.find(item => item.numero === p);
+    const nomeLivro = (document.getElementById('id_nome')?.value || '{% if modo_fatiar_existente %}{{ fonte_origem.nome|escapejs }}{% endif %}').trim();
+    const numBloco = blocosMarcados.length + 1;
+    if (info && info.titulo_sugerido && !info.titulo_sugerido.startsWith('Página ')) {
+        const limpo = info.titulo_sugerido.substring(0, 65);
+        return nomeLivro ? `${nomeLivro} — ${limpo}` : limpo;
+    }
+    return nomeLivro ? `${nomeLivro} — Bloco ${numBloco} (p. ${p})` : `Bloco ${numBloco} (p. ${p})`;
+}
+
+// =========================================================================
+// MARCAÇÃO DIRETA DE BLOCOS NA PÁGINA ATUAL DO PDF
+// =========================================================================
+
+function marcarInicioBlocoNaPaginaAtual(pagOpcional) {
+    const p = pagOpcional || paginaAtual;
+    inicioBlocoPendente = p;
+
+    const statusEl = document.getElementById('statusMarcacaoDireta');
+    statusEl.innerHTML = `
+        <span class="text-success fw-bold">
+            <i class="fas fa-flag me-1"></i> Início marcado na <strong>Pág. ${p}</strong>!
+        </span>
+        Agora navegue até a página final deste bloco e clique em <strong>Marcar FIM Aqui</strong>.
+    `;
+    renderizarFitaPaginas();
+    renderizarGradeMiniaturas();
+}
+
+function marcarFimBlocoNaPaginaAtual(pagOpcional) {
+    const pFim = pagOpcional || paginaAtual;
+    const pIni = inicioBlocoPendente !== null ? inicioBlocoPendente : pFim;
+
+    const iniReal = Math.min(pIni, pFim);
+    const fimReal = Math.max(pIni, pFim);
+
+    const tituloSugerido = obterTituloSugeridoDaPagina(iniReal);
+    blocosMarcados.push({
+        id: Date.now() + Math.random(),
+        titulo: tituloSugerido,
+        inicio: iniReal,
+        fim: fimReal,
+        ativa: true
+    });
+
+    inicioBlocoPendente = null;
+    const statusEl = document.getElementById('statusMarcacaoDireta');
+    statusEl.innerHTML = `
+        <span class="text-primary fw-bold">
+            <i class="fas fa-check-circle me-1"></i> Bloco criado (Pág. ${iniReal} até Pág. ${fimReal})!
+        </span>
+        Navegue para a próxima página desejada para iniciar outro bloco.
+    `;
+
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+    renderizarGradeMiniaturas();
+    atualizarBannerBlocoDaPagina(paginaAtual);
+}
+
+function cortarEDividirNestaPagina() {
+    const p = paginaAtual;
+    // Se havia um bloco pendente iniciado antes de p, fecha-o em p - 1
+    if (inicioBlocoPendente !== null && inicioBlocoPendente < p) {
+        marcarFimBlocoNaPaginaAtual(p - 1);
+    } else if (blocosMarcados.length > 0) {
+        // Se o último bloco englobava a página atual, corta o fim dele em p - 1
+        const ultimo = blocosMarcados[blocosMarcados.length - 1];
+        if (ultimo.inicio < p && ultimo.fim >= p) {
+            ultimo.fim = p - 1;
+        }
+    }
+    // E já inicia um novo bloco na página atual p!
+    marcarInicioBlocoNaPaginaAtual(p);
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+}
+
+function criarBlocoManualNaPaginaAtual() {
+    const ini = paginaAtual;
+    const fim = Math.min(totalPaginasGlobal || ini, ini + 9);
+    blocosMarcados.push({
+        id: Date.now() + Math.random(),
+        titulo: obterTituloSugeridoDaPagina(ini),
+        inicio: ini,
+        fim: fim,
+        ativa: true
+    });
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+    atualizarBannerBlocoDaPagina(paginaAtual);
+}
+
+function descobrirBlocoDaPagina(p) {
+    for (let i = 0; i < blocosMarcados.length; i++) {
+        const b = blocosMarcados[i];
+        if (b.ativa && p >= b.inicio && p <= b.fim) {
+            return { bloco: b, indice: i, cor: CORES_BLOCOS[i % CORES_BLOCOS.length] };
+        }
+    }
+    return null;
+}
+
+function atualizarBannerBlocoDaPagina(p) {
+    const banner = document.getElementById('bannerBlocoDaPaginaAtual');
+    if (!banner) return;
+
+    if (inicioBlocoPendente === p) {
+        banner.className = 'mb-2 py-1 px-3 rounded-pill d-inline-block fw-bold small bg-success text-white shadow-sm';
+        banner.innerHTML = `<i class="fas fa-flag me-1"></i> Pág. ${p}: INÍCIO DO NOVO BLOCO EM ABERTO`;
+        return;
+    }
+
+    const info = descobrirBlocoDaPagina(p);
+    if (info) {
+        banner.className = 'mb-2 py-1 px-3 rounded-pill d-inline-block fw-bold small shadow-xs';
+        banner.style.backgroundColor = info.cor.bg;
+        banner.style.color = info.cor.text;
+        banner.style.border = `1.5px solid ${info.cor.border}`;
+        let tagExtra = '';
+        if (p === info.bloco.inicio && p === info.bloco.fim) tagExtra = ' (Início e Fim do Bloco)';
+        else if (p === info.bloco.inicio) tagExtra = ' (🚩 PÁGINA INICIAL DO BLOCO)';
+        else if (p === info.bloco.fim) tagExtra = ' (🏁 PÁGINA FINAL DO BLOCO)';
+        banner.innerHTML = `Bloco #${info.indice + 1}: ${info.bloco.titulo} [Pág. ${info.bloco.inicio} a ${info.bloco.fim}]${tagExtra}`;
+    } else {
+        banner.className = 'd-none';
+    }
+}
+
+function atualizarRodapeTextoPagina(p) {
+    const rodape = document.getElementById('rodapeTextoDetectadoPagina');
+    if (!rodape) return;
+    const info = paginasResumoGlobal.find(item => item.numero === p);
+    if (info) {
+        rodape.innerHTML = `<strong>Texto topo da Pág. ${p}:</strong> ${info.titulo_sugerido || ''} — <em>${info.previa || ''}</em>`;
+    } else {
+        rodape.textContent = '';
+    }
+}
+
+function renderizarFitaPaginas() {
+    const container = document.getElementById('fitaPaginasPdf');
+    if (!container) return;
+    const total = totalPaginasGlobal || 0;
+    if (total === 0) {
+        container.innerHTML = '<div class="text-muted small py-2 px-3">Selecione um PDF para visualizar a fita de páginas.</div>';
+        return;
+    }
+
+    let html = '';
+    for (let p = 1; p <= total; p++) {
+        const info = descobrirBlocoDaPagina(p);
+        const isAtual = (p === paginaAtual);
+        const isInicioPendente = (inicioBlocoPendente === p);
+
+        let style = '';
+        let marcador = '';
+        if (isInicioPendente) {
+            style = 'background:#16a34a; color:#fff; border-color:#15803d;';
+            marcador = '<span style="font-size:0.6rem;">🚩INI</span>';
+        } else if (info) {
+            style = `background:${info.cor.bg}; color:${info.cor.text}; border-color:${info.cor.border};`;
+            if (p === info.bloco.inicio && p === info.bloco.fim) {
+                marcador = `<span style="font-size:0.58rem;">B${info.indice + 1}</span>`;
+            } else if (p === info.bloco.inicio) {
+                marcador = `<span style="font-size:0.58rem;">🚩B${info.indice + 1}</span>`;
+            } else if (p === info.bloco.fim) {
+                marcador = `<span style="font-size:0.58rem;">🏁B${info.indice + 1}</span>`;
+            } else {
+                marcador = `<span style="font-size:0.58rem;">B${info.indice + 1}</span>`;
+            }
+        }
+
+        html += `
+            <div class="pag-pill ${isAtual ? 'pagina-atual-ativa' : ''}"
+                 id="pill_pag_${p}"
+                 style="${style}"
+                 onclick="irParaPagina(${p})"
+                 title="Página ${p}">
+                <span>${p}</span>
+                ${marcador}
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+
+    const pillAtiva = document.getElementById(`pill_pag_${paginaAtual}`);
+    if (pillAtiva) {
+        pillAtiva.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+}
+
+function renderizarBlocosVisuais() {
+    const container = document.getElementById('listaBlocosVisuais');
+    const contador = document.getElementById('contadorBlocos');
+    if (!container) return;
+
+    if (contador) contador.textContent = blocosMarcados.filter(b => b.ativa).length;
+
+    if (blocosMarcados.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-4 border rounded-3 bg-light text-muted small">
+                <i class="fas fa-hand-pointer fa-2x text-primary mb-2 opacity-75"></i>
+                <p class="mb-1 fw-bold text-dark">Nenhum bloco delimitado ainda</p>
+                <p class="mb-0">
+                    Folheie o PDF ao lado e clique em <strong>"Marcar INÍCIO Aqui"</strong> na página inicial do capítulo e <strong>"Marcar FIM Aqui"</strong> na página final!
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = blocosMarcados.map((b, idx) => {
+        const cor = CORES_BLOCOS[idx % CORES_BLOCOS.length];
+        const qtdPags = Math.max(1, b.fim - b.inicio + 1);
+        return `
+            <div class="border rounded-3 p-2 mb-2 bg-white shadow-xs bloco-card-item"
+                 style="border-left-color: ${cor.border} !important; background-color: ${b.ativa ? '#fff' : '#f8fafc'};">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="checkbox" class="form-check-input m-0"
+                               ${b.ativa ? 'checked' : ''}
+                               onchange="alternarAtivoBloco(${idx}, this.checked)">
+                        <span class="badge" style="background:${cor.border}; color:#fff;">Bloco #${idx + 1}</span>
+                        <span class="badge bg-light text-dark border">${qtdPags} pág(s)</span>
+                    </div>
+                    <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2"
+                            onclick="removerBloco(${idx})" title="Remover este bloco">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="mb-2">
+                    <input type="text" class="form-control form-control-sm fw-semibold"
+                           value="${(b.titulo || '').replace(/"/g, '&quot;')}"
+                           placeholder="Nome do capítulo / fonte..."
+                           oninput="atualizarTituloBloco(${idx}, this.value)">
+                </div>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 small">
+                    <div class="d-flex align-items-center gap-1">
+                        <div class="input-group input-group-sm" style="width: 112px;">
+                            <span class="input-group-text px-1" style="font-size:0.72rem;">Início</span>
+                            <input type="number" class="form-control px-1 text-center fw-bold"
+                                   min="1" max="${totalPaginasGlobal || 9999}" value="${b.inicio}"
+                                   onchange="atualizarLimitesBloco(${idx}, this.value, ${b.fim})">
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1"
+                                title="Definir Início como a página visível agora (Pág. ${paginaAtual})"
+                                onclick="atualizarLimitesBloco(${idx}, paginaAtual, ${b.fim})">
+                            <i class="fas fa-map-pin"></i>
+                        </button>
+
+                        <span class="text-muted mx-1">➔</span>
+
+                        <div class="input-group input-group-sm" style="width: 105px;">
+                            <span class="input-group-text px-1" style="font-size:0.72rem;">Fim</span>
+                            <input type="number" class="form-control px-1 text-center fw-bold"
+                                   min="1" max="${totalPaginasGlobal || 9999}" value="${b.fim}"
+                                   onchange="atualizarLimitesBloco(${idx}, ${b.inicio}, this.value)">
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1"
+                                title="Definir Fim como a página visível agora (Pág. ${paginaAtual})"
+                                onclick="atualizarLimitesBloco(${idx}, ${b.inicio}, paginaAtual)">
+                            <i class="fas fa-map-pin"></i>
+                        </button>
+                    </div>
+
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary py-0 px-2" style="font-size:0.72rem;"
+                                onclick="irParaPagina(${b.inicio})" title="Ir para a primeira página deste bloco">
+                            Ver Início
+                        </button>
+                        <button type="button" class="btn btn-outline-dark py-0 px-2" style="font-size:0.72rem;"
+                                onclick="irParaPagina(${b.fim})" title="Ir para a última página deste bloco">
+                            Ver Fim
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function alternarAtivoBloco(idx, ativo) {
+    if (blocosMarcados[idx]) {
+        blocosMarcados[idx].ativa = ativo;
+        renderizarBlocosVisuais();
+        renderizarFitaPaginas();
+        atualizarBannerBlocoDaPagina(paginaAtual);
+    }
+}
+
+function atualizarTituloBloco(idx, novoTitulo) {
+    if (blocosMarcados[idx]) {
+        blocosMarcados[idx].titulo = novoTitulo;
+    }
+}
+
+function atualizarLimitesBloco(idx, novoIni, novoFim) {
+    if (!blocosMarcados[idx]) return;
+    let ini = Math.max(1, parseInt(novoIni || '1', 10) || 1);
+    let fim = Math.max(1, parseInt(novoFim || String(ini), 10) || ini);
+    if (ini > fim) {
+        const tmp = ini;
+        ini = fim;
+        fim = tmp;
+    }
+    blocosMarcados[idx].inicio = ini;
+    blocosMarcados[idx].fim = fim;
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+    renderizarGradeMiniaturas();
+    atualizarBannerBlocoDaPagina(paginaAtual);
+}
+
+function removerBloco(idx) {
+    blocosMarcados.splice(idx, 1);
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+    renderizarGradeMiniaturas();
+    atualizarBannerBlocoDaPagina(paginaAtual);
+}
+
+function limparTodosBlocos() {
+    blocosMarcados = [];
+    inicioBlocoPendente = null;
+    renderizarBlocosVisuais();
+    renderizarFitaPaginas();
+    renderizarGradeMiniaturas();
+    atualizarBannerBlocoDaPagina(paginaAtual);
+}
+
+function carregarCapitulosDetectados() {
+    const nomeLivroBase = (document.getElementById('id_nome')?.value || '{% if modo_fatiar_existente %}{{ fonte_origem.nome|escapejs }}{% endif %}').trim();
+    if (capitulosDetectadosGlobal && capitulosDetectadosGlobal.length > 0) {
+        blocosMarcados = capitulosDetectadosGlobal.map(cap => {
+            const prefixo = nomeLivroBase ? `${nomeLivroBase} — ` : '';
+            const tituloSug = cap.titulo.startsWith(nomeLivroBase) ? cap.titulo : `${prefixo}${cap.titulo}`;
+            return {
+                id: Date.now() + Math.random(),
+                titulo: tituloSug,
+                inicio: cap.pagina_inicio,
+                fim: cap.pagina_fim,
+                ativa: true
+            };
+        });
+        renderizarBlocosVisuais();
+        renderizarFitaPaginas();
+        renderizarGradeMiniaturas();
+        atualizarBannerBlocoDaPagina(paginaAtual);
+    }
+}
+
+// =========================================================================
+// MESA DE LUZ (GRADE DE MINIATURAS DAS PÁGINAS COM MARCAÇÃO DIRETA)
+// =========================================================================
+
+function alternarGradeMiniaturas() {
+    const container = document.getElementById('gradeMiniaturasContainer');
+    if (!container) return;
+    const estavaOculta = container.classList.contains('d-none');
+    container.classList.toggle('d-none');
+    if (estavaOculta) {
+        loteMiniaturaAtual = Math.floor((paginaAtual - 1) / TAMANHO_LOTE_MINIATURAS);
+        renderizarGradeMiniaturas();
+    }
+}
+
+function mudarLoteMiniaturas(delta) {
+    const maxLote = Math.max(0, Math.ceil((totalPaginasGlobal || 1) / TAMANHO_LOTE_MINIATURAS) - 1);
+    loteMiniaturaAtual = Math.max(0, Math.min(maxLote, loteMiniaturaAtual + delta));
+    renderizarGradeMiniaturas();
+}
+
+async function renderizarGradeMiniaturas() {
+    const container = document.getElementById('gradeMiniaturasContainer');
+    const grid = document.getElementById('gradeMiniaturasGrid');
+    if (!container || container.classList.contains('d-none') || !grid) return;
+
+    const total = totalPaginasGlobal || 1;
+    const pIni = loteMiniaturaAtual * TAMANHO_LOTE_MINIATURAS + 1;
+    const pFim = Math.min(total, pIni + TAMANHO_LOTE_MINIATURAS - 1);
+    document.getElementById('lblLoteMiniaturas').textContent = `Págs. ${pIni}-${pFim} de ${total}`;
+
+    let html = '';
+    for (let p = pIni; p <= pFim; p++) {
+        const info = descobrirBlocoDaPagina(p);
+        const resumoPag = paginasResumoGlobal.find(item => item.numero === p);
+        const styleCard = info ? `border: 2px solid ${info.cor.border}; background:${info.cor.bg};` : '';
+        html += `
+            <div class="col-6 col-sm-4 col-md-2">
+                <div class="border rounded p-2 text-center bg-white thumb-card h-100 d-flex flex-column justify-content-between"
+                     style="${styleCard}">
+                    <div onclick="irParaPagina(${p})">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-dark">Pág. ${p}</span>
+                            ${info ? `<span class="badge" style="background:${info.cor.border};color:#fff;">B${info.indice + 1}</span>` : ''}
+                        </div>
+                        <canvas id="thumb_canvas_${p}" class="img-fluid border rounded bg-light mb-1" style="max-height: 115px;"></canvas>
+                        <div class="text-truncate small text-muted" style="font-size: 0.68rem;">
+                            ${resumoPag ? resumoPag.titulo_sugerido : ''}
+                        </div>
+                    </div>
+                    <div class="btn-group btn-group-sm w-100 mt-1">
+                        <button type="button" class="btn btn-outline-success py-0 px-1" style="font-size:0.68rem;"
+                                onclick="marcarInicioBlocoNaPaginaAtual(${p})">
+                            🚩 Início
+                        </button>
+                        <button type="button" class="btn btn-outline-danger py-0 px-1" style="font-size:0.68rem;"
+                                onclick="marcarFimBlocoNaPaginaAtual(${p})">
+                            🏁 Fim
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    grid.innerHTML = html;
+
+    // Renderiza miniaturas via PDF.js se disponível
+    if (pdfDocJs) {
+        for (let p = pIni; p <= pFim; p++) {
+            try {
+                const c = document.getElementById(`thumb_canvas_${p}`);
+                if (!c) continue;
+                const page = await pdfDocJs.getPage(p);
+                const vp = page.getViewport({ scale: 0.28 });
+                c.width = vp.width;
+                c.height = vp.height;
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+            } catch (e) {}
+        }
+    }
+}
+
+// =========================================================================
+// BUSCA RÁPIDA DE TÍTULOS E SUMÁRIO NAS PÁGINAS
+// =========================================================================
+
+function renderizarBuscaPaginas() {
+    const container = document.getElementById('listaBuscaPaginas');
+    const badge = document.getElementById('badgePaginasEncontradas');
+    if (!container) return;
+
+    const termo = (document.getElementById('inputFiltroPaginas')?.value || '').trim().toLowerCase();
+    const filtradas = (paginasResumoGlobal || []).filter(p => {
+        if (!termo) return true;
+        return (
+            String(p.numero) === termo ||
+            (p.titulo_sugerido || '').toLowerCase().includes(termo) ||
+            (p.previa || '').toLowerCase().includes(termo)
+        );
+    });
+
+    if (badge) badge.textContent = filtradas.length;
+
+    if (filtradas.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-2">Nenhuma página encontrada com esse termo.</div>';
+        return;
+    }
+
+    container.innerHTML = filtradas.map(p => `
+        <div class="p-1 px-2 mb-1 rounded border bg-white d-flex justify-content-between align-items-center gap-2">
+            <div class="text-truncate" style="cursor:pointer; max-width: 68%;" onclick="irParaPagina(${p.numero})">
+                <span class="badge bg-dark me-1">Pág. ${p.numero}</span>
+                <strong class="text-dark">${p.titulo_sugerido || 'Página ' + p.numero}</strong>
+            </div>
+            <div class="btn-group btn-group-sm flex-shrink-0">
+                <button type="button" class="btn btn-outline-primary py-0 px-2" style="font-size:0.7rem;"
+                        onclick="irParaPagina(${p.numero})" title="Ver esta página no leitor">
+                    Ver
+                </button>
+                <button type="button" class="btn btn-outline-success py-0 px-2" style="font-size:0.7rem;"
+                        onclick="irParaPagina(${p.numero}); marcarInicioBlocoNaPaginaAtual(${p.numero});"
+                        title="Marcar início de bloco nesta página">
+                    🚩 Início
+                </button>
+                <button type="button" class="btn btn-outline-danger py-0 px-2" style="font-size:0.7rem;"
+                        onclick="irParaPagina(${p.numero}); marcarFimBlocoNaPaginaAtual(${p.numero});"
+                        title="Marcar fim de bloco nesta página">
+                    🏁 Fim
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function prepararSubmissaoFatias() {
+    const modo = document.getElementById('inputModoPdf').value;
+    if (modo === 'fatiar_capitulos') {
+        const ativos = blocosMarcados.filter(b => b.ativa);
+        if (ativos.length === 0) {
+            alert('Marque pelo menos 1 bloco no PDF (clicando em "Marcar INÍCIO Aqui" e "Marcar FIM Aqui" nas páginas desejadas) antes de salvar!');
+            return false;
+        }
+        const payload = ativos.map(b => ({
+            ativa: true,
+            titulo: (b.titulo || `Bloco p. ${b.inicio}-${b.fim}`).trim(),
+            inicio: b.inicio,
+            fim: b.fim,
+            intervalo: `${b.inicio}-${b.fim}`
+        }));
+        document.getElementById('inputFatiasJson').value = JSON.stringify(payload);
+    }
+    return true;
+}
+
+// Atalhos de teclado (Setas <- e -> para folhear o PDF rapidamente)
+document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (totalPaginasGlobal <= 0) return;
+
+    if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navegarPagina(1);
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navegarPagina(-1);
+    }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (fonteIdExistente && totalPaginasGlobal > 0) {
+        inicializarControlesPaginas(totalPaginasGlobal);
+        renderizarBuscaPaginas();
+        if (window.pdfjsLib && urlPdfExistente) {
+            try {
+                pdfDocJs = await pdfjsLib.getDocument(urlPdfExistente).promise;
+            } catch (e) {}
+        }
+        await irParaPagina(1);
+    } else {
+        renderizarBlocosVisuais();
+    }
+});
+</script>
 {% endblock %}

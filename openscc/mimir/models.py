@@ -233,6 +233,40 @@ class Prova(models.Model):
     assunto = models.ForeignKey(Assunto, on_delete=models.CASCADE)
     perguntas = models.ManyToManyField(Pergunta)
 
+    def __str__(self):
+        return self.titulo
+
+    @property
+    def is_unificada(self):
+        from .avaliacao_unificada import extrair_meta_unificada
+        _, meta = extrair_meta_unificada(self.descricao)
+        return bool(meta and meta.get('is_unificada'))
+
+    @property
+    def descricao_limpa(self):
+        from .avaliacao_unificada import extrair_meta_unificada
+        limpa, _ = extrair_meta_unificada(self.descricao)
+        return limpa
+
+    @property
+    def unificada_meta(self):
+        from .avaliacao_unificada import extrair_meta_unificada
+        _, meta = extrair_meta_unificada(self.descricao)
+        return meta or {}
+
+    @property
+    def estrutura_unificada(self):
+        from .avaliacao_unificada import construir_estrutura_unificada
+        return construir_estrutura_unificada(self)
+
+    @property
+    def assuntos_modulo(self):
+        meta = self.unificada_meta
+        ids = meta.get('assuntos_ids', [])
+        if ids:
+            return Assunto.objects.filter(id__in=ids)
+        return Assunto.objects.filter(id=self.assunto_id)
+
 class ImagemPergunta(models.Model):
     pergunta = models.ForeignKey(Pergunta, on_delete=models.CASCADE, related_name='imagens')
     imagem = models.ImageField(upload_to='perguntas/')
@@ -579,6 +613,13 @@ class ProvaAluno(models.Model):
 
     def calcular_nota(self):
         """Calcula a nota automaticamente baseada nas respostas corretas"""
+        if self.aplicacao_prova.prova.is_unificada:
+            from .avaliacao_unificada import calcular_diagnostico_prova_aluno_unificada
+            diag = calcular_diagnostico_prova_aluno_unificada(self)
+            self.nota_final = diag['nota_academica_final']
+            self.save()
+            return self.nota_final
+
         respostas = self.respostas.all()
         total_perguntas = self.aplicacao_prova.prova.perguntas.count()
         if total_perguntas == 0:

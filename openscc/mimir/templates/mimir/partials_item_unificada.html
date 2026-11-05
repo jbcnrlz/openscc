@@ -1,0 +1,42 @@
+<div class="border rounded-3 p-3 mb-2 bg-white shadow-xs">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="badge bg-dark">Questão {{ item.numero|stringformat:"02d" }}</span>
+            {% if item.is_dissertativa %}
+                <span class="badge bg-warning text-dark"><i class="fas fa-pen-fancy me-1"></i>Dissertativa</span>
+            {% else %}
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">
+                    <i class="fas fa-list-ul me-1"></i>Objetiva
+                </span>
+            {% endif %}
+            <span class="badge bg-light text-secondary border">
+                <i class="fas fa-tag me-1"></i>{{ item.assunto_nome }}
+            </span>
+            {% if item.letra_gabarito and not item.is_dissertativa and item.secao != 'sensacao_aluno' %}
+                <span class="badge bg-success">Gabarito: {{ item.letra_gabarito }}</span>
+            {% endif %}
+        </div>
+
+        <div class="d-flex align-items-center gap-1">
+            <a href="{% url 'mimir:editarPergunta' item.pergunta.id %}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Editar texto da questão">
+                <i class="fas fa-edit"></i>
+            </a>
+            <form method="post" class="d-inline" onsubmit="return confirm('Remover esta questão da Avaliação Unificada?');">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="remover_pergunta">
+                <input type="hidden" name="pergunta_id" value="{{ item.pergunta.id }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remover da prova">
+                    <i class="fas fa-times"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="small text-dark" style="white-space: pre-line;">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+
+    <div class="mt-2 pt-2 border-top small text-muted">
+        <strong class="text-secondary"><i class="fas fa-key me-1"></i>Gabarito / Critério:</strong>
+        <span>{{ item.pergunta.get_gabarito_com_feedback|truncatechars:220 }}</span>
+    </div>
+</div>
+
