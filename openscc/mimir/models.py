@@ -1018,3 +1018,190 @@ class HistoricoParte(models.Model):
 
     def __str__(self):
         return f"Versão da Parte {self.parte.ordem} - {self.salvo_em.strftime('%d/%m/%Y %H:%M')}"
+
+
+class ConfiguracaoModeloLLM(models.Model):
+    """
+    Permite cadastrar vários modelos de LLM no Django Admin e manter apenas UM ativo em tempo real.
+    Todas as chamadas ao LLM no sistema consultam dinamicamente o modelo ativo.
+    """
+    PROVEDOR_CHOICES = [
+        ('gemini', 'Google Gemini (API)'),
+        ('ollama', 'Ollama (Local / Self-Hosted)'),
+    ]
+
+    nome_exibicao = models.CharField(
+        max_length=120,
+        verbose_name="Nome de Exibição",
+        help_text="Ex: Gemini 3.1 Flash Lite, Gemini 2.5 Pro, Ollama Gemma 3 12B"
+    )
+    provedor = models.CharField(
+        max_length=30,
+        choices=PROVEDOR_CHOICES,
+        default='gemini',
+        verbose_name="Provedor"
+    )
+    model_id = models.CharField(
+        max_length=120,
+        verbose_name="ID do Modelo (Model Name)",
+        help_text="Ex: gemini-3.1-flash-lite, gemini-2.5-flash, gemini-2.5-pro, gemma3:12b"
+    )
+    temperatura = models.FloatField(
+        default=0.7,
+        verbose_name="Temperatura",
+        help_text="Valor entre 0.0 (mais determinístico) e 1.5 (mais criativo)."
+    )
+    max_retries = models.IntegerField(
+        default=2,
+        verbose_name="Máximo de Retentativas"
+    )
+    base_url = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="URL Base (Ollama / Endpoint Customizado)",
+        help_text="Opcional. Ex: http://localhost:11434 ou http://192.168.86.20:11434 para Ollama."
+    )
+    api_key_override = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Chave de API Específica (Opcional)",
+        help_text="Se deixado em branco, utilizará a GEMINI_API_KEY padrão do settings.py."
+    )
+    ativo = models.BooleanField(
+        default=False,
+        verbose_name="Ativo (Em Uso)"
+    )
+    descricao = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Descrição / Observações"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Modelo de IA (LLM)"
+        verbose_name_plural = "Modelos de IA (LLMs)"
+        ordering = ['-ativo', 'nome_exibicao']
+
+    def __str__(self):
+        status_str = " [ATIVO]" if self.ativo else ""
+        return f"{self.nome_exibicao} ({self.get_provedor_display()}: {self.model_id}){status_str}"
+
+    def save(self, *args, **kwargs):
+        garantir_tabela_configuracao_llm()
+        super().save(*args, **kwargs)
+        if self.ativo:
+            ConfiguracaoModeloLLM.objects.exclude(pk=self.pk).update(ativo=False)
+        elif not ConfiguracaoModeloLLM.objects.filter(ativo=True).exists():
+            ConfiguracaoModeloLLM.objects.filter(pk=self.pk).update(ativo=True)
+            self.ativo = True
+
+    @classmethod
+    def get_modelo_ativo(cls):
+        """Retorna a instância ativa de ConfiguracaoModeloLLM (criando os padrões se a tabela estiver vazia)."""
+        garantir_tabela_configuracao_llm()
+        ativo = cls.objects.filter(ativo=True).first()
+        if not ativo:
+            ativo = cls.objects.first()
+            if ativo:
+                ativo.ativo = True
+                ativo.save()
+        return ativo
+
+
+def garantir_tabela_configuracao_llm():
+    """
+    Garante que a tabela `mimir_configuracaomodelollm` exista no banco de dados SQLite/relacional
+    mesmo sem necessidade de rodar migrations manuais e popula modelos iniciais caso esteja vazia.
+    """
+    from django.db import connection
+
+    try:
+        tabelas = connection.introspection.table_names()
+        if 'mimir_configuracaomodelollm' not in tabelas:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS "mimir_configuracaomodelollm" (
+                        "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        "nome_exibicao" varchar(120) NOT NULL,
+                        "provedor" varchar(30) NOT NULL,
+                        "model_id" varchar(120) NOT NULL,
+                        "temperatura" real NOT NULL,
+                        "max_retries" integer NOT NULL,
+                        "base_url" varchar(255) NULL,
+                        "api_key_override" varchar(255) NULL,
+                        "ativo" bool NOT NULL,
+                        "descricao" text NULL,
+                        "criado_em" datetime NOT NULL,
+                        "atualizado_em" datetime NOT NULL
+                    )
+                """)
+
+        if ConfiguracaoModeloLLM.objects.count() == 0:
+            agora = timezone.now()
+            modelos_iniciais = [
+                {
+                    "nome_exibicao": "Gemini 3.1 Flash Lite (Padrão Rápido)",
+                    "provedor": "gemini",
+                    "model_id": "gemini-3.1-flash-lite",
+                    "temperatura": 0.7,
+                    "max_retries": 2,
+                    "ativo": True,
+                    "descricao": "Modelo padrão de alta velocidade e baixo custo para geração de questões, PBL e análises.",
+                },
+                {
+                    "nome_exibicao": "Gemini 2.5 Flash (Multimodal & Equilibrado)",
+                    "provedor": "gemini",
+                    "model_id": "gemini-2.5-flash",
+                    "temperatura": 0.5,
+                    "max_retries": 2,
+                    "ativo": False,
+                    "descricao": "Excelente para leitura óptica de provas por foto, geração de questões complexas e correções.",
+                },
+                {
+                    "nome_exibicao": "Gemini 2.5 Pro (Raciocínio Profundo)",
+                    "provedor": "gemini",
+                    "model_id": "gemini-2.5-pro",
+                    "temperatura": 0.6,
+                    "max_retries": 2,
+                    "ativo": False,
+                    "descricao": "Indicado para elaboração de problemas PBL avançados, avaliação de projetos PD&I e editais extensos.",
+                },
+                {
+                    "nome_exibicao": "Gemini 2.0 Flash",
+                    "provedor": "gemini",
+                    "model_id": "gemini-2.0-flash",
+                    "temperatura": 0.7,
+                    "max_retries": 2,
+                    "ativo": False,
+                    "descricao": "Alternativa estável da família Gemini 2.0.",
+                },
+                {
+                    "nome_exibicao": "Ollama Gemma 3 12B (Execução Local)",
+                    "provedor": "ollama",
+                    "model_id": "gemma3:12b",
+                    "temperatura": 0.7,
+                    "max_retries": 2,
+                    "base_url": "http://localhost:11434",
+                    "ativo": False,
+                    "descricao": "Modelo local via Ollama para operação sem consumo de API externa.",
+                },
+            ]
+            for item in modelos_iniciais:
+                ConfiguracaoModeloLLM.objects.create(
+                    nome_exibicao=item["nome_exibicao"],
+                    provedor=item["provedor"],
+                    model_id=item["model_id"],
+                    temperatura=item["temperatura"],
+                    max_retries=item["max_retries"],
+                    base_url=item.get("base_url"),
+                    ativo=item["ativo"],
+                    descricao=item["descricao"],
+                    criado_em=agora,
+                    atualizado_em=agora,
+                )
+    except Exception as e:
+        print(f"Aviso ao verificar tabela ConfiguracaoModeloLLM: {e}")
