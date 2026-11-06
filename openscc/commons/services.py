@@ -18,24 +18,68 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_classic.chains.summarize import load_summarize_chain
 from langchain_community.vectorstores import FAISS
 
-from mimir.models import LLMLog, Edital
+from mimir.models import LLMLog, Edital, ConfiguracaoModeloLLM
 
 # ==========================================
 # CONFIGURAÇÃO DE MODELOS E EMBEDDINGS
 # ==========================================
-def get_llm():
-    """Retorna uma instância configurada do LLM"""
+def get_active_model_label() -> str:
+    """Retorna o identificador do modelo LLM atualmente ativo no Django Admin."""
+    cfg = ConfiguracaoModeloLLM.get_modelo_ativo()
+    if cfg:
+        return f"{cfg.model_id} ({cfg.get_provedor_display()})"
+    if settings.GEMINI_API_KEY is None or settings.GEMINI_API_KEY == "":
+        return "gemma3:12b (Ollama)"
+    return "gemini-3.1-flash-lite (Gemini)"
+
+
+def get_llm(temperature_override: Optional[float] = None):
+    """
+    Retorna uma instância configurada do LLM em tempo real consultando o modelo
+    marcado como ativo (`ativo=True`) em `ConfiguracaoModeloLLM` no Django Admin.
+    """
+    cfg = ConfiguracaoModeloLLM.get_modelo_ativo()
+    if cfg:
+        temp = temperature_override if temperature_override is not None else float(cfg.temperatura)
+        if cfg.provedor == "ollama":
+            ollama_kwargs = {
+                "model": cfg.model_id.strip(),
+                "temperature": temp,
+            }
+            if cfg.base_url and cfg.base_url.strip():
+                ollama_kwargs["base_url"] = cfg.base_url.strip()
+            return ChatOllama(**ollama_kwargs)
+
+        # Provedor Gemini (Google Generative AI)
+        api_key = (cfg.api_key_override or "").strip() or getattr(settings, "GEMINI_API_KEY", None)
+        if api_key:
+            return ChatGoogleGenerativeAI(
+                model=cfg.model_id.strip(),
+                google_api_key=api_key,
+                temperature=temp,
+                max_tokens=None,
+                timeout=None,
+                max_retries=int(cfg.max_retries or 2),
+            )
+        # Se o modelo ativo for Gemini mas não houver API key configurada, cai para Ollama local
+        return ChatOllama(
+            model="gemma3:12b",
+            temperature=temp,
+        )
+
+    # Fallback padrão caso não haja configuração no banco
+    temp_fallback = temperature_override if temperature_override is not None else 0.7
     if settings.GEMINI_API_KEY is None or settings.GEMINI_API_KEY == "":
         print("Usando modelo Ollama Gemma 3 localmente")
         return ChatOllama(
             model="gemma3:12b",
-            temperature=0.7
+            temperature=temp_fallback
             #base_url="http://192.168.86.20:11434",
         )
     return ChatGoogleGenerativeAI(
         model="gemini-3.1-flash-lite",  # ou "gemini-1.5-flash"
         google_api_key=settings.GEMINI_API_KEY,
-        temperature=0.7,
+        temperature=temp_fallback,
         max_tokens=None,
         timeout=None,
         max_retries=2,
@@ -78,7 +122,7 @@ def invoke_chain(chain, inputs, endpoint, user=None, model_name=None):
     status = 'success'
     tokens_input = None
     tokens_output = None
-    model_used = model_name or 'unknown'
+    model_used = model_name or get_active_model_label()
     
     try:
         response = chain.invoke(inputs)
@@ -563,12 +607,13 @@ def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_perg
     error = None
     response_content = None
     status = 'success'
-    model_name = "gemini-2.5-flash"
+    cfg_ativo = ConfiguracaoModeloLLM.get_modelo_ativo()
+    model_name = cfg_ativo.model_id.strip() if cfg_ativo else "gemini-2.5-flash"
     tokens_input = None
     tokens_output = None
     output = None
     try:
-        llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=settings.GEMINI_API_KEY, temperature=0.3)
+        llm = get_llm(temperature_override=0.3)
         conteudos = []
         prompt_texto = f"ENUNCIADO DA PERGUNTA:\n{enunciado}\n\nGABARITO/PADRÃO DE RESPOSTA:\n{gabarito}\n\nRESPOSTA DO ALUNO:\n"
         conteudos.append(HumanMessage(content=prompt_texto))

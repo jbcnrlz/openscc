@@ -896,46 +896,67 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
 
     parsed_ia = None
     modo_utilizado = "Leitura Assistida Local"
-    api_key = getattr(settings, "GEMINI_API_KEY", None)
-    if api_key:
-        for model_candidate in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
-            try:
+    from .models import ConfiguracaoModeloLLM
+    cfg_ativo = ConfiguracaoModeloLLM.get_modelo_ativo()
+    api_key = (
+        (cfg_ativo.api_key_override or "").strip() if cfg_ativo else ""
+    ) or getattr(settings, "GEMINI_API_KEY", None)
+
+    # Prioriza sempre o modelo ativo no Django Admin em tempo real
+    candidatos_modelos = []
+    if cfg_ativo and cfg_ativo.model_id:
+        candidatos_modelos.append((cfg_ativo.provedor, cfg_ativo.model_id.strip(), cfg_ativo.base_url))
+    for fallback_m in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        if not any(m[1] == fallback_m for m in candidatos_modelos):
+            candidatos_modelos.append(("gemini", fallback_m, None))
+
+    for provedor_cand, model_candidate, base_url_cand in candidatos_modelos:
+        if provedor_cand == "gemini" and not api_key:
+            continue
+        try:
+            if provedor_cand == "ollama":
+                from langchain_ollama import ChatOllama
+                ollama_kwargs = {"model": model_candidate, "temperature": 0.1}
+                if base_url_cand and base_url_cand.strip():
+                    ollama_kwargs["base_url"] = base_url_cand.strip()
+                llm = ChatOllama(**ollama_kwargs)
+            else:
                 llm = ChatGoogleGenerativeAI(
                     model=model_candidate,
                     google_api_key=api_key,
                     temperature=0.1,
                 )
-                resp = llm.invoke(conteudos)
-                raw_text = resp.content if hasattr(resp, "content") else str(resp)
-                if isinstance(raw_text, list):
-                    raw_text = "\n".join(
-                        b.get("text", "") if isinstance(b, dict) else str(b) for b in raw_text
-                    )
-                LLMLog.objects.create(
-                    user=user,
-                    prompt=f"Correção por Foto Avaliação Unificada #{prova.id} ({len(arquivos_imagens)} foto(s))",
-                    response=raw_text[:5000],
-                    model_used=model_candidate,
-                    status="success",
-                    endpoint="analisar_foto_prova_unificada_ia",
+            resp = llm.invoke(conteudos)
+            raw_text = resp.content if hasattr(resp, "content") else str(resp)
+            if isinstance(raw_text, list):
+                raw_text = "\n".join(
+                    b.get("text", "") if isinstance(b, dict) else str(b) for b in raw_text
                 )
-                m = re.search(r"\{[\s\S]*\}", raw_text)
-                if m:
-                    cand = json.loads(m.group(0))
-                    if isinstance(cand, dict) and "itens" in cand:
-                        parsed_ia = cand
-                        modo_utilizado = f"Visão Computacional IA ({model_candidate})"
-                        break
-            except Exception as e:
-                LLMLog.objects.create(
-                    user=user,
-                    prompt=f"Erro Correção por Foto #{prova.id}",
-                    error_message=str(e),
-                    model_used=model_candidate,
-                    status="error",
-                    endpoint="analisar_foto_prova_unificada_ia",
-                )
-                continue
+            LLMLog.objects.create(
+                user=user,
+                prompt=f"Correção por Foto Avaliação Unificada #{prova.id} ({len(arquivos_imagens)} foto(s))",
+                response=raw_text[:5000],
+                model_used=model_candidate,
+                status="success",
+                endpoint="analisar_foto_prova_unificada_ia",
+            )
+            m = re.search(r"\{[\s\S]*\}", raw_text)
+            if m:
+                cand = json.loads(m.group(0))
+                if isinstance(cand, dict) and "itens" in cand:
+                    parsed_ia = cand
+                    modo_utilizado = f"Visão Computacional IA ({model_candidate})"
+                    break
+        except Exception as e:
+            LLMLog.objects.create(
+                user=user,
+                prompt=f"Erro Correção por Foto #{prova.id}",
+                error_message=str(e),
+                model_used=model_candidate,
+                status="error",
+                endpoint="analisar_foto_prova_unificada_ia",
+            )
+            continue
 
     # Normaliza os itens retornados (ou monta fallback assistido)
     mapa_ia_por_pid = {}
