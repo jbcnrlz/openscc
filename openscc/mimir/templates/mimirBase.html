@@ -24,6 +24,10 @@
     <!-- SweetAlert2 CSS e JS -->
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+
+    <!-- Highlight.js para Syntax Highlight de Código Fonte -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     {% block titlePage %}
     <title>Mimir - Sistema de Gestão do Conhecimento</title>
     {% endblock %}
@@ -785,7 +789,262 @@
                 }
             });
         });
+
+        // =========================================================================
+        // MOTOR UNIVERSAL DE SYNTAX HIGHLIGHT DO MIMIR (MimirCodeHighlighter)
+        // =========================================================================
+        window.MimirCodeHighlighter = (function() {
+            const LANG_LABELS = {
+                python: 'Python', py: 'Python',
+                javascript: 'JavaScript', js: 'JavaScript',
+                typescript: 'TypeScript', ts: 'TypeScript',
+                java: 'Java',
+                c: 'C', cpp: 'C++', 'c++': 'C++', csharp: 'C#', cs: 'C#',
+                sql: 'SQL',
+                html: 'HTML', xml: 'XML', css: 'CSS',
+                php: 'PHP',
+                bash: 'Bash / Shell', sh: 'Shell',
+                json: 'JSON',
+                portugol: 'Portugol / Pseudocódigo',
+                plaintext: 'Código Fonte', text: 'Código Fonte'
+            };
+
+            function escapeHtml(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            // Colorizador nativo (fallback caso CDN offline ou linguagem como Portugol)
+            function nativeTokenHighlight(escapedCode) {
+                // Protege strings e comentários primeiro usando placeholders
+                const tokens = [];
+                function saveToken(html) {
+                    const id = `@@MIMIR_TOK_${tokens.length}@@`;
+                    tokens.push(html);
+                    return id;
+                }
+
+                let out = escapedCode;
+
+                // Comentários de bloco /* ... */
+                out = out.replace(/\/\*[\s\S]*?\*\//g, m => saveToken(`<span class="mimir-hl-comment">${m}</span>`));
+                // Comentários de linha // ... ou # ... ou -- ...
+                out = out.replace(/(?:\/\/|#|--).*$/gm, m => saveToken(`<span class="mimir-hl-comment">${m}</span>`));
+                // Strings "..." ou '...'
+                out = out.replace(/(?:&quot;(?:\\.|[^&])*?&quot;|&#39;(?:\\.|[^&])*?&#39;)/g, m => saveToken(`<span class="mimir-hl-string">${m}</span>`));
+
+                // Palavras-chave (Python, C, Java, JS, SQL, Portugol)
+                const kwRegex = /\b(def|class|return|if|elif|else|for|while|do|switch|case|break|continue|try|except|catch|finally|raise|throw|import|from|as|pass|lambda|yield|with|async|await|True|False|None|and|or|not|in|is|function|const|let|var|new|this|super|extends|implements|public|private|protected|static|final|void|int|float|double|char|boolean|bool|string|String|long|short|unsigned|struct|enum|interface|package|namespace|using|include|printf|scanf|cout|cin|System|out|println|console|log|SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|INNER|LEFT|RIGHT|ON|GROUP|BY|ORDER|HAVING|LIMIT|CREATE|TABLE|ALTER|DROP|PRIMARY|KEY|FOREIGN|REFERENCES|AND|OR|NOT|NULL|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|algoritmo|var|inicio|fimalgoritmo|escreva|escreval|leia|se|entao|senao|fimse|para|de|ate|passo|faca|fimpara|enquanto|fimenquanto|repita|procedimento|funcao|retorne|inteiro|real|caractere|logico|verdadeiro|falso)\b/g;
+                out = out.replace(kwRegex, '<span class="mimir-hl-keyword">$1</span>');
+
+                // Funções seguidas de (
+                out = out.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, '<span class="mimir-hl-func">$1</span>');
+
+                // Números
+                out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="mimir-hl-number">$1</span>');
+
+                // Restaura strings e comentários
+                out = out.replace(/@@MIMIR_TOK_(\d+)@@/g, (_, idx) => tokens[Number(idx)] || '');
+                return out;
+            }
+
+            function highlightSnippet(rawCode, lang) {
+                const cleanLang = (lang || '').toLowerCase().trim();
+                const codeTrimmed = String(rawCode || '').replace(/^\r?\n|\r?\n$/g, '');
+
+                if (window.hljs && cleanLang !== 'portugol') {
+                    try {
+                        if (cleanLang && hljs.getLanguage(cleanLang)) {
+                            return hljs.highlight(codeTrimmed, { language: cleanLang, ignoreIllegals: true }).value;
+                        }
+                        const auto = hljs.highlightAuto(codeTrimmed);
+                        if (auto && auto.value) return auto.value;
+                    } catch (e) {}
+                }
+                return nativeTokenHighlight(escapeHtml(codeTrimmed));
+            }
+
+            function buildCodeBlockHtml(rawCode, lang) {
+                const cleanLang = (lang || 'plaintext').toLowerCase().trim();
+                const label = LANG_LABELS[cleanLang] || (cleanLang ? cleanLang.toUpperCase() : 'Código Fonte');
+                const highlighted = highlightSnippet(rawCode, cleanLang);
+                const lines = String(rawCode || '').replace(/^\r?\n|\r?\n$/g, '').split(/\r?\n/);
+                const lineNumbersHtml = lines.map((_, i) => `<span>${i + 1}</span>`).join('');
+
+                return `<div class="mimir-code-block my-2" style="white-space: normal;">` +
+                    `<div class="mimir-code-header">` +
+                        `<span class="mimir-code-dots"><i></i><i></i><i></i></span>` +
+                        `<span class="mimir-code-lang"><i class="bi bi-code-slash me-1"></i>${escapeHtml(label)}</span>` +
+                    `</div>` +
+                    `<div class="mimir-code-body">` +
+                        `<div class="mimir-code-lines" aria-hidden="true">${lineNumbersHtml}</div>` +
+                        `<pre class="mimir-code-pre"><code class="hljs language-${escapeHtml(cleanLang)}">${highlighted}</code></pre>` +
+                    `</div>` +
+                `</div>`;
+            }
+
+            // Converte texto puro (com ```lang ... ``` e `inline`) em HTML formatado com syntax highlight
+            function formatTextWithCodeBlocks(rawText) {
+                if (!rawText) return '';
+                const text = String(rawText);
+                const blocks = [];
+
+                // 1. Extrai blocos ```lang ... ```
+                let processed = text.replace(/```([a-zA-Z0-9_+\-#]*)[ \t]*\r?\n?([\s\S]*?)```/g, function(_, lang, code) {
+                    const placeholder = `@@MIMIR_CODE_BLOCK_${blocks.length}@@`;
+                    blocks.push(buildCodeBlockHtml(code, lang || 'plaintext'));
+                    return placeholder;
+                });
+
+                // 2. Escapa o restante do texto e aplica código inline `...` e quebras de linha
+                processed = escapeHtml(processed);
+                processed = processed.replace(/`([^`\r\n]+)`/g, '<code class="mimir-inline-code">$1</code>');
+                processed = processed.replace(/\r?\n/g, '<br>');
+
+                // 3. Reinsere os blocos de código já destacados
+                processed = processed.replace(/@@MIMIR_CODE_BLOCK_(\d+)@@/g, function(_, idx) {
+                    return blocks[Number(idx)] || '';
+                });
+
+                return processed;
+            }
+
+            // Varre elementos da página que contenham ``` ... ``` (inclusive os que passaram por |linebreaksbr)
+            function enhancePageCodeBlocks(root = document) {
+                const candidates = root.querySelectorAll(
+                    '.card-body div, .card-body p, .pergunta-preview div, .list-group-item p, td'
+                );
+                candidates.forEach(el => {
+                    if (el.dataset.mimirCodeEnhanced === '1') return;
+                    if (el.querySelector('textarea, input, select, button, .mimir-code-block')) return;
+                    const rawHtml = el.innerHTML || '';
+                    if (!rawHtml.includes('```')) return;
+
+                    // Reconstrói quebras de linha caso o template tenha usado |linebreaksbr
+                    const textRestored = rawHtml
+                        .replace(/<br\s*\/?>/gi, '\n')
+                        .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+                        .replace(/<p[^>]*>|<\/p>/gi, '')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&amp;/g, '&');
+
+                    if (/```[a-zA-Z0-9_+\-#]*[\s\S]*?```/.test(textRestored)) {
+                        el.innerHTML = formatTextWithCodeBlocks(textRestored);
+                        el.style.whiteSpace = 'normal';
+                        el.dataset.mimirCodeEnhanced = '1';
+                    }
+                });
+            }
+
+            return {
+                formatTextWithCodeBlocks,
+                buildCodeBlockHtml,
+                highlightSnippet,
+                enhancePageCodeBlocks
+            };
+        })();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.MimirCodeHighlighter) {
+                window.MimirCodeHighlighter.enhancePageCodeBlocks();
+            }
+        });
     </script>
+
+    <style>
+        /* Estilos Globais para Blocos de Código Fonte com Syntax Highlight no Mimir */
+        .mimir-code-block {
+            background: #1e1e1e;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            text-align: left;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+        }
+        .mimir-code-header {
+            background: #2d2d2d;
+            border-bottom: 1px solid #3f3f46;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+        }
+        .mimir-code-dots {
+            display: inline-flex;
+            gap: 5px;
+        }
+        .mimir-code-dots i {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .mimir-code-dots i:nth-child(1) { background: #ef4444; }
+        .mimir-code-dots i:nth-child(2) { background: #f59e0b; }
+        .mimir-code-dots i:nth-child(3) { background: #22c55e; }
+        .mimir-code-lang {
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            color: #93c5fd;
+        }
+        .mimir-code-body {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 0;
+        }
+        .mimir-code-lines {
+            user-select: none;
+            padding: 0 10px 0 12px;
+            border-right: 1px solid #334155;
+            color: #64748b;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+        }
+        .mimir-code-pre {
+            margin: 0;
+            padding: 0 14px;
+            background: transparent !important;
+            color: #e2e8f0;
+            font-size: 0.86rem;
+            line-height: 1.5;
+            overflow-x: visible;
+            flex: 1;
+            white-space: pre !important;
+        }
+        .mimir-code-pre code.hljs {
+            background: transparent !important;
+            padding: 0 !important;
+            white-space: pre !important;
+        }
+        .mimir-inline-code {
+            background: #f1f5f9;
+            color: #be123c;
+            border: 1px solid #cbd5e1;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        /* Cores do Fallback Nativo */
+        .mimir-hl-keyword { color: #569cd6; font-weight: 600; }
+        .mimir-hl-string { color: #ce9178; }
+        .mimir-hl-comment { color: #6a9955; font-style: italic; }
+        .mimir-hl-func { color: #dcdcaa; }
+        .mimir-hl-number { color: #b5cea8; }
+    </style>
 
     {% block ScriptCode %}
     {% endblock %}

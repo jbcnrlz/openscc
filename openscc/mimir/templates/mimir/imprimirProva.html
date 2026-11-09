@@ -190,7 +190,7 @@
     {% for pergunta in perguntas %}
     <div class="questao">
         <div class="questao-numero">Questão {{ forloop.counter }}</div>
-        <div class="questao-enunciado">{{ pergunta.pergunta|linebreaksbr }}</div>
+        <div class="questao-enunciado">{{ pergunta.texto_com_syntax_highlight }}</div>
         
         <!-- Seção de Imagens da Pergunta -->
         {% if pergunta.imagens.all %}

@@ -717,14 +717,84 @@ def solicitarFeedbackPerguntaDireto(request, pergunta_id):
         
     return redirect('mimir:visualizarPergunta', pID=pergunta.id)
 
+def _normalizar_post_pergunta_objetiva(post_data):
+    """
+    Se o formulário enviou `modo_questao == 'objetiva'` com a lista estruturada de
+    alternativas (`alternativa_item[]`) e a letra correta (`alternativa_correta_letra`),
+    monta automaticamente os campos `pergunta` (enunciado + A) B) C) D) E)) e `gabarito`
+    para manter compatibilidade total com `PerguntaForm`, impressão de provas e OMR.
+    """
+    mutable = post_data.copy()
+    modo = (mutable.get('modo_questao') or '').strip().lower()
+    alternativas_raw = mutable.getlist('alternativa_item[]')
+
+    if modo != 'objetiva' or not alternativas_raw:
+        return mutable
+
+    letras = 'ABCDEFGH'
+    alternativas_limpas = []
+    mapa_letra_texto = {}
+
+    for item in alternativas_raw:
+        txt = (item or '').strip()
+        if not txt:
+            continue
+        # Remove prefixo duplicado caso o usuário tenha digitado "A) " dentro da caixinha
+        txt = re.sub(r'^\s*[A-Ha-h][\)\.\-:]\s*', '', txt).strip()
+        if not txt:
+            continue
+        idx = len(alternativas_limpas)
+        if idx >= len(letras):
+            break
+        letra = letras[idx]
+        alternativas_limpas.append(f"{letra}) {txt}")
+        mapa_letra_texto[letra] = txt
+
+    enunciado_base = (mutable.get('enunciado_base_obj') or '').strip()
+    if not enunciado_base:
+        # Extrai apenas a parte antes das alternativas do campo pergunta/pergunta_texto
+        bruto = (mutable.get('pergunta') or mutable.get('pergunta_texto') or '').strip()
+        linhas_base = []
+        for linha in bruto.splitlines():
+            if re.match(r'^\s*[A-Ha-h][\)\.\-]\s+', linha):
+                break
+            linhas_base.append(linha)
+        enunciado_base = "\n".join(linhas_base).strip()
+
+    if enunciado_base and alternativas_limpas:
+        texto_completo = enunciado_base + "\n\n" + "\n".join(alternativas_limpas)
+        mutable['pergunta'] = texto_completo
+        mutable['pergunta_texto'] = texto_completo
+
+    letra_correta = (mutable.get('alternativa_correta_letra') or '').strip().upper()
+    justificativa = (mutable.get('gabarito_justificativa_obj') or '').strip()
+
+    if letra_correta and letra_correta in mapa_letra_texto:
+        txt_correta = mapa_letra_texto[letra_correta]
+        if justificativa:
+            gab_final = f"{letra_correta}) {txt_correta}\nJustificativa: {justificativa}"
+        else:
+            gab_final = f"{letra_correta}) {txt_correta}"
+        mutable['gabarito'] = gab_final
+        mutable['gabarito_texto'] = gab_final
+    elif letra_correta:
+        gab_final = f"{letra_correta} — {justificativa}" if justificativa else letra_correta
+        mutable['gabarito'] = gab_final
+        mutable['gabarito_texto'] = gab_final
+
+    return mutable
+
+
 @login_required(login_url='/login')
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def editarPergunta(request, pID):
+    garantir_tipos_pergunta_unificada()
     pergunta = get_object_or_404(Pergunta, id=pID)
     
     if request.method == 'POST':
-        form = PerguntaForm(request.user, request.POST, request.FILES, instance=pergunta)
+        post_normalizado = _normalizar_post_pergunta_objetiva(request.POST)
+        form = PerguntaForm(request.user, post_normalizado, request.FILES, instance=pergunta)
         if form.is_valid():
             try:
                 pergunta = form.save()
@@ -2639,9 +2709,11 @@ def parse_gemini_response(resultado):
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def criarPergunta(request):
+    garantir_tipos_pergunta_unificada()
     if request.method == 'POST':
-        # Instancia o form vazio com os dados do POST (supondo que o PerguntaForm exija request.user)
-        form = PerguntaForm(request.user, request.POST, request.FILES)
+        post_normalizado = _normalizar_post_pergunta_objetiva(request.POST)
+        # Instancia o form com os dados normalizados do POST
+        form = PerguntaForm(request.user, post_normalizado, request.FILES)
         
         if form.is_valid():
             try:
@@ -2666,7 +2738,8 @@ def criarPergunta(request):
                 if 'salvar_e_ver' in request.POST:
                     return redirect('mimir:visualizarPergunta', pergunta.id)
                 elif 'salvar_e_adicionar_outra' in request.POST:
-                    return redirect('mimir:criarPergunta')
+                    url_criar = reverse('mimir:criarPergunta')
+                    return redirect(f"{url_criar}?assunto={pergunta.assunto_id}&tipo={pergunta.tipoDePergunta_id}")
                 else:
                     return redirect('mimir:visualizarPerguntas')
                     
@@ -2677,8 +2750,12 @@ def criarPergunta(request):
             messages.error(request, 'Por favor, corrija os erros no formulário.')
             print(f"Erros do formulário: {form.errors}")
     else:
-        # Requer instanciar o form apenas com o user
-        form = PerguntaForm(request.user)
+        initial_data = {}
+        if request.GET.get('assunto'):
+            initial_data['assunto'] = request.GET.get('assunto')
+        if request.GET.get('tipo'):
+            initial_data['tipoDePergunta'] = request.GET.get('tipo')
+        form = PerguntaForm(request.user, initial=initial_data)
 
     return render(request, 'mimir/criarPergunta.html', {
         'form': form,
@@ -4062,10 +4139,11 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
             return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
 
         elif acao == 'criar_pergunta_secao':
-            secao_destino = request.POST.get('secao_destino', 'materia_objetivas')
-            assunto_destino_id = request.POST.get('assunto_destino_id')
-            enunciado = (request.POST.get('pergunta_texto') or '').strip()
-            gabarito = (request.POST.get('gabarito_texto') or '').strip()
+            post_norm = _normalizar_post_pergunta_objetiva(request.POST)
+            secao_destino = post_norm.get('secao_destino', 'materia_objetivas')
+            assunto_destino_id = post_norm.get('assunto_destino_id')
+            enunciado = (post_norm.get('pergunta_texto') or '').strip()
+            gabarito = (post_norm.get('gabarito_texto') or '').strip()
 
             if not enunciado or not gabarito:
                 messages.error(request, 'Preencha o enunciado e o gabarito da questão.')

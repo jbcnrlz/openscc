@@ -2,10 +2,13 @@
 {% load static %}
 
 {% block mainContent %}
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
     <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ titulo }}</h2>
+        <div>
+            <h2 class="fw-bold mb-1">{{ titulo }}</h2>
+            <p class="text-muted small mb-0">Edite o enunciado, manipule as alternativas visualmente ou altere o gabarito.</p>
+        </div>
         <div class="btn-group">
             <a href="{% url 'mimir:visualizarPergunta' pergunta.id %}" class="btn btn-info">
                 <i class="bi bi-eye"></i> Ver Detalhes
@@ -17,16 +20,19 @@
     </div>
 
     <!-- Informações da Pergunta -->
-    <div class="card mb-4">
+    <div class="card mb-4 shadow-sm border-0">
         <div class="card-header bg-light">
-            <h5 class="mb-0">
+            <h6 class="mb-0 fw-bold">
                 <i class="bi bi-info-circle"></i> Informações Atuais
-            </h5>
+            </h6>
         </div>
-        <div class="card-body">
-            <div class="row">
+        <div class="card-body py-2">
+            <div class="row small">
                 <div class="col-md-3">
                     <strong>ID:</strong> #{{ pergunta.id }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Assunto:</strong> {{ pergunta.assunto.nome }}
                 </div>
                 <div class="col-md-3">
                     <strong>Palavras:</strong> {{ pergunta.pergunta|wordcount }}
@@ -39,15 +45,26 @@
     </div>
 
     <!-- Formulário de Edição -->
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">
-                <i class="bi bi-pencil"></i> Formulário de Edição
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0 fw-bold">
+                <i class="bi bi-pencil me-1"></i> Formulário de Edição
             </h5>
+            <!-- Seletor Rápido de Modo: Objetiva vs Dissertativa -->
+            <div class="btn-group bg-white p-1 rounded-pill shadow-sm" role="group">
+                <button type="button" id="btnModoObjetiva" class="btn btn-sm rounded-pill fw-bold px-3 btn-primary" onclick="definirModoQuestao('objetiva', true)">
+                    <i class="bi bi-ui-radios me-1"></i> Questão Objetiva (Alternativas)
+                </button>
+                <button type="button" id="btnModoDissertativa" class="btn btn-sm rounded-pill fw-bold px-3 btn-light text-dark" onclick="definirModoQuestao('dissertativa', true)">
+                    <i class="bi bi-justify-left me-1"></i> Questão Dissertativa (Aberta)
+                </button>
+            </div>
         </div>
-        <div class="card-body">
+        <div class="card-body p-4">
             <form method="post" id="formEditarPergunta" enctype="multipart/form-data">
                 {% csrf_token %}
+                <input type="hidden" name="modo_questao" id="input_modo_questao" value="objetiva">
+                <input type="hidden" name="alternativa_correta_letra" id="input_alternativa_correta_letra" value="A">
                 
                 {% if form.non_field_errors %}
                 <div class="alert alert-danger">
@@ -81,6 +98,7 @@
                         <div class="form-text">Tipo de resposta esperada</div>
                     </div>
                 </div>
+
                 <!-- Checkbox para controle de upload -->
                 <div class="row mb-4">
                     <div class="col-md-12">
@@ -95,19 +113,189 @@
                         </div>
                     </div>
                 </div>
+
                 <!-- Enunciado -->
                 <div class="mb-4">
-                    <label for="{{ form.pergunta.id_for_label }}" class="form-label">
-                        <strong>{{ form.pergunta.label }}</strong>
-                        <span class="text-danger">*</span>
-                    </label>
-                    {{ form.pergunta }}
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <label for="input_enunciado_visivel" class="form-label mb-0">
+                            <strong id="label_enunciado_titulo">Comando / Texto-Base da Questão</strong>
+                            <span class="text-danger">*</span>
+                        </label>
+                        <div class="d-flex flex-wrap align-items-center gap-1">
+                            <button type="button" id="btnExtrairDoEnunciado" class="btn btn-xs btn-outline-primary d-none" onclick="extrairAlternativasDoEnunciado()">
+                                <i class="bi bi-magic me-1"></i> Extrair alternativas A-E do texto
+                            </button>
+                            <!-- Barra Rápida de Inserção de Código Fonte -->
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Inserir Código Fonte">
+                                <button type="button" class="btn btn-xs btn-dark fw-semibold" onclick="abrirEstudioCodigo('enunciado')" title="Abrir Estúdio de Código com Syntax Highlight em Tempo Real">
+                                    <i class="bi bi-code-square text-info me-1"></i> Inserir Código Fonte
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-dark" onclick="inserirBlocoCodigoRapido('python')" title="Inserir bloco Python">+ Python</button>
+                                <button type="button" class="btn btn-xs btn-outline-dark" onclick="inserirBlocoCodigoRapido('javascript')" title="Inserir bloco JavaScript">+ JS</button>
+                                <button type="button" class="btn btn-xs btn-outline-dark" onclick="inserirBlocoCodigoRapido('java')" title="Inserir bloco Java">+ Java</button>
+                                <button type="button" class="btn btn-xs btn-outline-dark" onclick="inserirBlocoCodigoRapido('c')" title="Inserir bloco C/C++">+ C/C++</button>
+                                <button type="button" class="btn btn-xs btn-outline-dark" onclick="inserirBlocoCodigoRapido('sql')" title="Inserir bloco SQL">+ SQL</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="inserirCodigoInline()" title="Inserir código inline (`código`)"><code>`inline`</code></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estúdio Retrátil de Código Fonte com Syntax Highlight ao Vivo -->
+                    <div class="collapse mb-3" id="collapseEstudioCodigo">
+                        <div class="card border-dark shadow-sm" style="background: #0f172a; color: #f8fafc;">
+                            <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background: #1e293b; border-bottom: 1px solid #334155;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-terminal-fill text-info"></i>
+                                    <strong class="small text-white">Estúdio de Código Fonte (Syntax Highlight)</strong>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <label class="small text-white-50 mb-0">Linguagem:</label>
+                                        <select id="estudio_codigo_lang" class="form-select form-select-sm py-0 bg-dark text-white border-secondary" style="width: auto;" onchange="atualizarPreviewEstudioCodigo()">
+                                            <option value="python">Python</option>
+                                            <option value="javascript">JavaScript</option>
+                                            <option value="java">Java</option>
+                                            <option value="c">C</option>
+                                            <option value="cpp">C++</option>
+                                            <option value="csharp">C#</option>
+                                            <option value="sql">SQL</option>
+                                            <option value="html">HTML / XML</option>
+                                            <option value="css">CSS</option>
+                                            <option value="php">PHP</option>
+                                            <option value="typescript">TypeScript</option>
+                                            <option value="bash">Bash / Shell</option>
+                                            <option value="json">JSON</option>
+                                            <option value="portugol">Portugol / Pseudocódigo</option>
+                                        </select>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <label class="small text-white-50 mb-0">Inserir em:</label>
+                                        <select id="estudio_codigo_destino" class="form-select form-select-sm py-0 bg-dark text-white border-secondary" style="width: auto;">
+                                            <option value="enunciado">Enunciado da Questão</option>
+                                            <option value="gabarito">Gabarito / Resposta</option>
+                                            <option value="alt_0">Alternativa A</option>
+                                            <option value="alt_1">Alternativa B</option>
+                                            <option value="alt_2">Alternativa C</option>
+                                            <option value="alt_3">Alternativa D</option>
+                                            <option value="alt_4">Alternativa E</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" class="btn-close btn-close-white btn-sm" onclick="fecharEstudioCodigo()"></button>
+                                </div>
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-white-50 mb-1">
+                                            Digite ou cole o código (<kbd>Tab</kbd> indenta com 4 espaços):
+                                        </label>
+                                        <textarea id="estudio_codigo_textarea" rows="7"
+                                                  class="form-control font-monospace bg-dark text-light border-secondary"
+                                                  style="font-size: 0.86rem; line-height: 1.45; tab-size: 4;"
+                                                  placeholder="def calcular_media(notas):&#10;    return sum(notas) / len(notas)"></textarea>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-white-50 mb-1">
+                                            Preview com Syntax Highlight:
+                                        </label>
+                                        <div id="estudio_codigo_preview" class="rounded overflow-auto" style="max-height: 210px; min-height: 165px; background: #1e1e1e; border: 1px solid #334155; padding: 4px;"></div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                                    <small class="text-white-50">
+                                        Dica: Você também pode escrever direto no texto usando <code>```python ... ```</code>
+                                    </small>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-light" onclick="fecharEstudioCodigo()">Cancelar</button>
+                                        <button type="button" class="btn btn-sm btn-info fw-bold text-dark" onclick="confirmarInsercaoEstudioCodigo()">
+                                            <i class="bi bi-check2-circle me-1"></i> Inserir Código Formatado
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <textarea id="input_enunciado_visivel" name="enunciado_base_obj" rows="5" class="form-control"></textarea>
+
+                    <div class="d-none">
+                        {{ form.pergunta }}
+                    </div>
+
                     {% if form.pergunta.errors %}
                     <div class="text-danger small">{{ form.pergunta.errors }}</div>
                     {% endif %}
-                    <div class="form-text">
-                        <span id="contador-enunciado">0</span> caracteres | 
-                        <span id="contador-palavras">0</span> palavras
+                    <div class="form-text d-flex justify-content-between">
+                        <span>
+                            <span id="contador-enunciado">0</span> caracteres | 
+                            <span id="contador-palavras">0</span> palavras
+                        </span>
+                        <span id="dica_modo_enunciado" class="text-primary fw-semibold">
+                            <i class="bi bi-lightbulb"></i> As alternativas abaixo compõem automaticamente a questão final.
+                        </span>
+                    </div>
+                </div>
+
+                <!-- CONSTRUTOR INTERATIVO DE ALTERNATIVAS -->
+                <div id="painel_construtor_objetiva" class="card border-primary border-opacity-50 shadow-sm mb-4">
+                    <div class="card-header bg-primary bg-opacity-10 py-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <h6 class="mb-0 fw-bold text-primary-emphasis">
+                                    <i class="bi bi-list-check me-1"></i> Alternativas da Questão & Escolha do Gabarito
+                                </h6>
+                                <small class="text-muted">
+                                    Clique na <strong>letra (A, B, C...)</strong> ou no botão <strong>"Correta"</strong> para definir o gabarito. Pressione <kbd>Enter</kbd> para pular de alternativa.
+                                </small>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button type="button" class="btn btn-xs btn-outline-primary fw-semibold" onclick="aplicarPresetAlternativas(5)">A–E (5)</button>
+                                <button type="button" class="btn btn-xs btn-outline-primary fw-semibold" onclick="aplicarPresetAlternativas(4)">A–D (4)</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary fw-semibold" onclick="aplicarPresetVerdadeiroFalso()">V / F</button>
+                                <button type="button" class="btn btn-xs btn-outline-success fw-semibold" onclick="embaralharAlternativas()">
+                                    <i class="bi bi-shuffle"></i> Embaralhar
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" data-bs-toggle="collapse" data-bs-target="#collapseColarLoteEdit">
+                                    <i class="bi bi-clipboard-plus"></i> Colar em Lote
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="collapse mt-3" id="collapseColarLoteEdit">
+                            <div class="card card-body bg-white border shadow-sm p-3">
+                                <label class="form-label small fw-bold mb-1">Colar Alternativas em Lote (uma por linha):</label>
+                                <textarea id="textarea_colar_lote" rows="4" class="form-control form-control-sm mb-2"
+                                          placeholder="Cole aqui as alternativas (uma por linha)..."></textarea>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#collapseColarLoteEdit">Fechar</button>
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="processarColagemEmLote()">
+                                        <i class="bi bi-check2-all me-1"></i> Distribuir nas Alternativas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-3">
+                        <div id="lista_alternativas_container" class="d-flex flex-column gap-2"></div>
+
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 pt-2 border-top">
+                            <button type="button" id="btnAdicionarAlternativa" class="btn btn-sm btn-outline-primary fw-bold" onclick="adicionarAlternativa('')">
+                                <i class="bi bi-plus-lg me-1"></i> Adicionar Alternativa
+                            </button>
+                            <div class="small">
+                                Alternativa correta marcada:
+                                <span id="badge_letra_correta_atual" class="badge bg-success fs-6 px-3 py-1 ms-1">Letra A</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-top">
+                            <label for="input_justificativa_objetiva" class="form-label small fw-bold text-muted mb-1">
+                                <i class="bi bi-chat-left-quote me-1"></i> Justificativa / Comentário do Gabarito (Opcional):
+                            </label>
+                            <input type="text" id="input_justificativa_objetiva" name="gabarito_justificativa_obj" class="form-control form-control-sm"
+                                   placeholder="Opcional: comentário ou justificativa pedagógica da alternativa correta...">
+                        </div>
                     </div>
                 </div>
 
@@ -117,7 +305,6 @@
                         <strong>Imagens da Pergunta</strong>
                     </label>
                     
-                    <!-- Área de Upload -->
                     <div class="border rounded p-3 mb-3">
                         <div class="mb-3">
                             <label for="imagens" class="form-label">Adicionar novas imagens:</label>
@@ -128,7 +315,6 @@
                             </div>
                         </div>
                         
-                        <!-- Preview das novas imagens -->
                         <div id="preview-novas-imagens" class="row mt-3" style="display: none;">
                             <div class="col-12">
                                 <h6>Preview das novas imagens:</h6>
@@ -137,7 +323,6 @@
                         </div>
                     </div>
 
-                    <!-- Imagens Existentes -->
                     {% if pergunta.imagens.all %}
                     <div class="border rounded p-3">
                         <h6>Imagens existentes:</h6>
@@ -163,10 +348,15 @@
 
                 <!-- Gabarito -->
                 <div class="mb-4">
-                    <label for="{{ form.gabarito.id_for_label }}" class="form-label">
-                        <strong>{{ form.gabarito.label }}</strong>
-                        <span class="text-danger">*</span>
-                    </label>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="{{ form.gabarito.id_for_label }}" class="form-label mb-0">
+                            <strong>{{ form.gabarito.label }}</strong>
+                            <span class="text-danger">*</span>
+                        </label>
+                        <span id="badge_gabarito_auto" class="badge bg-success-subtle text-success border border-success-subtle">
+                            Sincronizado automaticamente com a alternativa marcada como correta
+                        </span>
+                    </div>
                     {{ form.gabarito }}
                     {% if form.gabarito.errors %}
                     <div class="text-danger small">{{ form.gabarito.errors }}</div>
@@ -177,9 +367,9 @@
                 </div>
 
                 <!-- Ações -->
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <button type="submit" name="salvar" class="btn btn-success btn-lg">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-2 border-top">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" name="salvar" class="btn btn-success btn-lg fw-bold">
                             <i class="bi bi-check-lg"></i> Salvar Alterações
                         </button>
                         <button type="submit" name="salvar_e_continuar" class="btn btn-outline-success btn-lg">
@@ -187,7 +377,7 @@
                         </button>
                     </div>
                     
-                    <div>
+                    <div class="d-flex flex-wrap gap-2">
                         <button type="submit" name="salvar_e_ver" class="btn btn-primary btn-lg">
                             <i class="bi bi-eye"></i> Salvar e Ver Detalhes
                         </button>
@@ -201,21 +391,18 @@
     </div>
 
     <!-- Preview em Tempo Real -->
-    <div class="card mt-4">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="bi bi-eye"></i> Preview da Pergunta
+    <div class="card mt-4 shadow-sm border-0">
+        <div class="card-header bg-light py-3">
+            <h5 class="mb-0 fw-bold">
+                <i class="bi bi-eye me-1 text-primary"></i> Preview da Pergunta
             </h5>
         </div>
         <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h6>Enunciado:</h6>
-                    <div id="preview-enunciado" class="p-3 bg-light rounded" style="min-height: 100px;">
-                        {{ pergunta.pergunta|linebreaks }}
-                    </div>
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <h6 class="fw-bold text-secondary">Questão Completa:</h6>
+                    <div id="preview-enunciado" class="p-3 bg-light border rounded" style="min-height: 100px;"></div>
                     
-                    <!-- Preview de imagens no enunciado -->
                     <div id="preview-imagens-pergunta" class="mt-3">
                         {% if pergunta.imagens.all %}
                         <h6>Imagens:</h6>
@@ -230,11 +417,9 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <h6>Resposta:</h6>
-                    <div id="preview-gabarito" class="p-3 bg-success text-white rounded" style="min-height: 100px;">
-                        {{ pergunta.gabarito|linebreaks }}
-                    </div>
+                <div class="col-md-5">
+                    <h6 class="fw-bold text-secondary">Gabarito Oficial:</h6>
+                    <div id="preview-gabarito" class="p-3 bg-success text-white rounded shadow-sm" style="min-height: 100px;"></div>
                 </div>
             </div>
         </div>
@@ -242,72 +427,596 @@
 </div>
 
 <script>
+const LETRAS_ALT = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+let modoAtual = 'objetiva';
+let alternativasState = [
+    { texto: '' },
+    { texto: '' },
+    { texto: '' },
+    { texto: '' },
+    { texto: '' }
+];
+let indiceCorreta = 0;
+
 function toggleUploadResposta() {
     const checkbox = document.getElementById('aceita_upload_checkbox');
     const infoUpload = document.getElementById('info-upload-resposta');
-
+    if (!checkbox) return;
     if (checkbox.checked) {
-        // Criar ou mostrar informação sobre upload
         if (!infoUpload) {
             const divInfo = document.createElement('div');
             divInfo.id = 'info-upload-resposta';
-            divInfo.className = 'alert alert-info mt-2';
-            divInfo.innerHTML = `
-                <i class="bi bi-info-circle"></i>
-                <strong>Upload habilitado:</strong> Os alunos poderão enviar arquivos como resposta. 
-                Formatos aceitos: PDF, Word, imagens (JPG, PNG), arquivos de texto.
-            `;
+            divInfo.className = 'alert alert-info mt-2 py-2 small';
+            divInfo.innerHTML = `<i class="bi bi-info-circle"></i> <strong>Upload habilitado:</strong> Os alunos poderão enviar arquivos como resposta.`;
             checkbox.closest('.col-md-12').appendChild(divInfo);
         } else {
             infoUpload.style.display = 'block';
         }
+    } else if (infoUpload) {
+        infoUpload.style.display = 'none';
+    }
+}
+
+function isTextoTipoObjetivo(nomeTipo) {
+    const t = (nomeTipo || '').toLowerCase();
+    if (t.includes('dissertativa') || t.includes('discursiva') || t.includes('aberta')) {
+        return false;
+    }
+    return (
+        t.includes('múltipla') ||
+        t.includes('multipla') ||
+        t.includes('objetiva') ||
+        t.includes('alternativa') ||
+        t.includes('escolha') ||
+        t.includes('verdadeiro') ||
+        t.includes('sensação') ||
+        t.includes('sensacao')
+    );
+}
+
+function limparPrefixoAlternativa(linha) {
+    return (linha || '').replace(/^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\)|\d+[\)\.\-])\s*/, '').trim();
+}
+
+function decomporPerguntaExistente(textoCompleto, gabaritoExistente, tipoTexto) {
+    const linhas = (textoCompleto || '').split(/\r?\n/);
+    const linhasEnunciado = [];
+    const altsExtraidas = [];
+
+    let insideFence = false;
+    for (const linha of linhas) {
+        if (/^\s*```/.test(linha)) {
+            insideFence = !insideFence;
+        }
+        const m = !insideFence ? linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.+)$/) : null;
+        if (m) {
+            altsExtraidas.push({ texto: m[2].trim() });
+        } else if (altsExtraidas.length === 0) {
+            linhasEnunciado.push(linha);
+        } else if (linha.trim()) {
+            altsExtraidas[altsExtraidas.length - 1].texto += '\n' + linha;
+        }
+    }
+
+    const temAlternativasNoTexto = altsExtraidas.length >= 2;
+    const ehObjetiva = temAlternativasNoTexto || isTextoTipoObjetivo(tipoTexto);
+
+    if (ehObjetiva) {
+        document.getElementById('input_enunciado_visivel').value = temAlternativasNoTexto
+            ? linhasEnunciado.join('\n').trim()
+            : (textoCompleto || '').trim();
+
+        if (temAlternativasNoTexto) {
+            alternativasState = altsExtraidas;
+        }
+
+        // Identifica a letra correta e eventual justificativa a partir do gabarito existente
+        const gab = (gabaritoExistente || '').trim();
+        const matchLetra = gab.match(/^\s*\(?([A-Ha-h])(?:\b|[\)\.\-\s:])/);
+        if (matchLetra) {
+            const letraGab = matchLetra[1].toUpperCase();
+            const idxLetra = LETRAS_ALT.indexOf(letraGab);
+            if (idxLetra >= 0 && idxLetra < alternativasState.length) {
+                indiceCorreta = idxLetra;
+            }
+        }
+        const matchJust = gab.match(/Justificativa:\s*([\s\S]+)$/i);
+        if (matchJust) {
+            document.getElementById('input_justificativa_objetiva').value = matchJust[1].trim();
+        }
+        definirModoQuestao('objetiva', false);
     } else {
-        // Ocultar informação
-        if (infoUpload) {
-            infoUpload.style.display = 'none';
+        document.getElementById('input_enunciado_visivel').value = (textoCompleto || '').trim();
+        definirModoQuestao('dissertativa', false);
+    }
+}
+
+function sincronizarSelectTipoComModo(modo) {
+    const selectTipo = document.getElementById('{{ form.tipoDePergunta.id_for_label }}');
+    if (!selectTipo) return;
+    const textoAtual = selectTipo.options[selectTipo.selectedIndex]?.text || '';
+    const atualEhObj = isTextoTipoObjetivo(textoAtual);
+
+    if (modo === 'objetiva' && !atualEhObj) {
+        for (let i = 0; i < selectTipo.options.length; i++) {
+            if (isTextoTipoObjetivo(selectTipo.options[i].text)) {
+                selectTipo.selectedIndex = i;
+                break;
+            }
+        }
+    } else if (modo === 'dissertativa' && atualEhObj) {
+        for (let i = 0; i < selectTipo.options.length; i++) {
+            const tx = (selectTipo.options[i].text || '').toLowerCase();
+            if (tx.includes('dissertativa') || tx.includes('discursiva') || tx.includes('aberta')) {
+                selectTipo.selectedIndex = i;
+                break;
+            }
         }
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Elementos do DOM
-    const inputEnunciado = document.getElementById('{{ form.pergunta.id_for_label }}');
+function definirModoQuestao(novoModo, atualizarSelect) {
+    modoAtual = novoModo;
+    document.getElementById('input_modo_questao').value = novoModo;
+
+    const btnObj = document.getElementById('btnModoObjetiva');
+    const btnDiss = document.getElementById('btnModoDissertativa');
+    const painelObj = document.getElementById('painel_construtor_objetiva');
+    const badgeAuto = document.getElementById('badge_gabarito_auto');
+    const dicaModo = document.getElementById('dica_modo_enunciado');
+    const labelEnunciado = document.getElementById('label_enunciado_titulo');
     const inputGabarito = document.getElementById('{{ form.gabarito.id_for_label }}');
-    const previewEnunciado = document.getElementById('preview-enunciado');
-    const previewGabarito = document.getElementById('preview-gabarito');
-    const contadorEnunciado = document.getElementById('contador-enunciado');
-    const contadorPalavras = document.getElementById('contador-palavras');
-    const contadorGabarito = document.getElementById('contador-gabarito');
-    const imagensRemovidas = new Set();
-    toggleUploadResposta();
-    
-    document.getElementById('aceita_upload_checkbox').addEventListener('change', toggleUploadResposta);
-    // Função para mostrar informações sobre upload (opcional)
 
-    // Atualizar contadores e preview
-    function atualizarContadores() {
-        // Enunciado
-        const textoEnunciado = inputEnunciado.value;
-        contadorEnunciado.textContent = textoEnunciado.length;
-        contadorPalavras.textContent = textoEnunciado.split(/\s+/).filter(word => word.length > 0).length;
-        previewEnunciado.innerHTML = textoEnunciado.replace(/\n/g, '<br>') || '<em class="text-muted">Digite o enunciado...</em>';
-
-        // Gabarito
-        const textoGabarito = inputGabarito.value;
-        contadorGabarito.textContent = textoGabarito.length;
-        previewGabarito.innerHTML = textoGabarito.replace(/\n/g, '<br>') || '<em class="text-muted">Digite o gabarito...</em>';
+    if (atualizarSelect) {
+        sincronizarSelectTipoComModo(novoModo);
     }
 
-    // Preview de novas imagens
+    if (novoModo === 'objetiva') {
+        btnObj.className = 'btn btn-sm rounded-pill fw-bold px-3 btn-primary';
+        btnDiss.className = 'btn btn-sm rounded-pill fw-bold px-3 btn-light text-dark';
+        painelObj.classList.remove('d-none');
+        badgeAuto.classList.remove('d-none');
+        dicaModo.classList.remove('d-none');
+        labelEnunciado.textContent = 'Comando / Texto-Base da Questão (Sem as alternativas)';
+        inputGabarito.readOnly = true;
+        inputGabarito.classList.add('bg-light');
+    } else {
+        btnDiss.className = 'btn btn-sm rounded-pill fw-bold px-3 btn-primary';
+        btnObj.className = 'btn btn-sm rounded-pill fw-bold px-3 btn-light text-dark';
+        painelObj.classList.add('d-none');
+        badgeAuto.classList.add('d-none');
+        dicaModo.classList.add('d-none');
+        labelEnunciado.textContent = 'Enunciado Completo da Questão Dissertativa';
+        inputGabarito.readOnly = false;
+        inputGabarito.classList.remove('bg-light');
+    }
+
+    sincronizarTudo();
+}
+
+function renderizarAlternativas(focarIndice = null) {
+    const container = document.getElementById('lista_alternativas_container');
+    container.innerHTML = '';
+
+    if (indiceCorreta >= alternativasState.length) {
+        indiceCorreta = 0;
+    }
+
+    alternativasState.forEach((alt, idx) => {
+        const letra = LETRAS_ALT[idx] || String(idx + 1);
+        const ehCorreta = idx === indiceCorreta;
+
+        const row = document.createElement('div');
+        row.className = `alternativa-row d-flex align-items-center gap-2 p-2 rounded-3 border ${
+            ehCorreta ? 'border-success bg-success bg-opacity-10 shadow-sm' : 'border-secondary-subtle bg-white'
+        }`;
+
+        row.innerHTML = `
+            <button type="button"
+                    class="btn ${ehCorreta ? 'btn-success' : 'btn-outline-secondary'} rounded-circle fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
+                    style="width: 40px; height: 40px; font-size: 1rem;"
+                    onclick="selecionarAlternativaCorreta(${idx})"
+                    title="Clique para marcar a alternativa ${letra} como CORRETA">
+                ${letra}
+            </button>
+
+            <div class="flex-grow-1">
+                <input type="text"
+                       name="alternativa_item[]"
+                       class="form-control input-alternativa-texto ${ehCorreta ? 'border-success fw-semibold' : ''}"
+                       data-idx="${idx}"
+                       placeholder="Digite o texto da alternativa ${letra}..."
+                       value="${(alt.texto || '').replace(/"/g, '&quot;')}">
+            </div>
+
+            <button type="button"
+                    class="btn btn-sm ${ehCorreta ? 'btn-success fw-bold' : 'btn-outline-success'} flex-shrink-0 px-2"
+                    onclick="selecionarAlternativaCorreta(${idx})">
+                <i class="bi ${ehCorreta ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
+                <span class="d-none d-md-inline ms-1">${ehCorreta ? 'Correta' : 'Marcar'}</span>
+            </button>
+
+            <div class="btn-group btn-group-sm flex-shrink-0">
+                <button type="button" class="btn btn-outline-secondary" onclick="moverAlternativa(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>
+                    <i class="bi bi-arrow-up"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="moverAlternativa(${idx}, 1)" ${idx === alternativasState.length - 1 ? 'disabled' : ''}>
+                    <i class="bi bi-arrow-down"></i>
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="removerAlternativa(${idx})" ${alternativasState.length <= 2 ? 'disabled' : ''}>
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    const inputs = container.querySelectorAll('.input-alternativa-texto');
+    inputs.forEach((inp, idx) => {
+        inp.addEventListener('input', function () {
+            alternativasState[idx].texto = this.value;
+            sincronizarTudo();
+        });
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (idx + 1 < alternativasState.length) {
+                    const nextInp = container.querySelector(`.input-alternativa-texto[data-idx="${idx + 1}"]`);
+                    if (nextInp) nextInp.focus();
+                } else if (alternativasState.length < LETRAS_ALT.length) {
+                    adicionarAlternativa('');
+                }
+            }
+        });
+        inp.addEventListener('paste', function (e) {
+            const clipText = (e.clipboardData || window.clipboardData).getData('text') || '';
+            const linhas = clipText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (linhas.length >= 2) {
+                e.preventDefault();
+                distribuirLinhasNasAlternativas(linhas, idx);
+            }
+        });
+    });
+
+    const letraAtual = LETRAS_ALT[indiceCorreta] || 'A';
+    document.getElementById('input_alternativa_correta_letra').value = letraAtual;
+    document.getElementById('badge_letra_correta_atual').textContent = `Letra ${letraAtual}`;
+    document.getElementById('btnAdicionarAlternativa').disabled = alternativasState.length >= LETRAS_ALT.length;
+
+    if (focarIndice !== null) {
+        const target = container.querySelector(`.input-alternativa-texto[data-idx="${focarIndice}"]`);
+        if (target) target.focus();
+    }
+
+    sincronizarTudo();
+}
+
+function distribuirLinhasNasAlternativas(linhas, indiceInicial = 0) {
+    linhas.forEach((linha, offset) => {
+        const targetIdx = indiceInicial + offset;
+        if (targetIdx >= LETRAS_ALT.length) return;
+        const limpo = limparPrefixoAlternativa(linha);
+        if (targetIdx < alternativasState.length) {
+            alternativasState[targetIdx].texto = limpo;
+        } else {
+            alternativasState.push({ texto: limpo });
+        }
+    });
+    renderizarAlternativas();
+}
+
+function processarColagemEmLote() {
+    const area = document.getElementById('textarea_colar_lote');
+    const linhas = (area.value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (linhas.length === 0) return;
+    alternativasState = linhas.slice(0, LETRAS_ALT.length).map(l => ({ texto: limparPrefixoAlternativa(l) }));
+    while (alternativasState.length < 2) alternativasState.push({ texto: '' });
+    indiceCorreta = 0;
+    area.value = '';
+    renderizarAlternativas();
+}
+
+function selecionarAlternativaCorreta(idx) {
+    indiceCorreta = idx;
+    renderizarAlternativas();
+}
+
+function adicionarAlternativa(textoInicial = '') {
+    if (alternativasState.length >= LETRAS_ALT.length) return;
+    alternativasState.push({ texto: textoInicial });
+    renderizarAlternativas(alternativasState.length - 1);
+}
+
+function removerAlternativa(idx) {
+    if (alternativasState.length <= 2) return;
+    alternativasState.splice(idx, 1);
+    if (indiceCorreta === idx) indiceCorreta = 0;
+    else if (indiceCorreta > idx) indiceCorreta--;
+    renderizarAlternativas();
+}
+
+function moverAlternativa(idx, direcao) {
+    const novoIdx = idx + direcao;
+    if (novoIdx < 0 || novoIdx >= alternativasState.length) return;
+    const temp = alternativasState[idx];
+    alternativasState[idx] = alternativasState[novoIdx];
+    alternativasState[novoIdx] = temp;
+    if (indiceCorreta === idx) indiceCorreta = novoIdx;
+    else if (indiceCorreta === novoIdx) indiceCorreta = idx;
+    renderizarAlternativas(novoIdx);
+}
+
+function aplicarPresetAlternativas(qtd) {
+    while (alternativasState.length < qtd) alternativasState.push({ texto: '' });
+    if (alternativasState.length > qtd) alternativasState = alternativasState.slice(0, qtd);
+    if (indiceCorreta >= qtd) indiceCorreta = 0;
+    renderizarAlternativas();
+}
+
+function aplicarPresetVerdadeiroFalso() {
+    alternativasState = [{ texto: 'Verdadeiro (Certo)' }, { texto: 'Falso (Errado)' }];
+    indiceCorreta = 0;
+    renderizarAlternativas();
+}
+
+function embaralharAlternativas() {
+    const itemCorreto = alternativasState[indiceCorreta];
+    for (let i = alternativasState.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [alternativasState[i], alternativasState[j]] = [alternativasState[j], alternativasState[i]];
+    }
+    indiceCorreta = Math.max(0, alternativasState.indexOf(itemCorreto));
+    renderizarAlternativas();
+}
+
+function extrairAlternativasDoEnunciado() {
+    const inputVisivel = document.getElementById('input_enunciado_visivel');
+    const linhas = (inputVisivel.value || '').split(/\r?\n/);
+    const linhasEnunciado = [];
+    const novasAlts = [];
+
+    for (const linha of linhas) {
+        const m = linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.+)$/);
+        if (m) {
+            novasAlts.push({ texto: m[2].trim() });
+        } else if (novasAlts.length === 0) {
+            linhasEnunciado.push(linha);
+        } else if (linha.trim()) {
+            novasAlts[novasAlts.length - 1].texto += ' ' + linha.trim();
+        }
+    }
+
+    if (novasAlts.length >= 2) {
+        inputVisivel.value = linhasEnunciado.join('\n').trim();
+        alternativasState = novasAlts;
+        indiceCorreta = 0;
+        document.getElementById('btnExtrairDoEnunciado').classList.add('d-none');
+        renderizarAlternativas();
+    }
+}
+
+function sincronizarTudo() {
+    const inputVisivel = document.getElementById('input_enunciado_visivel');
+    const inputDjangoPergunta = document.getElementById('{{ form.pergunta.id_for_label }}');
+    const inputDjangoGabarito = document.getElementById('{{ form.gabarito.id_for_label }}');
+    const inputJustificativa = document.getElementById('input_justificativa_objetiva');
+    const previewEnunciado = document.getElementById('preview-enunciado');
+    const previewGabarito = document.getElementById('preview-gabarito');
+
+    const textoBase = (inputVisivel.value || '').trim();
+
+    if (modoAtual === 'objetiva') {
+        const linhasFormatadas = [];
+        alternativasState.forEach((alt, idx) => {
+            const letra = LETRAS_ALT[idx] || String(idx + 1);
+            const txtLimpo = limparPrefixoAlternativa(alt.texto);
+            if (txtLimpo) {
+                linhasFormatadas.push(`${letra}) ${txtLimpo}`);
+            }
+        });
+
+        const perguntaCompleta = linhasFormatadas.length > 0
+            ? `${textoBase}\n\n${linhasFormatadas.join('\n')}`
+            : textoBase;
+
+        inputDjangoPergunta.value = perguntaCompleta;
+
+        const letraCorreta = LETRAS_ALT[indiceCorreta] || 'A';
+        const textoCorreta = limparPrefixoAlternativa(alternativasState[indiceCorreta]?.texto || '');
+        const just = (inputJustificativa.value || '').trim();
+
+        let gabaritoMontado = textoCorreta ? `${letraCorreta}) ${textoCorreta}` : letraCorreta;
+        if (just) {
+            gabaritoMontado += `\nJustificativa: ${just}`;
+        }
+        inputDjangoGabarito.value = gabaritoMontado;
+
+        const fmt = window.MimirCodeHighlighter
+            ? window.MimirCodeHighlighter.formatTextWithCodeBlocks
+            : (t => (t || '').replace(/\n/g, '<br>'));
+
+        let htmlPreview = textoBase
+            ? `<div class="mb-3 fw-semibold text-dark">${fmt(textoBase)}</div>`
+            : `<em class="text-muted">Digite o enunciado...</em>`;
+
+        if (linhasFormatadas.length > 0) {
+            htmlPreview += `<div class="d-flex flex-column gap-2 mt-2">`;
+            alternativasState.forEach((alt, idx) => {
+                const letra = LETRAS_ALT[idx];
+                const txtLimpo = limparPrefixoAlternativa(alt.texto);
+                if (!txtLimpo) return;
+                const isCorr = idx === indiceCorreta;
+                htmlPreview += `
+                    <div class="p-2 rounded border ${isCorr ? 'border-success bg-success bg-opacity-10 fw-bold text-success-emphasis' : 'bg-white text-dark'}">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="flex-grow-1">
+                                <span class="badge ${isCorr ? 'bg-success' : 'bg-secondary'} me-2">${letra}</span>
+                                <span>${fmt(txtLimpo)}</span>
+                            </div>
+                            ${isCorr ? '<span class="badge bg-success flex-shrink-0">✓ Gabarito</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            htmlPreview += `</div>`;
+        }
+        previewEnunciado.innerHTML = htmlPreview;
+        previewGabarito.innerHTML = fmt(gabaritoMontado);
+    } else {
+        const fmt = window.MimirCodeHighlighter
+            ? window.MimirCodeHighlighter.formatTextWithCodeBlocks
+            : (t => (t || '').replace(/\n/g, '<br>'));
+        inputDjangoPergunta.value = inputVisivel.value;
+        previewEnunciado.innerHTML = inputVisivel.value ? fmt(inputVisivel.value) : '<em class="text-muted">Digite o enunciado...</em>';
+        previewGabarito.innerHTML = inputDjangoGabarito.value ? fmt(inputDjangoGabarito.value) : '<em class="text-white-50">Digite o gabarito...</em>';
+    }
+
+    const fullText = inputDjangoPergunta.value || '';
+    document.getElementById('contador-enunciado').textContent = fullText.length;
+    document.getElementById('contador-palavras').textContent = fullText.split(/\s+/).filter(w => w.length > 0).length;
+    document.getElementById('contador-gabarito').textContent = (inputDjangoGabarito.value || '').length;
+}
+
+function inserirTextoNoCursor(textarea, textoParaInserir, offsetCursor = null) {
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const val = textarea.value || '';
+    textarea.value = val.substring(0, start) + textoParaInserir + val.substring(end);
+    textarea.focus();
+    const pos = offsetCursor !== null ? start + offsetCursor : start + textoParaInserir.length;
+    textarea.setSelectionRange(pos, pos);
+    sincronizarTudo();
+}
+
+function inserirBlocoCodigoRapido(linguagem) {
+    const area = document.getElementById('input_enunciado_visivel');
+    const selecionado = area.value.substring(area.selectionStart || 0, area.selectionEnd || 0).trim();
+    const exemplo = selecionado || `# Digite seu código ${linguagem} aqui\n`;
+    const prefixo = (area.value && !area.value.endsWith('\n')) ? '\n\n' : '';
+    const bloco = `${prefixo}\`\`\`${linguagem}\n${exemplo}\n\`\`\`\n`;
+    const offset = prefixo.length + 3 + linguagem.length + 1;
+    inserirTextoNoCursor(area, bloco, selecionado ? null : offset + exemplo.length);
+}
+
+function inserirCodigoInline() {
+    const area = document.getElementById('input_enunciado_visivel');
+    const selecionado = area.value.substring(area.selectionStart || 0, area.selectionEnd || 0) || 'codigo';
+    inserirTextoNoCursor(area, `\`${selecionado}\``);
+}
+
+function abrirEstudioCodigo(destinoPadrao = 'enunciado') {
+    const el = document.getElementById('collapseEstudioCodigo');
+    const selDestino = document.getElementById('estudio_codigo_destino');
+    if (selDestino && destinoPadrao) selDestino.value = destinoPadrao;
+    const bsCollapse = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+    bsCollapse.show();
+    atualizarPreviewEstudioCodigo();
+    setTimeout(() => document.getElementById('estudio_codigo_textarea')?.focus(), 120);
+}
+
+function fecharEstudioCodigo() {
+    const el = document.getElementById('collapseEstudioCodigo');
+    const bsCollapse = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+    bsCollapse.hide();
+}
+
+function atualizarPreviewEstudioCodigo() {
+    const lang = document.getElementById('estudio_codigo_lang')?.value || 'python';
+    const code = document.getElementById('estudio_codigo_textarea')?.value || '// Seu código aparecerá destacado aqui...';
+    const previewBox = document.getElementById('estudio_codigo_preview');
+    if (previewBox && window.MimirCodeHighlighter) {
+        previewBox.innerHTML = window.MimirCodeHighlighter.buildCodeBlockHtml(code, lang);
+    }
+}
+
+function confirmarInsercaoEstudioCodigo() {
+    const lang = document.getElementById('estudio_codigo_lang')?.value || 'python';
+    const code = (document.getElementById('estudio_codigo_textarea')?.value || '').replace(/^\r?\n|\r?\n$/g, '');
+    const destino = document.getElementById('estudio_codigo_destino')?.value || 'enunciado';
+
+    if (!code.trim()) {
+        alert('Digite ou cole o código fonte antes de inserir.');
+        return;
+    }
+
+    const blocoFormatado = `\`\`\`${lang}\n${code}\n\`\`\``;
+
+    if (destino === 'enunciado') {
+        const area = document.getElementById('input_enunciado_visivel');
+        const sep = (area.value && !area.value.endsWith('\n')) ? '\n\n' : '';
+        inserirTextoNoCursor(area, `${sep}${blocoFormatado}\n`);
+    } else if (destino === 'gabarito') {
+        if (modoAtual === 'objetiva') {
+            const just = document.getElementById('input_justificativa_objetiva');
+            just.value = (just.value ? just.value + ' ' : '') + `\`${code}\``;
+        } else {
+            const gab = document.getElementById('{{ form.gabarito.id_for_label }}');
+            const sep = (gab.value && !gab.value.endsWith('\n')) ? '\n\n' : '';
+            inserirTextoNoCursor(gab, `${sep}${blocoFormatado}\n`);
+        }
+    } else if (destino.startsWith('alt_')) {
+        const idxAlt = parseInt(destino.split('_')[1], 10);
+        while (alternativasState.length <= idxAlt) {
+            alternativasState.push({ texto: '' });
+        }
+        alternativasState[idxAlt].texto = code.includes('\n') ? `\n${blocoFormatado}` : `\`${code.trim()}\``;
+        renderizarAlternativas();
+    }
+
+    document.getElementById('estudio_codigo_textarea').value = '';
+    fecharEstudioCodigo();
+    sincronizarTudo();
+}
+
+function habilitarTabIndentacao(textarea) {
+    if (!textarea) return;
+    textarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            inserirTextoNoCursor(this, '    ');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selectTipo = document.getElementById('{{ form.tipoDePergunta.id_for_label }}');
+    const inputVisivel = document.getElementById('input_enunciado_visivel');
+    const inputDjangoPergunta = document.getElementById('{{ form.pergunta.id_for_label }}');
+    const inputDjangoGabarito = document.getElementById('{{ form.gabarito.id_for_label }}');
+    const inputJustificativa = document.getElementById('input_justificativa_objetiva');
+
+    toggleUploadResposta();
+    const chkUpload = document.getElementById('aceita_upload_checkbox');
+    if (chkUpload) chkUpload.addEventListener('change', toggleUploadResposta);
+
+    const textoTipoInicial = selectTipo ? (selectTipo.options[selectTipo.selectedIndex]?.text || '') : '';
+    decomporPerguntaExistente(inputDjangoPergunta.value, inputDjangoGabarito.value, textoTipoInicial);
+    renderizarAlternativas();
+
+    if (selectTipo) {
+        selectTipo.addEventListener('change', function() {
+            const tx = this.options[this.selectedIndex]?.text || '';
+            definirModoQuestao(isTextoTipoObjetivo(tx) ? 'objetiva' : 'dissertativa', false);
+        });
+    }
+
+    inputVisivel.addEventListener('input', sincronizarTudo);
+    inputDjangoGabarito.addEventListener('input', sincronizarTudo);
+    inputJustificativa.addEventListener('input', sincronizarTudo);
+
+    const estudioTextarea = document.getElementById('estudio_codigo_textarea');
+    if (estudioTextarea) {
+        estudioTextarea.addEventListener('input', atualizarPreviewEstudioCodigo);
+        habilitarTabIndentacao(estudioTextarea);
+    }
+    habilitarTabIndentacao(inputVisivel);
+
     window.previewImages = function(files) {
         const previewContainer = document.getElementById('preview-container');
         const previewNovas = document.getElementById('preview-novas-imagens');
-        
         previewContainer.innerHTML = '';
-        
         if (files.length > 0) {
             previewNovas.style.display = 'block';
-            
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 if (file.type.startsWith('image/')) {
@@ -317,8 +1026,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         col.className = 'col-md-3 mb-3';
                         col.innerHTML = `
                             <div class="card">
-                                <img src="${e.target.result}" class="card-img-top" 
-                                     alt="Preview" style="height: 150px; object-fit: cover;">
+                                <img src="${e.target.result}" class="card-img-top" alt="Preview" style="height: 150px; object-fit: cover;">
                                 <div class="card-body text-center">
                                     <small class="text-muted">${file.name}</small>
                                 </div>
@@ -334,135 +1042,46 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Remover imagem existente
-    // Substitua a função removerImagemExistente por esta versão corrigida:
     window.removerImagemExistente = function(imagemId) {
         if (confirm('Tem certeza que deseja remover esta imagem?')) {
             const elemento = document.querySelector(`.imagem-existente[data-id="${imagemId}"]`);
             if (elemento) {
                 elemento.style.opacity = '0.5';
                 elemento.style.pointerEvents = 'none';
-                
-                // CORREÇÃO: Criar um ID único para cada campo hidden
                 const inputHidden = document.createElement('input');
                 inputHidden.type = 'hidden';
-                inputHidden.name = 'imagens_removidas'; // Mesmo nome para todos
+                inputHidden.name = 'imagens_removidas';
                 inputHidden.value = imagemId;
                 inputHidden.id = `imagem_removida_${imagemId}`;
                 document.getElementById('formEditarPergunta').appendChild(inputHidden);
-                
-                imagensRemovidas.add(imagemId);
-                
-                console.log(`Imagem ${imagemId} marcada para remoção`);
             }
         }
     };
 
-    // Event listeners
-    inputEnunciado.addEventListener('input', atualizarContadores);
-    inputGabarito.addEventListener('input', atualizarContadores);
-
-    // Inicializar
-    atualizarContadores();
-
-    // Validação antes de enviar
     document.getElementById('formEditarPergunta').addEventListener('submit', function(e) {
-        const enunciado = inputEnunciado.value.trim();
-        const gabarito = inputGabarito.value.trim();
-
-        if (!enunciado) {
+        sincronizarTudo();
+        if (!inputVisivel.value.trim()) {
             e.preventDefault();
             alert('O enunciado da pergunta é obrigatório.');
-            inputEnunciado.focus();
+            inputVisivel.focus();
             return false;
         }
-
-        if (!gabarito) {
-            e.preventDefault();
-            alert('O gabarito é obrigatório.');
-            inputGabarito.focus();
-            return false;
-        }
-
-        // Validar tamanho das imagens
-        const inputImagens = document.getElementById('imagens');
-        for (let file of inputImagens.files) {
-            if (file.size > 5 * 1024 * 1024) { // 5MB
+        if (modoAtual === 'objetiva') {
+            const preenchidas = alternativasState.filter(a => limparPrefixoAlternativa(a.texto).length > 0);
+            if (preenchidas.length < 2) {
                 e.preventDefault();
-                alert(`A imagem "${file.name}" é muito grande. O tamanho máximo é 5MB.`);
+                alert('Para questões objetivas, preencha pelo menos 2 alternativas.');
                 return false;
             }
         }
-
-        // Confirmação para alterações grandes
-        if (enunciado !== '{{ pergunta.pergunta|escapejs }}' || 
-            gabarito !== '{{ pergunta.gabarito|escapejs }}' ||
-            inputImagens.files.length > 0 || 
-            imagensRemovidas.size > 0) {
-            return confirm('Tem certeza que deseja salvar as alterações?');
-        }
-
         return true;
     });
-
-    // Auto-expand textareas
-    function autoExpand(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-    }
-
-    inputEnunciado.addEventListener('input', function() { autoExpand(this); });
-    inputGabarito.addEventListener('input', function() { autoExpand(this); });
-
-    // Inicializar altura
-    autoExpand(inputEnunciado);
-    autoExpand(inputGabarito);
 });
 </script>
 
 <style>
-/* Estilos para o formulário */
-.form-control, .form-select {
-    border-radius: 0.375rem;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-}
-
-/* Preview styling */
-#preview-enunciado, #preview-gabarito {
-    transition: all 0.3s ease;
-}
-
-/* Contadores */
-.form-text {
-    font-size: 0.875rem;
-}
-
-/* Botões com espaçamento */
-.btn-group .btn {
-    margin-right: 0.5rem;
-}
-
-/* Textareas auto-expansíveis */
-textarea {
-    resize: vertical;
-    min-height: 100px;
-}
-
-/* Estilos para as imagens */
-.imagem-existente {
-    transition: all 0.3s ease;
-}
-
-.card-img-top {
-    cursor: pointer;
-}
-
-.card-img-top:hover {
-    opacity: 0.8;
-}
+.btn-xs { padding: 0.2rem 0.55rem; font-size: 0.78rem; border-radius: 0.35rem; }
+.alternativa-row { transition: all 0.15s ease-in-out; }
+.alternativa-row:hover { border-color: #198754 !important; }
 </style>
 {% endblock %}
