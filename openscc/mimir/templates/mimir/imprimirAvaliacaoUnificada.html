@@ -157,7 +157,6 @@
             font-weight: 700;
         }
         .question-body {
-            white-space: pre-line;
             font-size: 10pt;
         }
         .essay-box {
@@ -448,7 +447,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • CONHECIMENTOS GERAIS</span>
                 <span>MÚLTIPLA ESCOLHA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
         </div>
         {% endfor %}
         {% endif %}
@@ -465,7 +464,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA DE CONHECIMENTO GERAL</span>
                 <span>RESPOSTA ARGUMENTATIVA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
             <div class="essay-box">
                 <div class="essay-box-header">
                     <span>ESPAÇO PARA RESPOSTA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
@@ -495,7 +494,7 @@
                     <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • {{ mat.assunto.nome|upper }}</span>
                     <span>MÚLTIPLA ESCOLHA</span>
                 </div>
-                <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+                <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
             </div>
             {% endfor %}
             {% endif %}
@@ -513,7 +512,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA TÉCNICA ({{ item.assunto_nome|upper }})</span>
                 <span>RESPOSTA TÉCNICA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
             <div class="essay-box">
                 <div class="essay-box-header">
                     <span>ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
@@ -539,7 +538,7 @@
                 <span>ITEM {{ item.numero|stringformat:"02d" }} • PERCEPÇÃO E AUTOAVALIAÇÃO DO ESTUDANTE</span>
                 <span>NÃO PENALIZA A NOTA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.get_texto_com_feedback|safe }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
         </div>
         {% endfor %}
         {% endif %}
