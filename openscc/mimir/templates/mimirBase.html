@@ -913,14 +913,15 @@
                 return processed;
             }
 
-            // Varre elementos da página que contenham ``` ... ``` (inclusive os que passaram por |linebreaksbr)
+            // Varre apenas elementos finais de texto (folhas) que contenham ``` ... ```
             function enhancePageCodeBlocks(root = document) {
-                const candidates = root.querySelectorAll(
-                    '.card-body div, .card-body p, .pergunta-preview div, .list-group-item p, td'
-                );
+                const candidates = root.querySelectorAll('.mimir-render-code, .pergunta-preview div, .list-group-item p');
                 candidates.forEach(el => {
                     if (el.dataset.mimirCodeEnhanced === '1') return;
-                    if (el.querySelector('textarea, input, select, button, .mimir-code-block')) return;
+                    // Nunca substitui containers estruturais (tabelas, formulários, cards, links, divs filhas)
+                    if (el.querySelector('table, thead, tbody, tr, td, th, div, form, a, button, input, select, textarea, ul, ol, nav, .mimir-code-block')) {
+                        return;
+                    }
                     const rawHtml = el.innerHTML || '';
                     if (!rawHtml.includes('```')) return;
 
