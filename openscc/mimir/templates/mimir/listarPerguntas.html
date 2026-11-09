@@ -1,13 +1,16 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-        <h2 class="h4 mb-0 text-dark fw-bold">
-            <i class="fas fa-question-circle me-2 text-primary"></i> Banco de Questões
-        </h2>
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
         <div>
-            <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-outline-success btn-sm me-2 fw-bold">
+            <h2 class="h4 mb-0 text-dark fw-bold">
+                <i class="fas fa-question-circle me-2 text-primary"></i> Banco de Questões
+            </h2>
+            <small class="text-muted">Total encontrado: <strong>{{ total_perguntas }}</strong> questão(ões)</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-outline-success btn-sm fw-bold">
                 <i class="fas fa-plus me-1"></i> Criar Manualmente
             </a>
             <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary btn-sm fw-bold shadow-sm">
@@ -25,6 +28,49 @@
         {% endfor %}
     {% endif %}
 
+    <!-- Barra de Busca e Filtros -->
+    <div class="card shadow-sm border-0 mb-3 bg-white">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label small fw-bold text-secondary mb-1">Buscar no Enunciado ou Gabarito</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="search" class="form-control" placeholder="Digite palavras-chave..." value="{{ search_atual }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Assunto / Disciplina</label>
+                    <select name="assunto" class="form-select form-select-sm">
+                        <option value="">Todos os assuntos</option>
+                        {% for a in assuntos_filtro %}
+                        <option value="{{ a.id }}" {% if assunto_atual == a.id|stringformat:"s" %}selected{% endif %}>{{ a.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-secondary mb-1">Tipo</label>
+                    <select name="tipo" class="form-select form-select-sm">
+                        <option value="">Todos os tipos</option>
+                        {% for t in tipos_filtro %}
+                        <option value="{{ t.id }}" {% if tipo_atual == t.id|stringformat:"s" %}selected{% endif %}>{{ t.descricao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold w-100">
+                        <i class="fas fa-filter me-1"></i> Filtrar
+                    </button>
+                    {% if search_atual or assunto_atual or tipo_atual %}
+                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-sm btn-outline-secondary" title="Limpar filtros">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             {% if perguntas %}
@@ -32,37 +78,69 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 45%;" class="ps-4">Enunciado da Pergunta</th>                                    
-                                <th style="width: 20%;">Tipo de Pergunta</th>
-                                <th style="width: 20%;">Assunto</th>
-                                <th style="width: 15%;" class="text-end pe-4">Ações</th>
+                                <th style="width: 48%;" class="ps-4">Enunciado da Pergunta</th>
+                                <th style="width: 17%;">Tipo de Pergunta</th>
+                                <th style="width: 18%;">Assunto</th>
+                                <th style="width: 17%;" class="text-end pe-4">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for template in perguntas %}
+                            {% for item in perguntas %}
                             <tr>
-                                <td class="text-dark ps-4">
-                                    <span class="d-block text-truncate-2" title="{{ template.pergunta }}">
-                                        <i class="fas fa-align-left text-muted me-2 small"></i>{{ template.pergunta }}
-                                    </span>
+                                <td class="text-dark ps-4 py-3">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center gap-2 mb-1">
+                                                <span class="badge bg-secondary-subtle text-secondary border">#{{ item.id }}</span>
+                                                {% if "```" in item.pergunta %}
+                                                    <span class="badge bg-dark text-info"><i class="fas fa-code me-1"></i>Código Fonte</span>
+                                                {% endif %}
+                                            </div>
+                                            <span class="d-block text-truncate-2 small text-dark">
+                                                {{ item.pergunta|striptags|truncatechars:180 }}
+                                            </span>
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-xs btn-light border text-secondary flex-shrink-0"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#collapsePreviewPergunta{{ item.id }}"
+                                                title="Expandir pré-visualização rápida">
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Pré-visualização rápida retrátil com Syntax Highlight -->
+                                    <div class="collapse mt-2" id="collapsePreviewPergunta{{ item.id }}">
+                                        <div class="p-3 rounded border bg-light small">
+                                            <div class="mb-2 text-dark">{{ item.texto_com_syntax_highlight }}</div>
+                                            <div class="pt-2 border-top text-success-emphasis">
+                                                <strong><i class="fas fa-check-circle me-1"></i>Gabarito:</strong>
+                                                {{ item.gabarito_com_syntax_highlight }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-secondary border px-2 py-1">
-                                        {{ template.tipoDePergunta.descricao }}
+                                        {{ item.tipoDePergunta.descricao }}
                                     </span>
                                 </td>
-                                <td class="text-secondary small">{{ template.assunto.nome }}</td>
+                                <td class="text-secondary small fw-semibold">{{ item.assunto.nome }}</td>
                                 <td class="text-end pe-4">
-                                    <a href="{% url 'mimir:visualizarPergunta' template.id %}" class="btn btn-outline-primary btn-sm me-1" title="Visualizar">
+                                    <a href="{% url 'mimir:visualizarPergunta' item.id %}" class="btn btn-outline-primary btn-sm me-1" title="Visualizar">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{% url 'mimir:editarPergunta' template.id %}" class="btn btn-outline-secondary btn-sm me-1" title="Editar">
+                                    <a href="{% url 'mimir:editarPergunta' item.id %}" class="btn btn-outline-secondary btn-sm me-1" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <a href="#" class="btn btn-outline-danger btn-sm" title="Excluir"
-                                       onclick="return deletarPergunta(event, '{% url 'mimir:deletarPergunta' template.id %}', '{{ template.pergunta|escapejs }}')">
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-sm"
+                                            title="Excluir"
+                                            data-url="{% url 'mimir:deletarPergunta' item.id %}"
+                                            data-id="{{ item.id }}"
+                                            onclick="deletarPerguntaSegura(this)">
                                         <i class="fas fa-trash"></i>
-                                    </a>
+                                    </button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -76,7 +154,7 @@
                         <ul class="pagination pagination-sm justify-content-center mb-2">
                             {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_atual %}&search={{ search_atual }}{% endif %}{% if assunto_atual %}&assunto={{ assunto_atual }}{% endif %}{% if tipo_atual %}&tipo={{ tipo_atual }}{% endif %}">
                                     Anterior
                                 </a>
                             </li>
@@ -89,7 +167,7 @@
                                     </li>
                                 {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                        <a class="page-link" href="?page={{ num }}{% if search_atual %}&search={{ search_atual }}{% endif %}{% if assunto_atual %}&assunto={{ assunto_atual }}{% endif %}{% if tipo_atual %}&tipo={{ tipo_atual }}{% endif %}">
                                             {{ num }}
                                         </a>
                                     </li>
@@ -98,7 +176,7 @@
 
                             {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_atual %}&search={{ search_atual }}{% endif %}{% if assunto_atual %}&assunto={{ assunto_atual }}{% endif %}{% if tipo_atual %}&tipo={{ tipo_atual }}{% endif %}">
                                     Próxima
                                 </a>
                             </li>
@@ -118,10 +196,15 @@
                 <div class="text-center py-5 text-secondary">
                     <i class="fas fa-question-circle fa-3x mb-3 text-muted opacity-50"></i>
                     <h5>Nenhuma pergunta encontrada</h5>
-                    <p class="small text-muted mb-4">Você ainda não possui questões cadastradas neste banco.</p>
-                    <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-robot me-1"></i> Gere suas primeiras perguntas com IA
-                    </a>
+                    <p class="small text-muted mb-4">Você ainda não possui questões cadastradas para os filtros selecionados.</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-success btn-sm fw-bold">
+                            <i class="fas fa-plus me-1"></i> Criar Questão Manualmente
+                        </a>
+                        <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary btn-sm fw-bold">
+                            <i class="fas fa-robot me-1"></i> Gerar com IA
+                        </a>
+                    </div>
                 </div>
             {% endif %}
         </div>
@@ -129,19 +212,18 @@
 </div>
 
 <script>
-// Função para deletar pergunta via AJAX
-function deletarPergunta(e, urlExclusao, perguntaEnunciado) {
-    if (!confirm(`Tem certeza que deseja excluir a pergunta:\n"${perguntaEnunciado}"?`)) {
+function deletarPerguntaSegura(btn) {
+    const urlExclusao = btn.getAttribute('data-url');
+    const perguntaId = btn.getAttribute('data-id');
+
+    if (!confirm(`Tem certeza que deseja excluir a pergunta #${perguntaId}?`)) {
         return false;
     }
-    
-    // CORREÇÃO: Captura o botão corretamente mesmo se clicar no ícone interno <i>
-    const btn = e.target.closest('a');
+
     const originalHtml = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btn.classList.add('disabled');
-    
-    // Fazer requisição AJAX
+    btn.disabled = true;
+
     fetch(urlExclusao, {
         method: 'POST',
         headers: {
@@ -154,24 +236,23 @@ function deletarPergunta(e, urlExclusao, perguntaEnunciado) {
         if (data.success) {
             showToast('success', data.message);
             setTimeout(() => {
-                window.location.href = data.redirect_url || '{% url "mimir:visualizarPerguntas" %}';
-            }, 1000);
+                window.location.reload();
+            }, 700);
         } else {
-            showToast('danger', data.message);
+            showToast('danger', data.message || 'Erro ao excluir pergunta.');
             btn.innerHTML = originalHtml;
-            btn.classList.remove('disabled');
+            btn.disabled = false;
         }
     })
-    .catch(error => {
+    .catch(() => {
         showToast('danger', 'Erro de conexão com o servidor');
         btn.innerHTML = originalHtml;
-        btn.classList.remove('disabled');
+        btn.disabled = false;
     });
-    
+
     return false;
 }
 
-// Função auxiliar para pegar o cookie CSRF
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -187,7 +268,6 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Função para mostrar notificações toast
 function showToast(type, message) {
     const toast = document.createElement('div');
     toast.className = `toast align-items-center text-white bg-${type} border-0 shadow`;
@@ -209,7 +289,11 @@ function showToast(type, message) {
 </script>
 
 <style>
-/* Limita o enunciado longo a duas linhas com reticências para manter a tabela compacta */
+.btn-xs {
+    padding: 0.15rem 0.45rem;
+    font-size: 0.75rem;
+    border-radius: 0.3rem;
+}
 .text-truncate-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -219,8 +303,6 @@ function showToast(type, message) {
     white-space: normal;
     line-height: 1.4;
 }
-
-/* Ajustes finos de paginação */
 .pagination .page-link {
     color: #4e73df;
     border-color: #e3e6f0;
