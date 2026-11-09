@@ -224,6 +224,122 @@ class Pergunta(models.Model):
             return partes[1].strip() if len(partes) >= 2 else self.gabarito
         return self.gabarito
 
+    @property
+    def texto_com_syntax_highlight(self):
+        from django.utils.safestring import mark_safe
+        return mark_safe(formatar_texto_com_syntax_highlight(self.get_texto_com_feedback()))
+
+    @property
+    def gabarito_com_syntax_highlight(self):
+        from django.utils.safestring import mark_safe
+        return mark_safe(formatar_texto_com_syntax_highlight(self.get_gabarito_com_feedback()))
+
+
+def _colorir_codigo_html_server(codigo_escapado: str) -> str:
+    """Aplica syntax highlight server-side via regex (compatível com WeasyPrint PDF e navegador)."""
+    tokens = []
+
+    def _guardar(html_span):
+        idx = len(tokens)
+        tokens.append(html_span)
+        return f"@@MIMIR_SRV_TOK_{idx}@@"
+
+    out = codigo_escapado
+    # Comentários de bloco /* ... */
+    out = re.sub(
+        r"/\*[\s\S]*?\*/",
+        lambda m: _guardar(f'<span style="color:#6a9955;font-style:italic;">{m.group(0)}</span>'),
+        out,
+    )
+    # Comentários de linha //, #, --
+    out = re.sub(
+        r"(?m)(?://|#|--).*$",
+        lambda m: _guardar(f'<span style="color:#6a9955;font-style:italic;">{m.group(0)}</span>'),
+        out,
+    )
+    # Strings "..." ou '...'
+    out = re.sub(
+        r"(?:&quot;(?:\\.|[^&])*?&quot;|&#39;(?:\\.|[^&])*?&#39;)",
+        lambda m: _guardar(f'<span style="color:#ce9178;">{m.group(0)}</span>'),
+        out,
+    )
+    # Palavras-chave
+    kw_pattern = (
+        r"\b(def|class|return|if|elif|else|for|while|do|switch|case|break|continue|try|except|catch|"
+        r"finally|raise|throw|import|from|as|pass|lambda|yield|with|async|await|True|False|None|and|or|"
+        r"not|in|is|function|const|let|var|new|this|super|extends|implements|public|private|protected|"
+        r"static|final|void|int|float|double|char|boolean|bool|string|String|long|short|unsigned|struct|"
+        r"enum|interface|package|namespace|using|include|printf|scanf|cout|cin|System|out|println|console|"
+        r"log|SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|INNER|LEFT|RIGHT|ON|GROUP|BY|"
+        r"ORDER|HAVING|LIMIT|CREATE|TABLE|ALTER|DROP|PRIMARY|KEY|FOREIGN|REFERENCES|AND|OR|NOT|NULL|AS|"
+        r"DISTINCT|COUNT|SUM|AVG|MIN|MAX|algoritmo|inicio|fimalgoritmo|escreva|escreval|leia|se|entao|"
+        r"senao|fimse|para|de|ate|passo|faca|fimpara|enquanto|fimenquanto|repita|procedimento|funcao|"
+        r"retorne|inteiro|real|caractere|logico|verdadeiro|falso)\b"
+    )
+    out = re.sub(kw_pattern, r'<span style="color:#569cd6;font-weight:700;">\1</span>', out)
+    # Chamadas de função
+    out = re.sub(r"\b([a-zA-Z_]\w*)(?=\s*\()", r'<span style="color:#dcdcaa;">\1</span>', out)
+    # Números
+    out = re.sub(r"\b(\d+(?:\.\d+)?)\b", r'<span style="color:#b5cea8;">\1</span>', out)
+    # Restaura strings e comentários
+    out = re.sub(r"@@MIMIR_SRV_TOK_(\d+)@@", lambda m: tokens[int(m.group(1))], out)
+    return out
+
+
+def formatar_texto_com_syntax_highlight(texto: str) -> str:
+    """
+    Converte blocos de código cercados por ```lang ... ``` e código inline `...`
+    em HTML estilizado com syntax highlight (funciona no navegador e em PDFs WeasyPrint).
+    """
+    from django.utils.html import escape
+
+    if not texto:
+        return ""
+    raw = str(texto)
+    blocos = []
+
+    def _substituir_bloco(match):
+        lang = (match.group(1) or "código").strip()
+        codigo = (match.group(2) or "").strip("\r\n")
+        linhas = codigo.splitlines() or [""]
+        escaped_lines = []
+        for idx, l in enumerate(linhas, 1):
+            esc = (
+                escape(l)
+                .replace('"', "&quot;")
+                .replace("'", "&#39;")
+            )
+            colored = _colorir_codigo_html_server(esc)
+            num_str = f'<span style="color:#64748b;user-select:none;display:inline-block;width:26px;text-align:right;margin-right:12px;border-right:1px solid #334155;padding-right:6px;">{idx}</span>'
+            escaped_lines.append(f"{num_str}{colored}")
+
+        codigo_html = "\n".join(escaped_lines)
+        lang_label = lang.upper() if lang else "CÓDIGO FONTE"
+        html_bloco = (
+            f'<div class="mimir-code-block" data-mimir-code-enhanced="1" '
+            f'style="background:#1e1e1e;color:#e2e8f0;border:1px solid #334155;border-radius:6px;margin:8px 0;overflow:hidden;white-space:normal;">'
+            f'<div style="background:#2d2d2d;color:#93c5fd;padding:4px 10px;font-size:8.5pt;font-weight:700;font-family:monospace;border-bottom:1px solid #3f3f46;">'
+            f'&lt;/&gt; {escape(lang_label)}'
+            f'</div>'
+            f'<pre style="margin:0;padding:8px 10px;font-family:\'Consolas\',\'Courier New\',monospace;font-size:9pt;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:#1e1e1e;color:#e2e8f0;">'
+            f'<code>{codigo_html}</code></pre>'
+            f'</div>'
+        )
+        idx_b = len(blocos)
+        blocos.append(html_bloco)
+        return f"@@MIMIR_BLOCK_{idx_b}@@"
+
+    processado = re.sub(r"```([a-zA-Z0-9_+\-#]*)[ \t]*\r?\n?([\s\S]*?)```", _substituir_bloco, raw)
+    processado = escape(processado)
+    processado = re.sub(
+        r"`([^`\r\n]+)`",
+        r'<code style="background:#f1f5f9;color:#be123c;border:1px solid #cbd5e1;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:0.92em;">\1</code>',
+        processado,
+    )
+    processado = processado.replace("\r\n", "\n").replace("\n", "<br>")
+    processado = re.sub(r"@@MIMIR_BLOCK_(\d+)@@", lambda m: blocos[int(m.group(1))], processado)
+    return processado
+
 class Prova(models.Model):
     titulo = models.CharField(max_length=200, blank=False, null=False)
     descricao = models.TextField(blank=False, null=False)

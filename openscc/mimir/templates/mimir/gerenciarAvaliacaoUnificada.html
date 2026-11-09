@@ -509,24 +509,63 @@
 <div class="modal fade" id="modalNovaQuestaoSecao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form method="post">
+            <form method="post" id="formModalNovaQuestaoSecao">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="criar_pergunta_secao">
                 <input type="hidden" name="secao_destino" id="modal_secao_destino">
                 <input type="hidden" name="assunto_destino_id" id="modal_assunto_destino_id">
+                <input type="hidden" name="modo_questao" id="modal_modo_questao" value="objetiva">
+                <input type="hidden" name="alternativa_correta_letra" id="modal_alt_correta_letra" value="A">
+                <input type="hidden" name="pergunta_texto" id="modal_pergunta_texto_hidden">
+
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title fw-bold" id="modal_titulo_secao">Adicionar Nova Questão</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Enunciado da Questão (com alternativas A-E se for objetiva)</label>
-                        <textarea name="pergunta_texto" id="modal_pergunta_texto" rows="7" class="form-control" required></textarea>
+                        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
+                            <label class="form-label fw-bold mb-0" id="modal_label_enunciado">Comando / Texto-Base da Questão</label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="modalInserirCodigo('python')">+ Python</button>
+                                <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="modalInserirCodigo('javascript')">+ JS</button>
+                                <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="modalInserirCodigo('java')">+ Java</button>
+                                <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="modalInserirCodigo('c')">+ C/C++</button>
+                                <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="modalInserirCodigo('sql')">+ SQL</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="modalInserirInline()"><code>`inline`</code></button>
+                            </div>
+                        </div>
+                        <textarea name="enunciado_base_obj" id="modal_enunciado_base" rows="4" class="form-control" required
+                                  placeholder="Digite o enunciado da questão (use os botões acima ou ```linguagem ... ``` para inserir código com syntax highlight)..."></textarea>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold">Gabarito / Critério de Correção</label>
-                        <textarea name="gabarito_texto" id="modal_gabarito_texto" rows="2" class="form-control" required
-                                  placeholder="Ex: C (para objetiva) ou os critérios esperados na resposta dissertativa..."></textarea>
+
+                    <!-- Painel de Alternativas (exibido automaticamente para seções Objetivas) -->
+                    <div id="modal_bloco_alternativas" class="card border-primary border-opacity-25 bg-light mb-3">
+                        <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="small fw-bold text-primary">
+                                <i class="fas fa-list-ol me-1"></i> Alternativas (Clique na letra para marcar o gabarito correto)
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="modalSetQtdAlts(5)">A–E</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="modalSetQtdAlts(4)">A–D</button>
+                                <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="modalAddAlt()">+ Opção</button>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="modal_lista_alternativas" class="d-flex flex-column gap-2"></div>
+                            <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center small">
+                                <span class="text-muted">Dica: Você pode colar várias linhas de uma vez na opção A.</span>
+                                <span>Gabarito: <strong class="badge bg-success" id="modal_badge_correta">Letra A</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco de Gabarito / Justificativa -->
+                    <div class="mb-2" id="modal_bloco_gabarito_diss">
+                        <label class="form-label fw-bold" id="modal_label_gabarito">Justificativa / Comentário do Gabarito (Opcional)</label>
+                        <textarea name="gabarito_texto" id="modal_gabarito_texto" rows="2" class="form-control"
+                                  placeholder="Opcional: comentário do gabarito..."></textarea>
+                        <input type="hidden" name="gabarito_justificativa_obj" id="modal_justificativa_hidden">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -541,23 +580,193 @@
 </div>
 
 <script>
+const MODAL_LETRAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+let modalIsObjetiva = true;
+let modalAlts = [{ texto: '' }, { texto: '' }, { texto: '' }, { texto: '' }, { texto: '' }];
+let modalIdxCorreta = 0;
+
+function limparPrefModal(t) {
+    return (t || '').replace(/^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\)|\d+[\)\.\-])\s*/, '').trim();
+}
+
+function renderModalAlternativas(focusIdx = null) {
+    const container = document.getElementById('modal_lista_alternativas');
+    container.innerHTML = '';
+    if (modalIdxCorreta >= modalAlts.length) modalIdxCorreta = 0;
+
+    modalAlts.forEach((alt, idx) => {
+        const letra = MODAL_LETRAS[idx] || String(idx + 1);
+        const isCorr = idx === modalIdxCorreta;
+        const div = document.createElement('div');
+        div.className = `d-flex align-items-center gap-2 p-1 rounded ${isCorr ? 'bg-success bg-opacity-10 border border-success' : ''}`;
+        div.innerHTML = `
+            <button type="button" class="btn btn-sm ${isCorr ? 'btn-success' : 'btn-outline-secondary'} rounded-circle fw-bold flex-shrink-0"
+                    style="width:34px; height:34px;" onclick="modalSelecionarCorreta(${idx})" title="Marcar ${letra} como correta">
+                ${letra}
+            </button>
+            <input type="text" name="alternativa_item[]" class="form-control form-control-sm modal-alt-input ${isCorr ? 'border-success fw-semibold' : ''}"
+                   data-idx="${idx}" placeholder="Texto da alternativa ${letra}..." value="${(alt.texto || '').replace(/"/g, '&quot;')}">
+            <button type="button" class="btn btn-sm ${isCorr ? 'btn-success' : 'btn-outline-success'} flex-shrink-0" onclick="modalSelecionarCorreta(${idx})">
+                ${isCorr ? '✓ Correta' : 'Correta'}
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="modalRemoverAlt(${idx})" ${modalAlts.length <= 2 ? 'disabled' : ''}>
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    });
+
+    const inputs = container.querySelectorAll('.modal-alt-input');
+    inputs.forEach((inp, idx) => {
+        inp.addEventListener('input', function() {
+            modalAlts[idx].texto = this.value;
+        });
+        inp.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (idx + 1 < modalAlts.length) {
+                    container.querySelector(`.modal-alt-input[data-idx="${idx + 1}"]`)?.focus();
+                } else if (modalAlts.length < MODAL_LETRAS.length) {
+                    modalAddAlt();
+                }
+            }
+        });
+        inp.addEventListener('paste', function(e) {
+            const clip = (e.clipboardData || window.clipboardData).getData('text') || '';
+            const linhas = clip.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (linhas.length >= 2) {
+                e.preventDefault();
+                linhas.forEach((l, off) => {
+                    const tIdx = idx + off;
+                    if (tIdx >= MODAL_LETRAS.length) return;
+                    if (tIdx < modalAlts.length) modalAlts[tIdx].texto = limparPrefModal(l);
+                    else modalAlts.push({ texto: limparPrefModal(l) });
+                });
+                renderModalAlternativas();
+            }
+        });
+    });
+
+    const letraCorr = MODAL_LETRAS[modalIdxCorreta] || 'A';
+    document.getElementById('modal_alt_correta_letra').value = letraCorr;
+    document.getElementById('modal_badge_correta').textContent = `Letra ${letraCorr}`;
+
+    if (focusIdx !== null) {
+        container.querySelector(`.modal-alt-input[data-idx="${focusIdx}"]`)?.focus();
+    }
+}
+
+function modalSelecionarCorreta(idx) {
+    modalIdxCorreta = idx;
+    renderModalAlternativas();
+}
+
+function modalAddAlt() {
+    if (modalAlts.length >= MODAL_LETRAS.length) return;
+    modalAlts.push({ texto: '' });
+    renderModalAlternativas(modalAlts.length - 1);
+}
+
+function modalRemoverAlt(idx) {
+    if (modalAlts.length <= 2) return;
+    modalAlts.splice(idx, 1);
+    if (modalIdxCorreta >= modalAlts.length) modalIdxCorreta = 0;
+    renderModalAlternativas();
+}
+
+function modalSetQtdAlts(qtd) {
+    while (modalAlts.length < qtd) modalAlts.push({ texto: '' });
+    if (modalAlts.length > qtd) modalAlts = modalAlts.slice(0, qtd);
+    if (modalIdxCorreta >= qtd) modalIdxCorreta = 0;
+    renderModalAlternativas();
+}
+
+function modalInserirCodigo(lang) {
+    const area = document.getElementById('modal_enunciado_base');
+    const start = area.selectionStart || 0;
+    const end = area.selectionEnd || 0;
+    const sel = area.value.substring(start, end).trim() || `# Código ${lang} aqui`;
+    const sep = (area.value && !area.value.endsWith('\n')) ? '\n\n' : '';
+    const bloco = `${sep}\`\`\`${lang}\n${sel}\n\`\`\`\n`;
+    area.value = area.value.substring(0, start) + bloco + area.value.substring(end);
+    area.focus();
+}
+
+function modalInserirInline() {
+    const area = document.getElementById('modal_enunciado_base');
+    const start = area.selectionStart || 0;
+    const end = area.selectionEnd || 0;
+    const sel = area.value.substring(start, end) || 'codigo';
+    area.value = area.value.substring(0, start) + `\`${sel}\`` + area.value.substring(end);
+    area.focus();
+}
+
 function abrirModalNovaQuestao(secao, assuntoId, tituloSecao, isObjetiva) {
+    modalIsObjetiva = !!isObjetiva;
     document.getElementById('modal_secao_destino').value = secao;
     document.getElementById('modal_assunto_destino_id').value = assuntoId || '';
     document.getElementById('modal_titulo_secao').textContent = 'Nova Questão • ' + tituloSecao;
+    document.getElementById('modal_modo_questao').value = modalIsObjetiva ? 'objetiva' : 'dissertativa';
+    document.getElementById('modal_enunciado_base').value = '';
+    document.getElementById('modal_gabarito_texto').value = '';
 
-    const txtPergunta = document.getElementById('modal_pergunta_texto');
-    const txtGabarito = document.getElementById('modal_gabarito_texto');
-    if (isObjetiva) {
-        txtPergunta.placeholder = "Digite o enunciado da questão...\n\nA) Alternativa A\nB) Alternativa B\nC) Alternativa C\nD) Alternativa D\nE) Alternativa E";
-        txtGabarito.placeholder = "Ex: Letra C — Justificativa...";
+    const blocoAlts = document.getElementById('modal_bloco_alternativas');
+    const lblEnunc = document.getElementById('modal_label_enunciado');
+    const lblGab = document.getElementById('modal_label_gabarito');
+    const txtGab = document.getElementById('modal_gabarito_texto');
+
+    if (modalIsObjetiva) {
+        blocoAlts.classList.remove('d-none');
+        lblEnunc.textContent = 'Comando / Texto-Base da Questão Objetiva';
+        lblGab.textContent = 'Justificativa / Comentário do Gabarito (Opcional)';
+        txtGab.required = false;
+        txtGab.placeholder = 'Opcional: explique por que a alternativa selecionada é a correta...';
+        modalAlts = [{ texto: '' }, { texto: '' }, { texto: '' }, { texto: '' }, { texto: '' }];
+        modalIdxCorreta = 0;
+        renderModalAlternativas();
     } else {
-        txtPergunta.placeholder = "Digite o caso ou enunciado da questão dissertativa...";
-        txtGabarito.placeholder = "Descreva o padrão de resposta esperado e critérios de pontuação...";
+        blocoAlts.classList.add('d-none');
+        lblEnunc.textContent = 'Enunciado da Questão Dissertativa';
+        lblGab.textContent = 'Padrão de Resposta Esperado / Critérios de Correção *';
+        txtGab.required = true;
+        txtGab.placeholder = 'Descreva o padrão de resposta esperado e os critérios de pontuação...';
     }
+
     const modal = new bootstrap.Modal(document.getElementById('modalNovaQuestaoSecao'));
     modal.show();
 }
+
+document.getElementById('formModalNovaQuestaoSecao').addEventListener('submit', function(e) {
+    const base = document.getElementById('modal_enunciado_base').value.trim();
+    if (!base) {
+        e.preventDefault();
+        alert('Informe o enunciado da questão.');
+        return;
+    }
+    if (modalIsObjetiva) {
+        const validas = modalAlts.filter(a => limparPrefModal(a.texto).length > 0);
+        if (validas.length < 2) {
+            e.preventDefault();
+            alert('Preencha pelo menos 2 alternativas para a questão objetiva.');
+            return;
+        }
+        const linhas = [];
+        modalAlts.forEach((a, idx) => {
+            const t = limparPrefModal(a.texto);
+            if (t) linhas.push(`${MODAL_LETRAS[idx]}) ${t}`);
+        });
+        document.getElementById('modal_pergunta_texto_hidden').value = `${base}\n\n${linhas.join('\n')}`;
+        const just = document.getElementById('modal_gabarito_texto').value.trim();
+        document.getElementById('modal_justificativa_hidden').value = just;
+        const letra = MODAL_LETRAS[modalIdxCorreta] || 'A';
+        const txtCorr = limparPrefModal(modalAlts[modalIdxCorreta]?.texto || '');
+        document.getElementById('modal_gabarito_texto').value = txtCorr
+            ? (just ? `${letra}) ${txtCorr}\nJustificativa: ${just}` : `${letra}) ${txtCorr}`)
+            : letra;
+    } else {
+        document.getElementById('modal_pergunta_texto_hidden').value = base;
+    }
+});
 </script>
 {% endblock %}
 

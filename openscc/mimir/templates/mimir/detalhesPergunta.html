@@ -140,7 +140,7 @@
                 </div>
                 <div class="card-body bg-light p-4">
                     <div class="text-dark" style="font-size: 1.05rem; line-height: 1.7; text-align: justify;">
-                        {{ pergunta.pergunta|linebreaksbr|safe }}
+                        {{ pergunta.texto_com_syntax_highlight }}
                     </div>
                 </div>
             </div>
@@ -179,7 +179,7 @@
                 </div>
                 <div class="card-body bg-success bg-opacity-10 p-4">
                     <div class="text-dark" style="font-size: 1rem; line-height: 1.6;">
-                        {{ pergunta.gabarito|linebreaksbr|safe }}
+                        {{ pergunta.gabarito_com_syntax_highlight }}
                     </div>
                 </div>
             </div>
