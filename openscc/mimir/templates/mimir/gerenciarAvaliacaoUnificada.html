@@ -613,7 +613,7 @@ function renderModalAlternativas(focusIdx = null) {
             </button>
             <textarea rows="1" name="alternativa_item[]" class="form-control form-control-sm modal-alt-input ${isCorr ? 'border-success fw-semibold' : ''}"
                       style="resize:vertical; min-height:32px;"
-                      data-idx="${idx}" placeholder="Texto ou código da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                      data-idx="${idx}" placeholder="Texto ou código da alternativa ${letra}...">${(alt.texto || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             <button type="button" class="btn btn-sm ${isCorr ? 'btn-success' : 'btn-outline-success'} flex-shrink-0" onclick="modalSelecionarCorreta(${idx})">
                 ${isCorr ? '✓ Correta' : 'Correta'}
             </button>
