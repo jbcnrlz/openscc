@@ -239,7 +239,21 @@
             background: #111827;
             color: #fff;
         }
+        .mimir-code-block, .mimir-code-block * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .mimir-question-images img {
+            max-width: 100%;
+            height: auto;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             .no-print-bar {
                 display: none !important;
             }
@@ -409,7 +423,8 @@
                 </div>
                 <div class="omr-cell-bubbles" style="text-align: left;">
                     {% if item.is_dissertativa %}
-                        <strong>Critério Dissertativo:</strong> {{ item.pergunta.get_gabarito_com_feedback }}
+                        <strong>Critério Dissertativo:</strong>
+                        <div style="margin-top: 3px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
                     {% elif item.secao == 'sensacao_aluno' %}
                         <em>Questão Diagnóstica (Sensação do Aluno) — Qualquer alternativa válida (A-E), Peso 0 na nota.</em>
                     {% else %}
@@ -417,7 +432,8 @@
                             <span class="bubble {% if item.letra_gabarito == letra %}bubble-filled{% endif %}">{{ letra }}</span>
                         {% endfor %}
                         <div style="font-size: 8.5pt; margin-top: 4px; color: #374151;">
-                            <strong>Gabarito:</strong> {{ item.pergunta.get_gabarito_com_feedback }}
+                            <strong>Gabarito:</strong>
+                            <div style="margin-top: 2px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
                         </div>
                     {% endif %}
                 </div>
@@ -447,7 +463,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • CONHECIMENTOS GERAIS</span>
                 <span>MÚLTIPLA ESCOLHA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
         </div>
         {% endfor %}
         {% endif %}
@@ -464,7 +480,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA DE CONHECIMENTO GERAL</span>
                 <span>RESPOSTA ARGUMENTATIVA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
             <div class="essay-box">
                 <div class="essay-box-header">
                     <span>ESPAÇO PARA RESPOSTA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
@@ -494,7 +510,7 @@
                     <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • {{ mat.assunto.nome|upper }}</span>
                     <span>MÚLTIPLA ESCOLHA</span>
                 </div>
-                <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+                <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
             </div>
             {% endfor %}
             {% endif %}
@@ -512,7 +528,7 @@
                 <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA TÉCNICA ({{ item.assunto_nome|upper }})</span>
                 <span>RESPOSTA TÉCNICA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
             <div class="essay-box">
                 <div class="essay-box-header">
                     <span>ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
@@ -538,7 +554,7 @@
                 <span>ITEM {{ item.numero|stringformat:"02d" }} • PERCEPÇÃO E AUTOAVALIAÇÃO DO ESTUDANTE</span>
                 <span>NÃO PENALIZA A NOTA</span>
             </div>
-            <div class="question-body">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
         </div>
         {% endfor %}
         {% endif %}

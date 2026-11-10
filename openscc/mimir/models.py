@@ -224,10 +224,47 @@ class Pergunta(models.Model):
             return partes[1].strip() if len(partes) >= 2 else self.gabarito
         return self.gabarito
 
+    def gerar_html_imagens_impressao(self) -> str:
+        from django.utils.html import escape
+
+        try:
+            imgs = list(self.imagens.all())
+        except Exception:
+            imgs = []
+        if not imgs:
+            return ""
+
+        partes = [
+            '<div class="mimir-question-images" '
+            'style="margin:10px 0;text-align:center;page-break-inside:avoid;break-inside:avoid;">'
+        ]
+        for idx, img_obj in enumerate(imgs, 1):
+            src = getattr(img_obj, "src_impressao", "")
+            if not src:
+                continue
+            partes.append(
+                f'<div style="display:inline-block;max-width:100%;margin:4px 8px;text-align:center;vertical-align:top;">'
+                f'<img src="{escape(src)}" alt="Figura {idx} da questão" '
+                f'style="max-width:100%;max-height:260px;width:auto;height:auto;border:1px solid #cbd5e1;border-radius:4px;padding:3px;background:#ffffff;object-fit:contain;">'
+                f'</div>'
+            )
+        partes.append("</div>")
+        return "".join(partes)
+
     @property
     def texto_com_syntax_highlight(self):
         from django.utils.safestring import mark_safe
         return mark_safe(formatar_texto_com_syntax_highlight(self.get_texto_com_feedback()))
+
+    @property
+    def texto_com_imagens_e_syntax_highlight(self):
+        from django.utils.safestring import mark_safe
+        return mark_safe(
+            formatar_texto_com_syntax_highlight(
+                self.get_texto_com_feedback(),
+                imagens_html=self.gerar_html_imagens_impressao(),
+            )
+        )
 
     @property
     def gabarito_com_syntax_highlight(self):
@@ -235,8 +272,121 @@ class Pergunta(models.Model):
         return mark_safe(formatar_texto_com_syntax_highlight(self.get_gabarito_com_feedback()))
 
 
+KNOWN_CODE_LANGS = {
+    "python", "py", "javascript", "js", "typescript", "ts", "java",
+    "c", "cpp", "c++", "csharp", "cs", "c#", "sql", "html", "xml",
+    "css", "php", "bash", "sh", "shell", "json", "portugol",
+    "pseudocodigo", "plaintext", "text", "txt", "codigo", "código",
+    "ruby", "go", "rust", "kotlin", "swift", "r", "dart",
+}
+
+
+def _desachatar_codigo_se_necessario(codigo: str, lang: str) -> str:
+    """
+    Restaura quebras de linha e indentação caso um bloco de código tenha sido salvo
+    em uma única linha (ex.: dentro de uma alternativa ou resposta).
+    Se o código já possuir quebras de linha, mantém exatamente como está.
+    """
+    if not codigo or "\n" in codigo.strip():
+        return codigo
+
+    s = codigo.strip()
+    lang_norm = (lang or "").lower().strip()
+
+    # Caso 1: Linguagens com chaves/ponto-e-vírgula (C, C++, Java, JS, TS, C#, PHP, CSS...)
+    if any(tok in s for tok in ("; ", "{ ", "} ", "};")) or re.search(r"#\s*include\s*[<\"][^>\"]+[>\"]", s):
+        s_prep = re.sub(r"(#\s*include\s*(?:<[^>]+>|\"[^\"]+\"))\s+", r"\1\n", s)
+        out_chars = []
+        in_str = None
+        paren_depth = 0
+        n = len(s_prep)
+        i = 0
+        while i < n:
+            ch = s_prep[i]
+            if in_str:
+                out_chars.append(ch)
+                if ch == "\\" and i + 1 < n:
+                    i += 1
+                    out_chars.append(s_prep[i])
+                elif ch == in_str:
+                    in_str = None
+            else:
+                if ch in ('"', "'"):
+                    in_str = ch
+                    out_chars.append(ch)
+                elif ch == "(":
+                    paren_depth += 1
+                    out_chars.append(ch)
+                elif ch == ")":
+                    paren_depth = max(0, paren_depth - 1)
+                    out_chars.append(ch)
+                elif ch == "{" and paren_depth == 0:
+                    out_chars.append("{\n")
+                    while i + 1 < n and s_prep[i + 1] == " ":
+                        i += 1
+                elif ch == "}" and paren_depth == 0:
+                    if out_chars and not "".join(out_chars).endswith("\n"):
+                        out_chars.append("\n")
+                    out_chars.append("}")
+                    if i + 1 < n and s_prep[i + 1] not in (";", ",", ")"):
+                        out_chars.append("\n")
+                        while i + 1 < n and s_prep[i + 1] == " ":
+                            i += 1
+                elif ch == ";" and paren_depth == 0:
+                    out_chars.append(";\n")
+                    while i + 1 < n and s_prep[i + 1] == " ":
+                        i += 1
+                else:
+                    out_chars.append(ch)
+            i += 1
+
+        raw_lines = [ln.strip() for ln in "".join(out_chars).splitlines() if ln.strip()]
+        if len(raw_lines) > 1:
+            indented = []
+            indent = 0
+            for ln in raw_lines:
+                if ln.startswith("}"):
+                    indent = max(0, indent - 1)
+                indented.append(("    " * indent) + ln)
+                if ln.endswith("{"):
+                    indent += 1
+            return "\n".join(indented)
+
+    # Caso 2: Python / Portugol em linha única
+    if lang_norm in ("python", "py", "portugol", "código", "codigo", ""):
+        if re.search(r":\s+\S", s) or re.search(r"\b(def|class|for|while|if|elif|else|return|print)\b", s):
+            s_py = re.sub(
+                r"(?<!^)\s+\b(def |class |for |while |if |elif |else:|try:|except |finally:|return |print\()",
+                r"\n\1",
+                s,
+            )
+            s_py = re.sub(r":\s+(?!\n)", ":\n", s_py)
+            raw_lines = [ln.strip() for ln in s_py.splitlines() if ln.strip()]
+            if len(raw_lines) > 1:
+                indented = []
+                indent = 0
+                for ln in raw_lines:
+                    if re.match(r"^(elif |else:|except |finally:)", ln):
+                        indent = max(0, indent - 1)
+                    elif re.match(r"^(def |class )", ln):
+                        indent = 0
+                    indented.append(("    " * indent) + ln)
+                    if ln.endswith(":"):
+                        indent += 1
+                    elif re.match(r"^(return\b|break\b|continue\b|pass\b|raise\b)", ln):
+                        indent = max(0, indent - 1)
+                return "\n".join(indented)
+
+    return codigo
+
+
 def _colorir_codigo_html_server(codigo_escapado: str) -> str:
-    """Aplica syntax highlight server-side via regex (compatível com WeasyPrint PDF e navegador)."""
+    """
+    Aplica syntax highlight server-side de alto contraste (compatível com impressão,
+    WeasyPrint PDF e visualização em tela).
+    Protege strings e diretivas ANTES de comentários para que '&#39;' / '&#x27;' ou '#include'
+    nunca sejam confundidos com comentários '#'.
+    """
     tokens = []
 
     def _guardar(html_span):
@@ -245,25 +395,36 @@ def _colorir_codigo_html_server(codigo_escapado: str) -> str:
         return f"@@MIMIR_SRV_TOK_{idx}@@"
 
     out = codigo_escapado
-    # Comentários de bloco /* ... */
+
+    # 1. Comentários de bloco /* ... */
     out = re.sub(
         r"/\*[\s\S]*?\*/",
-        lambda m: _guardar(f'<span style="color:#6a9955;font-style:italic;">{m.group(0)}</span>'),
+        lambda m: _guardar(f'<span style="color:#116329;font-style:italic;">{m.group(0)}</span>'),
         out,
     )
-    # Comentários de linha //, #, --
+
+    # 2. Strings "..." ou '...' (escapadas como &quot; ou &#39; / &#x27;) ANTES de comentários!
     out = re.sub(
-        r"(?m)(?://|#|--).*$",
-        lambda m: _guardar(f'<span style="color:#6a9955;font-style:italic;">{m.group(0)}</span>'),
+        r"(?:&quot;(?:\\.|(?!&quot;).)*?&quot;|&#(?:39|x27);(?:\\.|(?!&#(?:39|x27);).)*?&#(?:39|x27);)",
+        lambda m: _guardar(f'<span style="color:#a31515;">{m.group(0)}</span>'),
         out,
     )
-    # Strings "..." ou '...'
+
+    # 3. Diretivas de pré-processador C/C++ (#include <...>, #define, etc.)
     out = re.sub(
-        r"(?:&quot;(?:\\.|[^&])*?&quot;|&#39;(?:\\.|[^&])*?&#39;)",
-        lambda m: _guardar(f'<span style="color:#ce9178;">{m.group(0)}</span>'),
+        r"(?m)^(\s*#\s*(?:include|define|ifdef|ifndef|endif|elif|else|pragma|undef)\b.*)$",
+        lambda m: _guardar(f'<span style="color:#6f42c1;font-weight:700;">{m.group(0)}</span>'),
         out,
     )
-    # Palavras-chave
+
+    # 4. Comentários de linha: //..., #... (sem preceder por '&' de entidade HTML), ou -- (SQL/Lua)
+    out = re.sub(
+        r"(?m)(?://.*$|(?<!&)#.*$|(?<!\w)--(?=\s|$).*$)",
+        lambda m: _guardar(f'<span style="color:#116329;font-style:italic;">{m.group(0)}</span>'),
+        out,
+    )
+
+    # 5. Palavras-chave (alto contraste azul escuro em negrito)
     kw_pattern = (
         r"\b(def|class|return|if|elif|else|for|while|do|switch|case|break|continue|try|except|catch|"
         r"finally|raise|throw|import|from|as|pass|lambda|yield|with|async|await|True|False|None|and|or|"
@@ -276,69 +437,125 @@ def _colorir_codigo_html_server(codigo_escapado: str) -> str:
         r"senao|fimse|para|de|ate|passo|faca|fimpara|enquanto|fimenquanto|repita|procedimento|funcao|"
         r"retorne|inteiro|real|caractere|logico|verdadeiro|falso)\b"
     )
-    out = re.sub(kw_pattern, r'<span style="color:#569cd6;font-weight:700;">\1</span>', out)
-    # Chamadas de função
-    out = re.sub(r"\b([a-zA-Z_]\w*)(?=\s*\()", r'<span style="color:#dcdcaa;">\1</span>', out)
-    # Números
-    out = re.sub(r"\b(\d+(?:\.\d+)?)\b", r'<span style="color:#b5cea8;">\1</span>', out)
-    # Restaura strings e comentários
+    out = re.sub(kw_pattern, r'<span style="color:#0550ae;font-weight:700;">\1</span>', out)
+
+    # 6. Chamadas de função
+    out = re.sub(r"\b([a-zA-Z_]\w*)(?=\s*\()", r'<span style="color:#6f42c1;font-weight:600;">\1</span>', out)
+
+    # 7. Números
+    out = re.sub(r"\b(\d+(?:\.\d+)?)\b", r'<span style="color:#953800;font-weight:600;">\1</span>', out)
+
+    # 8. Restaura tokens protegidos (strings, diretivas e comentários)
     out = re.sub(r"@@MIMIR_SRV_TOK_(\d+)@@", lambda m: tokens[int(m.group(1))], out)
     return out
 
 
-def formatar_texto_com_syntax_highlight(texto: str) -> str:
+def formatar_texto_com_syntax_highlight(texto: str, imagens_html: str = "") -> str:
     """
     Converte blocos de código cercados por ```lang ... ``` e código inline `...`
-    em HTML estilizado com syntax highlight (funciona no navegador e em PDFs WeasyPrint).
+    em HTML estilizado com syntax highlight de alto contraste (funciona no navegador,
+    window.print() e WeasyPrint PDF), além de estruturar alternativas A)-E) e imagens.
     """
     from django.utils.html import escape
 
     if not texto:
-        return ""
+        return imagens_html or ""
     raw = str(texto)
     blocos = []
 
     def _substituir_bloco(match):
-        lang = (match.group(1) or "código").strip()
-        codigo = (match.group(2) or "").strip("\r\n")
+        cand_lang = (match.group(1) or "").strip()
+        corpo = match.group(2) or ""
+        if cand_lang and cand_lang.lower() in KNOWN_CODE_LANGS:
+            lang = cand_lang
+            codigo = corpo.strip("\r\n")
+        else:
+            lang = "código"
+            codigo = (f"{cand_lang} {corpo}" if cand_lang else corpo).strip("\r\n")
+
+        codigo = _desachatar_codigo_se_necessario(codigo, lang)
         linhas = codigo.splitlines() or [""]
         escaped_lines = []
         for idx, l in enumerate(linhas, 1):
+            l_expanded = l.replace("\t", "    ")
+            leading_spaces = len(l_expanded) - len(l_expanded.lstrip(" "))
+            conteudo_linha = l_expanded.lstrip(" ")
             esc = (
-                escape(l)
+                escape(conteudo_linha)
                 .replace('"', "&quot;")
                 .replace("'", "&#39;")
             )
             colored = _colorir_codigo_html_server(esc)
-            num_str = f'<span style="color:#64748b;user-select:none;display:inline-block;width:26px;text-align:right;margin-right:12px;border-right:1px solid #334155;padding-right:6px;">{idx}</span>'
-            escaped_lines.append(f"{num_str}{colored}")
+            indent_html = "&nbsp;" * leading_spaces
+            linha_html = (
+                f'<div style="display:flex;align-items:baseline;line-height:1.45;font-family:\'Consolas\',\'Courier New\',monospace;font-size:9pt;">'
+                f'<span style="color:#64748b;user-select:none;display:inline-block;min-width:24px;text-align:right;margin-right:10px;padding-right:6px;border-right:1px solid #cbd5e1;font-size:8pt;flex-shrink:0;">{idx}</span>'
+                f'<span style="white-space:pre-wrap;word-break:break-word;flex:1;">{indent_html}{colored if colored else "&nbsp;"}</span>'
+                f'</div>'
+            )
+            escaped_lines.append(linha_html)
 
-        codigo_html = "\n".join(escaped_lines)
+        codigo_html = "".join(escaped_lines)
         lang_label = lang.upper() if lang else "CÓDIGO FONTE"
         html_bloco = (
             f'<div class="mimir-code-block" data-mimir-code-enhanced="1" '
-            f'style="background:#1e1e1e;color:#e2e8f0;border:1px solid #334155;border-radius:6px;margin:8px 0;overflow:hidden;white-space:normal;">'
-            f'<div style="background:#2d2d2d;color:#93c5fd;padding:4px 10px;font-size:8.5pt;font-weight:700;font-family:monospace;border-bottom:1px solid #3f3f46;">'
+            f'style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;border-left:4px solid #2563eb;border-radius:6px;margin:6px 0;overflow:hidden;white-space:normal;page-break-inside:avoid;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
+            f'<div style="background:#e2e8f0;color:#1e293b;padding:3px 10px;font-size:8pt;font-weight:700;font-family:\'Consolas\',\'Courier New\',monospace;border-bottom:1px solid #cbd5e1;letter-spacing:0.3px;">'
             f'&lt;/&gt; {escape(lang_label)}'
             f'</div>'
-            f'<pre style="margin:0;padding:8px 10px;font-family:\'Consolas\',\'Courier New\',monospace;font-size:9pt;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:#1e1e1e;color:#e2e8f0;">'
-            f'<code>{codigo_html}</code></pre>'
+            f'<div style="margin:0;padding:6px 10px;background:#f8fafc;color:#0f172a;">'
+            f'{codigo_html}'
+            f'</div>'
             f'</div>'
         )
         idx_b = len(blocos)
         blocos.append(html_bloco)
         return f"@@MIMIR_BLOCK_{idx_b}@@"
 
-    processado = re.sub(r"```([a-zA-Z0-9_+\-#]*)[ \t]*\r?\n?([\s\S]*?)```", _substituir_bloco, raw)
-    processado = escape(processado)
-    processado = re.sub(
-        r"`([^`\r\n]+)`",
-        r'<code style="background:#f1f5f9;color:#be123c;border:1px solid #cbd5e1;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:0.92em;">\1</code>',
-        processado,
-    )
-    processado = processado.replace("\r\n", "\n").replace("\n", "<br>")
-    processado = re.sub(r"@@MIMIR_BLOCK_(\d+)@@", lambda m: blocos[int(m.group(1))], processado)
-    return processado
+    processado = re.sub(r"```([a-zA-Z0-9_+\-#]*)(?:\r?\n|[ \t]+)?([\s\S]*?)```", _substituir_bloco, raw)
+
+    def _formatar_trecho_Final(trecho: str) -> str:
+        t = escape(trecho)
+        t = re.sub(
+            r"`([^`\r\n]+)`",
+            r'<code style="background:#f1f5f9;color:#be123c;border:1px solid #cbd5e1;padding:1px 5px;border-radius:4px;font-family:\'Consolas\',\'Courier New\',monospace;font-size:0.92em;-webkit-print-color-adjust:exact;print-color-adjust:exact;">\1</code>',
+            t,
+        )
+        t = t.replace("\r\n", "\n").replace("\n", "<br>")
+        t = re.sub(r"@@MIMIR_BLOCK_(\d+)@@", lambda m: blocos[int(m.group(1))], t)
+        return t
+
+    # Verifica se o texto possui alternativas estruturadas (A), B), C)...)
+    linhas_proc = processado.splitlines()
+    linhas_enunciado = []
+    alternativas_extraidas = []
+    for linha in linhas_proc:
+        m_alt = re.match(r"^\s*\(?([A-Ha-h])[\)\.\-]\s*(.*)$", linha)
+        if m_alt:
+            alternativas_extraidas.append([m_alt.group(1).upper(), [m_alt.group(2)]])
+        elif not alternativas_extraidas:
+            linhas_enunciado.append(linha)
+        else:
+            alternativas_extraidas[-1][1].append(linha)
+
+    if len(alternativas_extraidas) >= 2:
+        enunciado_html = _formatar_trecho_Final("\n".join(linhas_enunciado).strip())
+        alts_html_list = []
+        for letra, alt_lines in alternativas_extraidas:
+            alt_conteudo = _formatar_trecho_Final("\n".join(alt_lines).strip())
+            alts_html_list.append(
+                f'<div class="mimir-alt-item" style="display:flex;align-items:flex-start;gap:8px;margin-top:6px;page-break-inside:avoid;break-inside:avoid;">'
+                f'<span style="font-weight:700;min-width:22px;display:inline-block;">{letra})</span>'
+                f'<div style="flex:1;min-width:0;">{alt_conteudo}</div>'
+                f'</div>'
+            )
+        alts_block = '<div class="mimir-alts-list" style="margin-top:8px;">' + "".join(alts_html_list) + "</div>"
+        return f"{enunciado_html}{imagens_html or ''}{alts_block}"
+
+    corpo_final = _formatar_trecho_Final(processado)
+    if imagens_html:
+        return f"{corpo_final}{imagens_html}"
+    return corpo_final
 
 class Prova(models.Model):
     titulo = models.CharField(max_length=200, blank=False, null=False)
@@ -387,6 +604,31 @@ class ImagemPergunta(models.Model):
     pergunta = models.ForeignKey(Pergunta, on_delete=models.CASCADE, related_name='imagens')
     imagem = models.ImageField(upload_to='perguntas/')
     criado_em = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def src_impressao(self):
+        """
+        Retorna a imagem codificada em Data URI base64 quando o arquivo existe no disco
+        (garantindo impressão imediata no navegador e no WeasyPrint PDF), com fallback para URL.
+        """
+        import base64
+        import mimetypes
+        import os
+
+        try:
+            if self.imagem and hasattr(self.imagem, "path") and os.path.exists(self.imagem.path):
+                mime_type, _ = mimetypes.guess_type(self.imagem.path)
+                if not mime_type:
+                    mime_type = "image/png"
+                with open(self.imagem.path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("ascii")
+                return f"data:{mime_type};base64,{b64}"
+        except Exception:
+            pass
+        try:
+            return self.imagem.url
+        except Exception:
+            return ""
 
 class ObjetivosAprendizagem(models.Model):
     descricao = models.CharField(max_length=200, blank=False, null=False)

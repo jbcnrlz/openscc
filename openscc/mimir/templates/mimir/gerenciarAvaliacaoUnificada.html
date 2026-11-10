@@ -509,7 +509,7 @@
 <div class="modal fade" id="modalNovaQuestaoSecao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form method="post" id="formModalNovaQuestaoSecao">
+            <form method="post" id="formModalNovaQuestaoSecao" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="criar_pergunta_secao">
                 <input type="hidden" name="secao_destino" id="modal_secao_destino">
@@ -537,6 +537,13 @@
                         </div>
                         <textarea name="enunciado_base_obj" id="modal_enunciado_base" rows="4" class="form-control" required
                                   placeholder="Digite o enunciado da questão (use os botões acima ou ```linguagem ... ``` para inserir código com syntax highlight)..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">
+                            <i class="fas fa-image me-1"></i> Imagem(ns) do Enunciado (Opcional — impressas automaticamente no caderno)
+                        </label>
+                        <input type="file" name="imagens" class="form-control form-control-sm" multiple accept="image/*">
                     </div>
 
                     <!-- Painel de Alternativas (exibido automaticamente para seções Objetivas) -->
@@ -604,8 +611,9 @@ function renderModalAlternativas(focusIdx = null) {
                     style="width:34px; height:34px;" onclick="modalSelecionarCorreta(${idx})" title="Marcar ${letra} como correta">
                 ${letra}
             </button>
-            <input type="text" name="alternativa_item[]" class="form-control form-control-sm modal-alt-input ${isCorr ? 'border-success fw-semibold' : ''}"
-                   data-idx="${idx}" placeholder="Texto da alternativa ${letra}..." value="${(alt.texto || '').replace(/"/g, '&quot;')}">
+            <textarea rows="1" name="alternativa_item[]" class="form-control form-control-sm modal-alt-input ${isCorr ? 'border-success fw-semibold' : ''}"
+                      style="resize:vertical; min-height:32px;"
+                      data-idx="${idx}" placeholder="Texto ou código (```lang ... ```) da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             <button type="button" class="btn btn-sm ${isCorr ? 'btn-success' : 'btn-outline-success'} flex-shrink-0" onclick="modalSelecionarCorreta(${idx})">
                 ${isCorr ? '✓ Correta' : 'Correta'}
             </button>
@@ -618,11 +626,17 @@ function renderModalAlternativas(focusIdx = null) {
 
     const inputs = container.querySelectorAll('.modal-alt-input');
     inputs.forEach((inp, idx) => {
+        const autoResize = (el) => {
+            el.style.height = 'auto';
+            el.style.height = Math.max(32, el.scrollHeight) + 'px';
+        };
+        autoResize(inp);
         inp.addEventListener('input', function() {
+            autoResize(this);
             modalAlts[idx].texto = this.value;
         });
         inp.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey && !this.value.includes('```') && !this.value.includes('\n')) {
                 e.preventDefault();
                 if (idx + 1 < modalAlts.length) {
                     container.querySelector(`.modal-alt-input[data-idx="${idx + 1}"]`)?.focus();
@@ -633,8 +647,10 @@ function renderModalAlternativas(focusIdx = null) {
         });
         inp.addEventListener('paste', function(e) {
             const clip = (e.clipboardData || window.clipboardData).getData('text') || '';
+            if (clip.includes('```')) return;
             const linhas = clip.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            if (linhas.length >= 2) {
+            const pareceLista = linhas.length >= 2 && linhas.every(l => /^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\))/.test(l));
+            if (pareceLista || (linhas.length >= 2 && !this.value.trim())) {
                 e.preventDefault();
                 linhas.forEach((l, off) => {
                     const tIdx = idx + off;
