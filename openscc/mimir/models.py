@@ -396,9 +396,9 @@ def _colorir_codigo_html_server(codigo_escapado: str) -> str:
 
     out = codigo_escapado
 
-    # 1. Comentários de bloco /* ... */
+    # 1. Comentários de bloco /* ... */ e <!-- ... -->
     out = re.sub(
-        r"/\*[\s\S]*?\*/",
+        r"(?:/\*[\s\S]*?\*/|&lt;!--[\s\S]*?--&gt;)",
         lambda m: _guardar(f'<span style="color:#116329;font-style:italic;">{m.group(0)}</span>'),
         out,
     )
@@ -424,7 +424,14 @@ def _colorir_codigo_html_server(codigo_escapado: str) -> str:
         out,
     )
 
-    # 5. Palavras-chave (alto contraste azul escuro em negrito)
+    # 5. Tags HTML/XML (&lt;div, &lt;/div&gt;, /&gt;) e atributos HTML (class=, id=, etc.)
+    out = re.sub(
+        r"(&lt;/?[a-zA-Z][\w:-]*|/?&gt;)",
+        lambda m: _guardar(f'<span style="color:#0550ae;font-weight:700;">{m.group(0)}</span>'),
+        out,
+    )
+
+    # 6. Palavras-chave (usando _guardar para nunca expor números/atributos do style="" às próximas regexes!)
     kw_pattern = (
         r"\b(def|class|return|if|elif|else|for|while|do|switch|case|break|continue|try|except|catch|"
         r"finally|raise|throw|import|from|as|pass|lambda|yield|with|async|await|True|False|None|and|or|"
@@ -437,15 +444,27 @@ def _colorir_codigo_html_server(codigo_escapado: str) -> str:
         r"senao|fimse|para|de|ate|passo|faca|fimpara|enquanto|fimenquanto|repita|procedimento|funcao|"
         r"retorne|inteiro|real|caractere|logico|verdadeiro|falso)\b"
     )
-    out = re.sub(kw_pattern, r'<span style="color:#0550ae;font-weight:700;">\1</span>', out)
+    out = re.sub(
+        kw_pattern,
+        lambda m: _guardar(f'<span style="color:#0550ae;font-weight:700;">{m.group(1)}</span>'),
+        out,
+    )
 
-    # 6. Chamadas de função
-    out = re.sub(r"\b([a-zA-Z_]\w*)(?=\s*\()", r'<span style="color:#6f42c1;font-weight:600;">\1</span>', out)
+    # 7. Chamadas de função (usando _guardar)
+    out = re.sub(
+        r"\b([a-zA-Z_]\w*)(?=\s*\()",
+        lambda m: _guardar(f'<span style="color:#6f42c1;font-weight:600;">{m.group(1)}</span>'),
+        out,
+    )
 
-    # 7. Números
-    out = re.sub(r"\b(\d+(?:\.\d+)?)\b", r'<span style="color:#953800;font-weight:600;">\1</span>', out)
+    # 8. Números (ignorando entidades HTML e placeholders)
+    out = re.sub(
+        r"(?<![\w&#])(\d+(?:\.\d+)?)(?![\w;])",
+        lambda m: _guardar(f'<span style="color:#953800;font-weight:600;">{m.group(1)}</span>'),
+        out,
+    )
 
-    # 8. Restaura tokens protegidos (strings, diretivas e comentários)
+    # 9. Restaura todos os tokens protegidos
     out = re.sub(r"@@MIMIR_SRV_TOK_(\d+)@@", lambda m: tokens[int(m.group(1))], out)
     return out
 
