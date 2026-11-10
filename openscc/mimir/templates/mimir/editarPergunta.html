@@ -485,17 +485,16 @@ function decomporPerguntaExistente(textoCompleto, gabaritoExistente, tipoTexto) 
 
     let insideFence = false;
     for (const linha of linhas) {
-        if (/^\s*```/.test(linha)) {
-            insideFence = !insideFence;
-        }
-        const m = !insideFence ? linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.+)$/) : null;
+        const m = !insideFence ? linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.*)$/) : null;
         if (m) {
             altsExtraidas.push({ texto: m[2].trim() });
         } else if (altsExtraidas.length === 0) {
             linhasEnunciado.push(linha);
-        } else if (linha.trim()) {
+        } else if (linha.trim() || insideFence) {
             altsExtraidas[altsExtraidas.length - 1].texto += '\n' + linha;
         }
+        const fences = (linha.match(/```/g) || []).length;
+        if (fences % 2 === 1) insideFence = !insideFence;
     }
 
     const temAlternativasNoTexto = altsExtraidas.length >= 2;
@@ -621,12 +620,12 @@ function renderizarAlternativas(focarIndice = null) {
             </button>
 
             <div class="flex-grow-1">
-                <input type="text"
-                       name="alternativa_item[]"
-                       class="form-control input-alternativa-texto ${ehCorreta ? 'border-success fw-semibold' : ''}"
-                       data-idx="${idx}"
-                       placeholder="Digite o texto da alternativa ${letra}..."
-                       value="${(alt.texto || '').replace(/"/g, '&quot;')}">
+                <textarea rows="1"
+                          name="alternativa_item[]"
+                          class="form-control input-alternativa-texto ${ehCorreta ? 'border-success fw-semibold' : ''}"
+                          style="resize: vertical; min-height: 38px; font-family: inherit;"
+                          data-idx="${idx}"
+                          placeholder="Digite o texto ou código (```lang ... ```) da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             </div>
 
             <button type="button"
@@ -653,12 +652,19 @@ function renderizarAlternativas(focarIndice = null) {
 
     const inputs = container.querySelectorAll('.input-alternativa-texto');
     inputs.forEach((inp, idx) => {
+        const autoResize = (el) => {
+            el.style.height = 'auto';
+            el.style.height = Math.max(38, el.scrollHeight) + 'px';
+        };
+        autoResize(inp);
+
         inp.addEventListener('input', function () {
+            autoResize(this);
             alternativasState[idx].texto = this.value;
             sincronizarTudo();
         });
         inp.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey && !this.value.includes('```') && !this.value.includes('\n')) {
                 e.preventDefault();
                 if (idx + 1 < alternativasState.length) {
                     const nextInp = container.querySelector(`.input-alternativa-texto[data-idx="${idx + 1}"]`);
@@ -670,8 +676,10 @@ function renderizarAlternativas(focarIndice = null) {
         });
         inp.addEventListener('paste', function (e) {
             const clipText = (e.clipboardData || window.clipboardData).getData('text') || '';
+            if (clipText.includes('```')) return;
             const linhas = clipText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            if (linhas.length >= 2) {
+            const pareceListaAlts = linhas.length >= 2 && linhas.every(l => /^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\))/.test(l));
+            if (pareceListaAlts || (linhas.length >= 2 && !this.value.trim())) {
                 e.preventDefault();
                 distribuirLinhasNasAlternativas(linhas, idx);
             }
@@ -774,16 +782,19 @@ function extrairAlternativasDoEnunciado() {
     const linhas = (inputVisivel.value || '').split(/\r?\n/);
     const linhasEnunciado = [];
     const novasAlts = [];
+    let insideFence = false;
 
     for (const linha of linhas) {
-        const m = linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.+)$/);
+        const m = !insideFence ? linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.*)$/) : null;
         if (m) {
             novasAlts.push({ texto: m[2].trim() });
         } else if (novasAlts.length === 0) {
             linhasEnunciado.push(linha);
-        } else if (linha.trim()) {
-            novasAlts[novasAlts.length - 1].texto += ' ' + linha.trim();
+        } else if (linha.trim() || insideFence) {
+            novasAlts[novasAlts.length - 1].texto += '\n' + linha;
         }
+        const fences = (linha.match(/```/g) || []).length;
+        if (fences % 2 === 1) insideFence = !insideFence;
     }
 
     if (novasAlts.length >= 2) {

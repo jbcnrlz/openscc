@@ -15,10 +15,15 @@
             {% if item.letra_gabarito and not item.is_dissertativa and item.secao != 'sensacao_aluno' %}
                 <span class="badge bg-success">Gabarito: {{ item.letra_gabarito }}</span>
             {% endif %}
+            {% if item.pergunta.imagens.count %}
+                <span class="badge bg-info bg-opacity-10 text-info border border-info-subtle">
+                    <i class="fas fa-image me-1"></i>{{ item.pergunta.imagens.count }} imagem(ns)
+                </span>
+            {% endif %}
         </div>
 
         <div class="d-flex align-items-center gap-1">
-            <a href="{% url 'mimir:editarPergunta' item.pergunta.id %}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Editar texto da questão">
+            <a href="{% url 'mimir:editarPergunta' item.pergunta.id %}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Editar texto e imagens da questão">
                 <i class="fas fa-edit"></i>
             </a>
             <form method="post" class="d-inline" onsubmit="return confirm('Remover esta questão da Avaliação Unificada?');">
@@ -32,11 +37,11 @@
         </div>
     </div>
 
-    <div class="small text-dark">{{ item.pergunta.texto_com_syntax_highlight }}</div>
+    <div class="small text-dark">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
 
     <div class="mt-2 pt-2 border-top small text-muted">
         <strong class="text-secondary"><i class="fas fa-key me-1"></i>Gabarito / Critério:</strong>
-        <span>{{ item.pergunta.get_gabarito_com_feedback|truncatechars:220 }}</span>
+        <div class="mt-1 text-dark">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
     </div>
 </div>
 
