@@ -216,7 +216,7 @@
                         </div>
                     </div>
 
-                    <textarea id="input_enunciado_visivel" name="enunciado_base_obj" rows="5" class="form-control"></textarea>
+                    <textarea id="input_enunciado_visivel" name="enunciado_base_obj" rows="5" class="form-control">{{ form.pergunta.value|default_if_none:"" }}</textarea>
 
                     <div class="d-none">
                         {{ form.pergunta }}
@@ -485,7 +485,7 @@ function decomporPerguntaExistente(textoCompleto, gabaritoExistente, tipoTexto) 
 
     let insideFence = false;
     for (const linha of linhas) {
-        const m = !insideFence ? linha.match(/^\s*([A-Ha-h])[\)\.\-]\s*(.*)$/) : null;
+        const m = !insideFence ? linha.match(/^\s*\(?([A-Ha-h])[\)\.\-:]\s*(.*)$/) : null;
         if (m) {
             altsExtraidas.push({ texto: m[2].trim() });
         } else if (altsExtraidas.length === 0) {
@@ -523,9 +523,11 @@ function decomporPerguntaExistente(textoCompleto, gabaritoExistente, tipoTexto) 
         if (matchJust) {
             document.getElementById('input_justificativa_objetiva').value = matchJust[1].trim();
         }
+        renderizarAlternativas();
         definirModoQuestao('objetiva', false);
     } else {
         document.getElementById('input_enunciado_visivel').value = (textoCompleto || '').trim();
+        renderizarAlternativas();
         definirModoQuestao('dissertativa', false);
     }
 }
@@ -625,7 +627,7 @@ function renderizarAlternativas(focarIndice = null) {
                           class="form-control input-alternativa-texto ${ehCorreta ? 'border-success fw-semibold' : ''}"
                           style="resize: vertical; min-height: 38px; font-family: inherit;"
                           data-idx="${idx}"
-                          placeholder="Digite o texto ou código (```lang ... ```) da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                          placeholder="Digite o texto ou código da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             </div>
 
             <button type="button"
@@ -840,7 +842,11 @@ function sincronizarTudo() {
         if (just) {
             gabaritoMontado += `\nJustificativa: ${just}`;
         }
-        inputDjangoGabarito.value = gabaritoMontado;
+        if (linhasFormatadas.length > 0 || !inputDjangoGabarito.value) {
+            inputDjangoGabarito.value = gabaritoMontado;
+        } else {
+            gabaritoMontado = inputDjangoGabarito.value;
+        }
 
         const fmt = window.MimirCodeHighlighter
             ? window.MimirCodeHighlighter.formatTextWithCodeBlocks
@@ -1002,7 +1008,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const textoTipoInicial = selectTipo ? (selectTipo.options[selectTipo.selectedIndex]?.text || '') : '';
     decomporPerguntaExistente(inputDjangoPergunta.value, inputDjangoGabarito.value, textoTipoInicial);
-    renderizarAlternativas();
 
     if (selectTipo) {
         selectTipo.addEventListener('change', function() {
