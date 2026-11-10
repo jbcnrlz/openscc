@@ -830,26 +830,28 @@
 
                 let out = escapedCode;
 
-                // 1. Comentários de bloco /* ... */
-                out = out.replace(/\/\*[\s\S]*?\*\//g, m => saveToken(`<span class="mimir-hl-comment">${m}</span>`));
+                // 1. Comentários de bloco /* ... */ e <!-- ... -->
+                out = out.replace(/(?:\/\*[\s\S]*?\*\/|&lt;!--[\s\S]*?--&gt;)/g, m => saveToken(`<span class="mimir-hl-comment">${m}</span>`));
                 // 2. Strings "..." ou '...' (protegidas ANTES de comentários para que &#39; não acione '#')
                 out = out.replace(/(?:&quot;(?:\\.|(?!&quot;).)*?&quot;|&#(?:39|x27);(?:\\.|(?!&#(?:39|x27);).)*?&#(?:39|x27);)/g, m => saveToken(`<span class="mimir-hl-string">${m}</span>`));
                 // 3. Diretivas de pré-processador C/C++ (#include, #define, etc.)
                 out = out.replace(/^\s*#\s*(?:include|define|ifdef|ifndef|endif|elif|else|pragma|undef)\b.*$/gm, m => saveToken(`<span class="mimir-hl-keyword">${m}</span>`));
                 // 4. Comentários de linha // ... ou # ... (sem preceder por &) ou -- ...
                 out = out.replace(/(?:\/\/.*$|(?<!&)#.*$|(?<!\w)--(?=\s|$).*$)/gm, m => saveToken(`<span class="mimir-hl-comment">${m}</span>`));
+                // 5. Tags HTML/XML (&lt;div, &lt;/div&gt;, /&gt;)
+                out = out.replace(/(&lt;\/?[a-zA-Z][\w:-]*|\/?&gt;)/g, m => saveToken(`<span class="mimir-hl-keyword">${m}</span>`));
 
-                // Palavras-chave (Python, C, Java, JS, SQL, Portugol)
+                // 6. Palavras-chave (Python, C, Java, JS, SQL, Portugol) protegidas via saveToken
                 const kwRegex = /\b(def|class|return|if|elif|else|for|while|do|switch|case|break|continue|try|except|catch|finally|raise|throw|import|from|as|pass|lambda|yield|with|async|await|True|False|None|and|or|not|in|is|function|const|let|var|new|this|super|extends|implements|public|private|protected|static|final|void|int|float|double|char|boolean|bool|string|String|long|short|unsigned|struct|enum|interface|package|namespace|using|include|printf|scanf|cout|cin|System|out|println|console|log|SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|INNER|LEFT|RIGHT|ON|GROUP|BY|ORDER|HAVING|LIMIT|CREATE|TABLE|ALTER|DROP|PRIMARY|KEY|FOREIGN|REFERENCES|AND|OR|NOT|NULL|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|algoritmo|var|inicio|fimalgoritmo|escreva|escreval|leia|se|entao|senao|fimse|para|de|ate|passo|faca|fimpara|enquanto|fimenquanto|repita|procedimento|funcao|retorne|inteiro|real|caractere|logico|verdadeiro|falso)\b/g;
-                out = out.replace(kwRegex, '<span class="mimir-hl-keyword">$1</span>');
+                out = out.replace(kwRegex, m => saveToken(`<span class="mimir-hl-keyword">${m}</span>`));
 
-                // Funções seguidas de (
-                out = out.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, '<span class="mimir-hl-func">$1</span>');
+                // 7. Funções seguidas de (
+                out = out.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, m => saveToken(`<span class="mimir-hl-func">${m}</span>`));
 
-                // Números
-                out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="mimir-hl-number">$1</span>');
+                // 8. Números
+                out = out.replace(/(?<![\w&#])(\d+(?:\.\d+)?)(?![\w;])/g, m => saveToken(`<span class="mimir-hl-number">${m}</span>`));
 
-                // Restaura strings e comentários
+                // 9. Restaura todos os tokens protegidos
                 out = out.replace(/@@MIMIR_TOK_(\d+)@@/g, (_, idx) => tokens[Number(idx)] || '');
                 return out;
             }
