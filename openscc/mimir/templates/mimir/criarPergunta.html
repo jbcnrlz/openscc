@@ -528,7 +528,7 @@ function renderizarAlternativas(focarIndice = null) {
                           class="form-control input-alternativa-texto ${ehCorreta ? 'border-success fw-semibold' : ''}"
                           style="resize: vertical; min-height: 38px; font-family: inherit;"
                           data-idx="${idx}"
-                          placeholder="Digite o texto ou código (```lang ... ```) da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                          placeholder="Digite o texto ou código da alternativa ${letra}...">${(alt.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             </div>
 
             <button type="button"
