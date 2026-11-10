@@ -4171,6 +4171,9 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
                     gabarito=gabarito,
                     tipoDePergunta=tipo_obj,
                 )
+                for img_file in request.FILES.getlist('imagens'):
+                    if getattr(img_file, 'content_type', '') in ('image/jpeg', 'image/png', 'image/gif', 'image/webp'):
+                        ImagemPergunta.objects.create(pergunta=nova_p, imagem=img_file)
                 prova.perguntas.add(nova_p)
                 q_map = dict(meta.get('question_map', {}))
                 q_map[str(nova_p.id)] = {
