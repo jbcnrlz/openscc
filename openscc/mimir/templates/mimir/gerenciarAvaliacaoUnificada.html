@@ -36,16 +36,16 @@
 
                     <div class="btn-group shadow-sm">
                         <a href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank" class="btn btn-primary fw-semibold">
-                            <i class="fas fa-print me-1"></i> Imprimir Caderno
+                            <i class="fas fa-columns me-1"></i> Diagramar e Imprimir / PDF
                         </a>
                         <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="visually-hidden">Opções de Impressão</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow">
-                            <li><h6 class="dropdown-header">Visualização para Impressão</h6></li>
+                            <li><h6 class="dropdown-header">Estúdio Visual de Diagramação e Impressão</h6></li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank">
-                                    <i class="fas fa-book-open text-primary me-2"></i> Caderno de Prova Unificada
+                                    <i class="fas fa-columns text-primary me-2"></i> Diagramar Caderno de Prova (1 ou 2 Colunas)
                                 </a>
                             </li>
                             <li>

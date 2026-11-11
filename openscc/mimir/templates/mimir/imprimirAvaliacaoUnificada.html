@@ -6,24 +6,33 @@
     <style>
         @page {
             size: A4;
-            margin: 14mm 14mm 16mm 14mm;
+            margin: {{ diagramacao.config.margin_mm|default:12 }}mm;
         }
         * {
             box-sizing: border-box;
         }
+        :root {
+            --exam-font-size: {{ diagramacao.config.font_size|default:"10pt" }};
+            --exam-margin-mm: {{ diagramacao.config.margin_mm|default:12 }}mm;
+            --exam-question-gap: {{ diagramacao.config.question_gap|default:10 }}px;
+        }
         body {
             font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 10.5pt;
-            line-height: 1.45;
+            font-size: var(--exam-font-size);
+            line-height: 1.42;
             color: #111827;
             margin: 0;
             padding: 0;
-            background: #fff;
+            background: {% if is_pdf_export %}#ffffff{% else %}#cbd5e1{% endif %};
         }
+
+        /* ===================================================================
+           BARRA SUPERIOR E SIDEBAR DO ESTÚDIO DE DIAGRAMAÇÃO (NÃO IMPRIME)
+           =================================================================== */
         .no-print-bar {
-            background: #1e293b;
+            background: #0f172a;
             color: #fff;
-            padding: 12px 20px;
+            padding: 10px 18px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -31,73 +40,329 @@
             gap: 10px;
             position: sticky;
             top: 0;
-            z-index: 999;
-            margin-bottom: 18px;
+            z-index: 1050;
+            border-bottom: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+            font-size: 9.5pt;
         }
         .no-print-bar a, .no-print-bar button {
-            color: #fff;
+            color: #f8fafc;
             text-decoration: none;
-            padding: 7px 14px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 9.5pt;
+            font-size: 9pt;
             font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.25);
-            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .no-print-bar a:hover, .no-print-bar button:hover {
+            background: rgba(255,255,255,0.18);
         }
         .no-print-bar a.active, .no-print-bar button.primary {
             background: #2563eb;
             border-color: #3b82f6;
+            color: #fff;
         }
-        .page-container {
-            max-width: 210mm;
-            margin: 0 auto;
-            padding: 4mm;
-            position: relative;
+        .no-print-bar button.success {
+            background: #059669;
+            border-color: #10b981;
+            color: #fff;
         }
-        /* Marcadores fiduciais nos 4 cantos para leitura por Foto / Visão Computacional */
-        .fiducial-row {
+        .no-print-bar button.warning {
+            background: #d97706;
+            border-color: #f59e0b;
+            color: #fff;
+        }
+
+        .studio-workspace {
+            display: flex;
+            align-items: flex-start;
+            min-height: calc(100vh - 54px);
+        }
+        .studio-sidebar {
+            width: 320px;
+            min-width: 320px;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 14px;
+            position: sticky;
+            top: 53px;
+            height: calc(100vh - 53px);
+            overflow-y: auto;
+            border-right: 1px solid #334155;
+            font-size: 9pt;
+            z-index: 900;
+        }
+        .studio-sidebar h4 {
+            font-size: 9.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            margin: 14px 0 8px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #334155;
+        }
+        .studio-sidebar h4:first-child {
+            margin-top: 0;
+        }
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .studio-btn {
+            background: #334155;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 7px 9px;
+            font-size: 8.5pt;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s;
+        }
+        .studio-btn:hover {
+            background: #475569;
+            border-color: #64748b;
+        }
+        .studio-btn.accent {
+            background: #1d4ed8;
+            border-color: #3b82f6;
+            text-align: center;
+        }
+        .studio-btn.accent:hover {
+            background: #2563eb;
+        }
+        .studio-field {
+            margin-bottom: 9px;
+        }
+        .studio-field label {
+            display: block;
+            font-size: 8.5pt;
+            color: #cbd5e1;
+            margin-bottom: 3px;
+            font-weight: 600;
+        }
+        .studio-field select, .studio-field input[type="number"] {
+            width: 100%;
+            background: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            border-radius: 5px;
+            padding: 5px 8px;
+            font-size: 8.5pt;
+        }
+        .studio-check {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 8.5pt;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        .page-nav-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin-bottom: 5px;
+            font-size: 8.5pt;
+        }
+        .page-nav-item:hover {
+            border-color: #60a5fa;
+        }
+        .studio-canvas {
+            flex: 1;
+            padding: 24px 16px 60px 16px;
+            overflow-x: auto;
+        }
+
+        /* ===================================================================
+           FOLHAS A4 E ESTRUTURA DE PÁGINAS (TELA + IMPRESSÃO + WEASYPRINT)
+           =================================================================== */
+        .exam-sheet-wrapper {
+            max-width: 210mm;
+            margin: 0 auto 28px auto;
+            position: relative;
+        }
+        .sheet-studio-toolbar {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 7px 12px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 8.5pt;
+            border: 1px solid #334155;
+            border-bottom: none;
+        }
+        .sheet-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .sheet-btn {
+            background: #334155;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 8pt;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .sheet-btn:hover {
+            background: #475569;
+        }
+        .sheet-btn.active {
+            background: #2563eb;
+            border-color: #60a5fa;
+            color: #fff;
+        }
+        .sheet-btn.danger:hover {
+            background: #dc2626;
+            border-color: #ef4444;
+        }
+        .fill-badge {
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 7.8pt;
+        }
+        .fill-ok {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+        .fill-warn {
+            background: rgba(245, 158, 11, 0.25);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.5);
+        }
+        .fill-over {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+
+        .exam-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            background: #ffffff;
+            margin: 0 auto;
+            padding: var(--exam-margin-mm);
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.28);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-after: always;
+            break-after: page;
+        }
+        .exam-sheet.last-sheet {
+            page-break-after: auto;
+            break-after: auto;
+        }
+        /* Linha guia visual do limite exato de 1 folha A4 (apenas no modo edição na tela) */
+        body.studio-edit-mode .exam-sheet::after {
+            content: "LIMITE DE 1 FOLHA A4 (297mm)";
+            position: absolute;
+            top: 297mm;
+            left: 0;
+            right: 0;
+            border-top: 2px dashed rgba(239, 68, 68, 0.65);
+            color: #dc2626;
+            font-size: 7.5pt;
+            font-weight: 700;
+            text-align: right;
+            padding-right: 8px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* ===================================================================
+           ELEMENTOS DO CADERNO DE PROVA (CABEÇALHO, BANNERS, COLUNAS, QUESTÕES)
+           =================================================================== */
+        .fiducial-row {
+            display: table;
+            width: 100%;
             margin-bottom: 6px;
         }
+        .fiducial-cell-mark {
+            display: table-cell;
+            width: 20px;
+            vertical-align: middle;
+        }
+        .fiducial-cell-center {
+            display: table-cell;
+            text-align: center;
+            vertical-align: middle;
+            font-family: monospace;
+            font-size: 8pt;
+            font-weight: bold;
+            color: #111827;
+        }
         .fiducial-mark {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             background: #000;
             display: inline-block;
             border: 2px solid #000;
         }
+
         .header-box {
             border: 2px solid #111827;
             border-radius: 6px;
-            padding: 10px 14px;
-            margin-bottom: 14px;
+            padding: 9px 12px;
+            margin-bottom: 10px;
         }
         .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
             border-bottom: 1.5px solid #111827;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+        }
+        .header-top-left {
+            display: table-cell;
+            vertical-align: top;
+            padding-right: 10px;
+        }
+        .header-top-right {
+            display: table-cell;
+            width: 130px;
+            vertical-align: top;
+            text-align: right;
         }
         .exam-title {
-            font-size: 14pt;
+            font-size: 13.5pt;
             font-weight: 800;
             text-transform: uppercase;
             margin: 0 0 2px 0;
         }
         .exam-subtitle {
-            font-size: 9.5pt;
+            font-size: 9pt;
             color: #374151;
             margin: 0;
         }
         .code-box {
             text-align: right;
             font-family: monospace;
-            font-size: 9.5pt;
+            font-size: 8.8pt;
             border: 1.5px solid #000;
             padding: 4px 8px;
             border-radius: 4px;
@@ -106,90 +371,337 @@
         .student-fields {
             display: table;
             width: 100%;
-            font-size: 9.5pt;
+            font-size: 9pt;
         }
         .student-row {
             display: table-row;
         }
         .student-cell {
             display: table-cell;
-            padding: 5px 6px;
+            padding: 4px 6px;
             border-bottom: 1px dashed #9ca3af;
         }
+        .mini-running-header {
+            border-bottom: 1.5px solid #111827;
+            padding-bottom: 4px;
+            margin-bottom: 10px;
+            font-size: 8.5pt;
+            color: #374151;
+            display: table;
+            width: 100%;
+        }
+        .mini-running-header-left {
+            display: table-cell;
+            text-align: left;
+            font-weight: 700;
+        }
+        .mini-running-header-right {
+            display: table-cell;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        /* Segmentos de 1 Coluna (Largura Total) e 2 Colunas Lado a Lado */
+        .layout-segment-full {
+            width: 100%;
+            margin-bottom: 4px;
+        }
+        .layout-segment-2cols {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-bottom: 4px;
+        }
+        .layout-segment-2cols-row {
+            display: table-row;
+        }
+        .layout-col {
+            display: table-cell;
+            width: 48.6%;
+            vertical-align: top;
+        }
+        .layout-col-divider {
+            display: table-cell;
+            width: 2.8%;
+            vertical-align: top;
+            position: relative;
+        }
+        .layout-col-divider.with-rule::before {
+            content: "";
+            display: block;
+            width: 0;
+            height: 100%;
+            min-height: 40px;
+            margin: 0 auto;
+            border-left: 1px solid #cbd5e1;
+        }
+        /* Na impressão e WeasyPrint, aplica borda central diretamente na célula esquerda quando column_rule ativo */
+        .layout-segment-2cols.with-rule .layout-col-left {
+            padding-right: 8px;
+            border-right: 1px solid #cbd5e1;
+        }
+        .layout-segment-2cols.with-rule .layout-col-right {
+            padding-left: 8px;
+        }
+        .layout-segment-2cols.no-rule .layout-col-left {
+            padding-right: 6px;
+        }
+        .layout-segment-2cols.no-rule .layout-col-right {
+            padding-left: 6px;
+        }
+
+        /* Banners e Blocos de Questão */
         .section-banner {
             background: #111827;
             color: #ffffff;
-            padding: 6px 12px;
+            padding: 5px 10px;
             font-weight: 700;
-            font-size: 10.5pt;
+            font-size: 9.8pt;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin: 16px 0 10px 0;
+            letter-spacing: 0.3px;
+            margin: 8px 0 8px 0;
             border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .section-banner-left {
+            display: table-cell;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .section-banner-right {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
+            font-size: 8.5pt;
+            white-space: nowrap;
+            padding-left: 8px;
         }
         .subject-subbanner {
             background: #f3f4f6;
             border-left: 4px solid #111827;
-            padding: 5px 10px;
+            padding: 4px 9px;
             font-weight: 700;
-            font-size: 10pt;
-            margin: 10px 0 8px 0;
+            font-size: 9.2pt;
+            margin: 6px 0 6px 0;
             color: #111827;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
+
         .question-block {
             border: 1px solid #d1d5db;
             border-radius: 5px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
+            padding: 8px 10px;
+            margin-bottom: var(--exam-question-gap);
             page-break-inside: avoid;
+            break-inside: avoid;
+            background: #fff;
         }
+        /* Estilos alternativos de card de questão */
+        .card-style-clean .question-block {
+            border: none;
+            border-radius: 0;
+            padding: 4px 2px 8px 2px;
+            border-bottom: 1px dotted #cbd5e1;
+        }
+        .card-style-top_line .question-block {
+            border: none;
+            border-top: 1.5px solid #111827;
+            border-radius: 0;
+            padding: 6px 2px 8px 2px;
+        }
+
         .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
-            font-size: 9pt;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 8.6pt;
             font-weight: 700;
         }
-        .question-body {
-            font-size: 10pt;
+        .question-header-left {
+            display: table-cell;
+            text-align: left;
         }
+        .question-header-right {
+            display: table-cell;
+            text-align: right;
+            font-size: 8pt;
+            color: #4b5563;
+            white-space: nowrap;
+            padding-left: 6px;
+        }
+        .question-body {
+            font-size: 1em;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        /* Controle de alternativas em 2 colunas compactas */
+        .question-block.alt-cols-2 .mimir-alts-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 12px;
+        }
+        .question-block.alt-cols-2 .mimir-alt-item {
+            width: 48%;
+            display: inline-flex !important;
+            vertical-align: top;
+            margin-top: 4px !important;
+        }
+
+        /* Controle de tamanho de imagens por questão */
+        .question-block[data-img-size="sm"] .mimir-question-images img {
+            max-height: 115px !important;
+            max-width: 65% !important;
+        }
+        .question-block[data-img-size="md"] .mimir-question-images img {
+            max-height: 185px !important;
+            max-width: 85% !important;
+        }
+        .question-block[data-img-size="lg"] .mimir-question-images img {
+            max-height: 260px !important;
+            max-width: 96% !important;
+        }
+        .question-block[data-img-size="full"] .mimir-question-images img {
+            max-height: 360px !important;
+            max-width: 100% !important;
+        }
+
         .essay-box {
-            border: 2px solid #000;
+            border: 1.5px solid #000;
             border-radius: 4px;
-            padding: 6px 10px;
-            margin-top: 8px;
+            padding: 5px 8px;
+            margin-top: 7px;
             background: #fff;
         }
         .essay-box-header {
-            font-size: 8.5pt;
+            font-size: 8pt;
             font-weight: 700;
             text-transform: uppercase;
             color: #111827;
             border-bottom: 1px solid #000;
-            padding-bottom: 3px;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
+            padding-bottom: 2px;
+            margin-bottom: 3px;
+            display: table;
+            width: 100%;
+        }
+        .essay-box-header-left {
+            display: table-cell;
+            text-align: left;
+        }
+        .essay-box-header-right {
+            display: table-cell;
+            text-align: right;
         }
         .essay-line {
-            height: 22px;
+            height: 20px;
             border-bottom: 1px solid #9ca3af;
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #9ca3af;
-            padding-top: 4px;
+            padding-top: 3px;
         }
+
+        /* Controles interativos em cada bloco no modo edição do Estúdio */
+        .diagram-block-wrap {
+            position: relative;
+            transition: box-shadow 0.12s ease, border-color 0.12s ease;
+        }
+        body.studio-edit-mode .diagram-block-wrap:hover {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+            border-radius: 5px;
+            z-index: 15;
+        }
+        body.studio-edit-mode .diagram-block-wrap.dragging {
+            opacity: 0.45;
+            outline: 2px dashed #2563eb;
+        }
+        body.studio-edit-mode .col-dropzone {
+            min-height: 48px;
+            border: 1px dashed rgba(148, 163, 184, 0.55);
+            border-radius: 5px;
+            padding: 3px;
+        }
+        body.studio-edit-mode .col-dropzone.drag-over {
+            background: rgba(37, 99, 235, 0.06);
+            border-color: #2563eb;
+        }
+        .col-zone-label {
+            display: none;
+            font-size: 7.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-bottom: 4px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        body.studio-edit-mode .col-zone-label {
+            display: block;
+        }
+
+        .block-floating-tools {
+            display: none;
+            position: absolute;
+            top: -11px;
+            right: 6px;
+            background: #0f172a;
+            color: #fff;
+            border: 1px solid #334155;
+            border-radius: 5px;
+            padding: 2px 4px;
+            gap: 3px;
+            align-items: center;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.22);
+            z-index: 30;
+            font-size: 7.5pt;
+        }
+        body.studio-edit-mode .diagram-block-wrap:hover .block-floating-tools {
+            display: inline-flex;
+        }
+        .btool-btn {
+            background: #1e293b;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 7.3pt;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btool-btn:hover {
+            background: #2563eb;
+            border-color: #60a5fa;
+            color: #fff;
+        }
+        .btool-btn.active {
+            background: #1d4ed8;
+            border-color: #60a5fa;
+            color: #fff;
+        }
+        .btool-drag {
+            cursor: grab;
+            padding: 1px 5px;
+            color: #94a3b8;
+            font-weight: bold;
+        }
+
         /* Estilos da Folha OMR / Foto */
         .omr-grid {
             display: table;
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
         .omr-row {
             display: table-row;
@@ -200,38 +712,38 @@
         }
         .omr-cell-num {
             display: table-cell;
-            padding: 6px 8px;
+            padding: 5px 6px;
             font-weight: 800;
-            width: 58px;
+            width: 52px;
             border: 1px solid #111827;
             text-align: center;
-            font-size: 10pt;
+            font-size: 9.5pt;
         }
         .omr-cell-meta {
             display: table-cell;
-            padding: 6px 8px;
+            padding: 5px 7px;
             border: 1px solid #111827;
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #374151;
             width: 36%;
         }
         .omr-cell-bubbles {
             display: table-cell;
-            padding: 5px 10px;
+            padding: 4px 8px;
             border: 1px solid #111827;
             text-align: center;
         }
         .bubble {
             display: inline-block;
-            width: 24px;
-            height: 24px;
-            line-height: 21px;
+            width: 22px;
+            height: 22px;
+            line-height: 19px;
             border: 2px solid #000;
             border-radius: 50%;
             text-align: center;
             font-weight: 800;
-            font-size: 9.5pt;
-            margin: 0 6px;
+            font-size: 9pt;
+            margin: 0 4px;
             color: #000;
             background: #fff;
         }
@@ -239,6 +751,7 @@
             background: #111827;
             color: #fff;
         }
+
         .mimir-code-block, .mimir-code-block * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -249,51 +762,643 @@
             page-break-inside: avoid;
             break-inside: avoid;
         }
+
         @media print {
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            .no-print-bar {
+            body {
+                background: #ffffff !important;
+            }
+            .no-print-bar,
+            .studio-sidebar,
+            .sheet-studio-toolbar,
+            .block-floating-tools,
+            .col-zone-label {
                 display: none !important;
             }
-            .page-container {
-                padding: 0;
-                max-width: 100%;
+            .studio-workspace {
+                display: block !important;
+            }
+            .studio-canvas {
+                padding: 0 !important;
+            }
+            .exam-sheet-wrapper {
+                margin: 0 !important;
+                max-width: 100% !important;
+            }
+            .exam-sheet {
+                width: 100% !important;
+                min-height: auto !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .exam-sheet::after {
+                display: none !important;
+            }
+            .col-dropzone {
+                border: none !important;
+                padding: 0 !important;
             }
         }
     </style>
 </head>
-<body>
+<body class="{% if not is_pdf_export %}studio-edit-mode{% endif %} card-style-{{ diagramacao.config.card_style|default:'bordered' }}">
 
+{% if not is_pdf_export %}
+<!-- =======================================================================
+     BARRA SUPERIOR DO ESTÚDIO DE DIAGRAMAÇÃO E IMPRESSÃO
+     ======================================================================= -->
 <div class="no-print-bar">
     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <strong>Mimir • Impressão Unificada:</strong>
+        <strong>Mimir • Estúdio de Diagramação:</strong>
         <a href="?tipo=prova" class="{% if tipo_documento == 'prova' %}active{% endif %}">1. Caderno de Prova</a>
         <a href="?tipo=folha_resposta" class="{% if tipo_documento == 'folha_resposta' %}active{% endif %}">2. Folha de Respostas (Foto/OMR)</a>
         <a href="?tipo=gabarito" class="{% if tipo_documento == 'gabarito' %}active{% endif %}">3. Gabarito Oficial</a>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-        <a href="?tipo={{ tipo_documento }}&pdf=1" target="_blank">Baixar PDF</a>
-        <button type="button" class="primary" onclick="window.print()">Imprimir Agora</button>
-        <a href="{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}">Voltar ao Painel</a>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        {% if tipo_documento == 'prova' %}
+        <span id="studioSaveStatus" style="font-size: 8.5pt; color: #94a3b8; margin-right: 4px;">Diagramação pronta</span>
+        <button type="button" id="btnTogglePreviewMode" onclick="toggleStudioPreviewMode()" title="Alternar entre edição com guias visuais e visualização limpa">
+            👁️ Alternar Guias Visuais
+        </button>
+        <button type="button" class="success" onclick="salvarDiagramacaoServidor(true)">
+            💾 Salvar Diagramação
+        </button>
+        {% endif %}
+        <button type="button" class="primary" onclick="baixarPdfDiagramado()">
+            📥 Baixar PDF Diagramado
+        </button>
+        <button type="button" onclick="window.print()">
+            🖨️ Imprimir Agora
+        </button>
+        <a href="{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}">⬅ Voltar ao Painel</a>
     </div>
 </div>
+{% endif %}
 
-<div class="page-container">
-    <!-- Marcadores Fiduciais Superiores -->
-    <div class="fiducial-row">
-        <span class="fiducial-mark"></span>
-        <span style="font-family: monospace; font-size: 8.5pt; font-weight: bold;">
-            [MIMIR-UNIFICADA-ID:{{ prova.id }} | MODULO:{{ estrutura.modulo_nome|upper }} | DOC:{{ tipo_documento|upper }}]
-        </span>
-        <span class="fiducial-mark"></span>
-    </div>
+<div class="{% if not is_pdf_export %}studio-workspace{% endif %}">
 
-    <!-- Cabeçalho Institucional Padronizado -->
+    {% if not is_pdf_export and tipo_documento == 'prova' %}
+    <!-- ===================================================================
+         PAINEL LATERAL DO ESTÚDIO VISUAL DE DIAGRAMAÇÃO (CADERNO DE PROVA)
+         =================================================================== -->
+    <aside class="studio-sidebar">
+        <h4>⚡ Modelos de Diagramação (1 Clique)</h4>
+        <div class="preset-grid">
+            <button type="button" class="studio-btn" onclick="aplicarPresetDiagramacao('enem_2col')" title="Questões objetivas em 2 colunas e dissertativas em largura total">
+                📰 2 Colunas (ENEM)<br>
+                <span style="font-size:7.5pt; color:#94a3b8; font-weight:400;">Objetivas 2 cols • Diss. 1 col</span>
+            </button>
+            <button type="button" class="studio-btn" onclick="aplicarPresetDiagramacao('tudo_2col')" title="Todas as páginas da prova em 2 colunas para economizar papel">
+                📑 Tudo em 2 Colunas<br>
+                <span style="font-size:7.5pt; color:#94a3b8; font-weight:400;">Compacto • Menos folhas</span>
+            </button>
+            <button type="button" class="studio-btn" onclick="aplicarPresetDiagramacao('classico_1col')" title="Todas as páginas em 1 coluna tradicional">
+                📄 1 Coluna Clássico<br>
+                <span style="font-size:7.5pt; color:#94a3b8; font-weight:400;">Largura total em tudo</span>
+            </button>
+            <button type="button" class="studio-btn" onclick="aplicarPresetDiagramacao('por_parte')" title="Inicia cada Parte (I a V) em uma nova folha A4">
+                🗂️ 1 Parte por Folha<br>
+                <span style="font-size:7.5pt; color:#94a3b8; font-weight:400;">Separa Partes I..V</span>
+            </button>
+        </div>
+
+        <div style="margin-top: 8px;">
+            <button type="button" class="studio-btn accent" style="width: 100%;" onclick="autoPaginarFolhasA4()">
+                ⚖️ Auto-Paginar e Equilibrar Folhas A4
+            </button>
+        </div>
+
+        <h4>🎨 Tipografia, Margens e Colunas</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="studio-field">
+                <label>Tamanho da Fonte</label>
+                <select id="cfgFontSize" onchange="atualizarConfigGlobal()">
+                    <option value="9pt">9pt (Muito Compacta)</option>
+                    <option value="9.5pt">9.5pt (Compacta)</option>
+                    <option value="10pt">10pt (Padrão)</option>
+                    <option value="10.5pt">10.5pt (Confortável)</option>
+                    <option value="11pt">11pt (Ampla)</option>
+                </select>
+            </div>
+            <div class="studio-field">
+                <label>Margem da Folha A4</label>
+                <select id="cfgMarginMm" onchange="atualizarConfigGlobal()">
+                    <option value="10">Estreita (10mm)</option>
+                    <option value="12">Padrão (12mm)</option>
+                    <option value="14">Média (14mm)</option>
+                    <option value="18">Ampla (18mm)</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="studio-field">
+                <label>Espaço entre Questões</label>
+                <select id="cfgQuestionGap" onchange="atualizarConfigGlobal()">
+                    <option value="6">Compacto (6px)</option>
+                    <option value="10">Normal (10px)</option>
+                    <option value="14">Espaçado (14px)</option>
+                    <option value="18">Amplo (18px)</option>
+                </select>
+            </div>
+            <div class="studio-field">
+                <label>Estilo das Questões</label>
+                <select id="cfgCardStyle" onchange="atualizarConfigGlobal()">
+                    <option value="bordered">Quadro com Borda</option>
+                    <option value="clean">Sem Borda (ENEM)</option>
+                    <option value="top_line">Linha Superior</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="studio-field">
+            <label>Alternativas das Questões Objetivas</label>
+            <select id="cfgDefaultAltCols" onchange="aplicarColunasAlternativasTodas(this.value)">
+                <option value="1">1 por linha (Vertical Padrão)</option>
+                <option value="2">2 Colunas Lado a Lado (Compacto)</option>
+            </select>
+        </div>
+
+        <label class="studio-check">
+            <input type="checkbox" id="cfgColumnRule" onchange="atualizarConfigGlobal()">
+            Linha divisória vertical nas páginas de 2 colunas
+        </label>
+        <label class="studio-check">
+            <input type="checkbox" id="cfgRepeatMiniHeader" onchange="atualizarConfigGlobal()">
+            Repetir minicabeçalho a partir da Página 2
+        </label>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 8px;">
+            <span style="font-size: 9.5pt; text-transform: uppercase; font-weight: 700; color: #94a3b8;">📄 Folhas A4 (<span id="lblTotalPaginas">1</span>)</span>
+            <button type="button" class="sheet-btn active" onclick="adicionarNovaPaginaFinal()">+ Nova Página</button>
+        </div>
+        <div id="sidebarPagesList"></div>
+
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #334155; font-size: 8pt; color: #94a3b8; line-height: 1.4;">
+            <strong>💡 Dicas de Diagramação:</strong><br>
+            • Em cada folha A4 você pode escolher <strong>1 Coluna</strong> ou <strong>2 Colunas</strong>.<br>
+            • Passe o mouse sobre qualquer questão ou título para <strong>expandir nas 2 colunas</strong>, mover entre <strong>Coluna Esq/Dir</strong>, ajustar <strong>linhas dissertativas</strong> ou <strong>quebrar página</strong>.<br>
+            • Você também pode <strong>arrastar (⠿)</strong> qualquer questão entre colunas e páginas.
+        </div>
+    </aside>
+    {% endif %}
+
+    <main class="{% if not is_pdf_export %}studio-canvas{% endif %}">
+
+        {% if tipo_documento == 'folha_resposta' %}
+            <!-- ===============================================================
+                 MODO 2: FOLHA DE RESPOSTAS OMR / FOTO PARA CORREÇÃO AUTOMÁTICA
+                 =============================================================== -->
+            <div class="exam-sheet-wrapper">
+                {% if not is_pdf_export %}
+                <div class="sheet-studio-toolbar">
+                    <span><strong>FOLHA DE RESPOSTAS OMR / FOTO</strong></span>
+                    <div class="sheet-toolbar-group">
+                        <span>Grade de Alternativas:</span>
+                        <button type="button" id="btnOmr1Col" class="sheet-btn {% if diagramacao.config.omr_cols != 2 %}active{% endif %}" onclick="setOmrCols(1)">▭ 1 Coluna</button>
+                        <button type="button" id="btnOmr2Col" class="sheet-btn {% if diagramacao.config.omr_cols == 2 %}active{% endif %}" onclick="setOmrCols(2)">◫ 2 Colunas (Compacta)</button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="exam-sheet last-sheet">
+                    <div>
+                        <div class="fiducial-row">
+                            <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                            <div class="fiducial-cell-center">
+                                [MIMIR-UNIFICADA-ID:{{ prova.id }} | MODULO:{{ estrutura.modulo_nome|upper }} | DOC:FOLHA_RESPOSTA]
+                            </div>
+                            <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                        </div>
+
+                        <div class="header-box">
+                            <div class="header-top">
+                                <div class="header-top-left">
+                                    <div class="exam-title">{{ prova.titulo }}</div>
+                                    <div class="exam-subtitle">
+                                        <strong>{{ estrutura.modulo_nome }}</strong> •
+                                        Matérias Integradas:
+                                        {% for a in estrutura.assuntos %}{{ a.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="header-top-right">
+                                    <div class="code-box">
+                                        <div><strong>PROVA #{{ prova.id }}</strong></div>
+                                        <div>Itens: {{ estrutura.total_atual }}</div>
+                                        <div>{{ data_impressao|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="student-fields">
+                                <div class="student-row">
+                                    <div class="student-cell" style="width: 58%;"><strong>NOME DO(A) ALUNO(A):</strong> __________________________________________________</div>
+                                    <div class="student-cell" style="width: 22%;"><strong>RA / MATRÍCULA:</strong> _____________</div>
+                                    <div class="student-cell" style="width: 20%;"><strong>TURMA:</strong> _________</div>
+                                </div>
+                                <div class="student-row">
+                                    <div class="student-cell"><strong>ASSINATURA:</strong> _______________________________________________________</div>
+                                    <div class="student-cell"><strong>DATA:</strong> ____/____/202___</div>
+                                    <div class="student-cell"><strong>NOTA:</strong> ______ / 10,0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="border: 1.5px solid #111827; background: #f8fafc; padding: 7px 10px; border-radius: 5px; font-size: 8.5pt; margin-bottom: 10px;">
+                            <strong>INSTRUÇÕES PARA LEITURA POR FOTO (Mimir OMR + Visão Computacional):</strong>
+                            1. Preencha completamente o círculo da alternativa escolhida com caneta azul ou preta.
+                            2. Redija as respostas dissertativas exclusivamente dentro das caixas delimitadas abaixo.
+                            3. Ao fotografar esta folha para correção no Mimir, enquadre os 4 quadrados pretos dos cantos.
+                        </div>
+
+                        <div class="section-banner">
+                            <span class="section-banner-left">BLOCO 1 • QUESTÕES OBJETIVAS (CONHECIMENTOS GERAIS E MATÉRIAS DO MÓDULO)</span>
+                            <span class="section-banner-right">MARQUE APENAS 1 OPÇÃO POR QUESTÃO</span>
+                        </div>
+
+                        <!-- Grade OMR em 1 Coluna -->
+                        <div id="omrGrid1Col" style="{% if diagramacao.config.omr_cols == 2 %}display:none;{% endif %}">
+                            <div class="omr-grid">
+                                {% for item in itens_objetivos %}
+                                <div class="omr-row">
+                                    <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                                    <div class="omr-cell-meta">
+                                        <strong>{{ item.assunto_nome }}</strong><br>
+                                        <span>{{ item.secao_titulo }}</span>
+                                    </div>
+                                    <div class="omr-cell-bubbles">
+                                        {% for letra in alternativas %}
+                                            <span class="bubble">{{ letra }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Grade OMR em 2 Colunas -->
+                        <div id="omrGrid2Col" style="{% if diagramacao.config.omr_cols != 2 %}display:none;{% endif %}">
+                            <table class="layout-segment-2cols with-rule">
+                                <tr class="layout-segment-2cols-row">
+                                    <td class="layout-col layout-col-left">
+                                        <div class="omr-grid">
+                                            {% for item in itens_objetivos_col1 %}
+                                            <div class="omr-row">
+                                                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                                                <div class="omr-cell-meta"><strong>{{ item.assunto_nome|truncatechars:22 }}</strong></div>
+                                                <div class="omr-cell-bubbles">
+                                                    {% for letra in alternativas %}<span class="bubble" style="width:19px;height:19px;line-height:16px;font-size:8pt;margin:0 2px;">{{ letra }}</span>{% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td class="layout-col layout-col-right">
+                                        <div class="omr-grid">
+                                            {% for item in itens_objetivos_col2 %}
+                                            <div class="omr-row">
+                                                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                                                <div class="omr-cell-meta"><strong>{{ item.assunto_nome|truncatechars:22 }}</strong></div>
+                                                <div class="omr-cell-bubbles">
+                                                    {% for letra in alternativas %}<span class="bubble" style="width:19px;height:19px;line-height:16px;font-size:8pt;margin:0 2px;">{{ letra }}</span>{% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        {% if itens_dissertativos %}
+                        <div class="section-banner">
+                            <span class="section-banner-left">BLOCO 2 • QUESTÕES DISSERTATIVAS (TRANSCRIÇÃO E AVALIAÇÃO POR FOTO)</span>
+                            <span class="section-banner-right">ESCREVA COM LETRA LEGÍVEL DENTRO DO QUADRO</span>
+                        </div>
+                        {% for item in itens_dissertativos %}
+                        <div class="essay-box" style="margin-bottom: 10px; page-break-inside: avoid;">
+                            <div class="essay-box-header">
+                                <span class="essay-box-header-left">[QUESTÃO Q{{ item.numero|stringformat:"02d" }} • {{ item.secao_titulo|upper }}]</span>
+                                <span class="essay-box-header-right">MATÉRIA/EIXO: {{ item.assunto_nome|upper }}</span>
+                            </div>
+                            <div style="font-size: 8.2pt; color: #374151; margin-bottom: 3px;">
+                                {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:220 }}
+                            </div>
+                            {% for linha in linhas_dissertativa %}
+                                <div class="essay-line">{{ linha }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        {% if itens_sensacao %}
+                        <div class="section-banner" style="background: #374151;">
+                            <span class="section-banner-left">BLOCO 3 • SENSAÇÃO DO ALUNO SOBRE A AVALIAÇÃO (AUTOAVALIAÇÃO / PESO ZERO)</span>
+                            <span class="section-banner-right">DIAGNÓSTICO PEDAGÓGICO</span>
+                        </div>
+                        <div class="omr-grid">
+                            {% for item in itens_sensacao %}
+                            <div class="omr-row">
+                                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                                <div class="omr-cell-meta">
+                                    {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:110 }}
+                                </div>
+                                <div class="omr-cell-bubbles">
+                                    {% for letra in alternativas %}
+                                        <span class="bubble">{{ letra }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="fiducial-row" style="margin-top: 10px;">
+                        <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                        <div class="fiducial-cell-center" style="font-weight:normal; color:#4b5563;">
+                            Gerado pelo Mimir (OpenSCC) • Folha OMR / Visão Computacional
+                        </div>
+                        <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                    </div>
+                </div>
+            </div>
+
+        {% elif tipo_documento == 'gabarito' %}
+            <!-- ===============================================================
+                 MODO 3: GABARITO OFICIAL E CRITÉRIOS DE CORREÇÃO
+                 =============================================================== -->
+            <div class="exam-sheet-wrapper">
+                <div class="exam-sheet last-sheet">
+                    <div>
+                        <div class="fiducial-row">
+                            <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                            <div class="fiducial-cell-center">
+                                [MIMIR-UNIFICADA-ID:{{ prova.id }} | MODULO:{{ estrutura.modulo_nome|upper }} | DOC:GABARITO]
+                            </div>
+                            <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                        </div>
+
+                        <div class="header-box">
+                            <div class="header-top" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+                                <div class="header-top-left">
+                                    <div class="exam-title">{{ prova.titulo }} — GABARITO OFICIAL</div>
+                                    <div class="exam-subtitle">
+                                        <strong>{{ estrutura.modulo_nome }}</strong> •
+                                        Matérias Integradas:
+                                        {% for a in estrutura.assuntos %}{{ a.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="header-top-right">
+                                    <div class="code-box">
+                                        <div><strong>PROVA #{{ prova.id }}</strong></div>
+                                        <div>Itens: {{ estrutura.total_atual }}</div>
+                                        <div>{{ data_impressao|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-banner">
+                            <span class="section-banner-left">GABARITO OFICIAL E MATRIZ DE CORREÇÃO • {{ prova.titulo }}</span>
+                            <span class="section-banner-right">TOTAL: {{ estrutura.total_atual }} ITENS</span>
+                        </div>
+
+                        <div class="omr-grid">
+                            {% for item in estrutura.questoes_numeradas %}
+                            <div class="omr-row">
+                                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
+                                <div class="omr-cell-meta">
+                                    <strong>{{ item.secao_titulo }}</strong><br>
+                                    Matéria: {{ item.assunto_nome }} • Peso sugerido: {{ item.peso_sugerido }}
+                                </div>
+                                <div class="omr-cell-bubbles" style="text-align: left;">
+                                    {% if item.is_dissertativa %}
+                                        <strong>Critério Dissertativo:</strong>
+                                        <div style="margin-top: 3px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
+                                    {% elif item.secao == 'sensacao_aluno' %}
+                                        <em>Questão Diagnóstica (Sensação do Aluno) — Qualquer alternativa válida (A-E), Peso 0 na nota.</em>
+                                    {% else %}
+                                        {% for letra in alternativas %}
+                                            <span class="bubble {% if item.letra_gabarito == letra %}bubble-filled{% endif %}">{{ letra }}</span>
+                                        {% endfor %}
+                                        <div style="font-size: 8.5pt; margin-top: 4px; color: #374151;">
+                                            <strong>Gabarito:</strong>
+                                            <div style="margin-top: 2px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="fiducial-row" style="margin-top: 10px;">
+                        <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                        <div class="fiducial-cell-center" style="font-weight:normal; color:#4b5563;">
+                            Gerado pelo Mimir (OpenSCC) • Gabarito Oficial Unificado
+                        </div>
+                        <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                    </div>
+                </div>
+            </div>
+
+        {% else %}
+            <!-- ===============================================================
+                 MODO 1: CADERNO DE PROVA UNIFICADA (PÁGINAS EM 1 OU 2 COLUNAS)
+                 =============================================================== -->
+            <div id="studioPagesRoot">
+                {% for pagina in diagramacao.paginas_render %}
+                <div class="exam-sheet-wrapper" id="sheet_wrap_{{ pagina.numero }}">
+                    <div class="exam-sheet {% if forloop.last %}last-sheet{% endif %}" data-page-num="{{ pagina.numero }}">
+                        <div>
+                            <!-- Marcadores Fiduciais Superiores em cada folha -->
+                            <div class="fiducial-row">
+                                <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                                <div class="fiducial-cell-center">
+                                    [MIMIR-UNIFICADA-ID:{{ prova.id }} | MODULO:{{ estrutura.modulo_nome|upper }} | PÁG:{{ pagina.numero }}/{{ diagramacao.paginas_render|length }}]
+                                </div>
+                                <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                            </div>
+
+                            {% if forloop.first %}
+                                <!-- Cabeçalho Institucional Completo na Página 1 -->
+                                <div class="header-box">
+                                    <div class="header-top">
+                                        <div class="header-top-left">
+                                            <div class="exam-title">{{ prova.titulo }}</div>
+                                            <div class="exam-subtitle">
+                                                <strong>{{ estrutura.modulo_nome }}</strong> •
+                                                Matérias Integradas:
+                                                {% for a in estrutura.assuntos %}{{ a.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="header-top-right">
+                                            <div class="code-box">
+                                                <div><strong>PROVA #{{ prova.id }}</strong></div>
+                                                <div>Itens: {{ estrutura.total_atual }}</div>
+                                                <div>{{ data_impressao|date:"d/m/Y" }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="student-fields">
+                                        <div class="student-row">
+                                            <div class="student-cell" style="width: 58%;"><strong>NOME DO(A) ALUNO(A):</strong> __________________________________________________</div>
+                                            <div class="student-cell" style="width: 22%;"><strong>RA / MATRÍCULA:</strong> _____________</div>
+                                            <div class="student-cell" style="width: 20%;"><strong>TURMA:</strong> _________</div>
+                                        </div>
+                                        <div class="student-row">
+                                            <div class="student-cell"><strong>ASSINATURA:</strong> _______________________________________________________</div>
+                                            <div class="student-cell"><strong>DATA:</strong> ____/____/202___</div>
+                                            <div class="student-cell"><strong>NOTA:</strong> ______ / 10,0</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% if estrutura.descricao_limpa %}
+                                <div style="border: 1px solid #d1d5db; background: #f9fafb; padding: 6px 10px; border-radius: 5px; font-size: 9pt; margin-bottom: 10px;">
+                                    <strong>Instruções Gerais:</strong> {{ estrutura.descricao_limpa }}
+                                </div>
+                                {% endif %}
+                            {% elif diagramacao.config.repeat_mini_header %}
+                                <!-- Minicabeçalho nas páginas 2+ -->
+                                <div class="mini-running-header">
+                                    <span class="mini-running-header-left">{{ prova.titulo }} • {{ estrutura.modulo_nome }}</span>
+                                    <span class="mini-running-header-right">PROVA #{{ prova.id }} • PÁGINA {{ pagina.numero }} DE {{ diagramacao.paginas_render|length }}</span>
+                                </div>
+                            {% endif %}
+
+                            <!-- Renderização dos Segmentos da Página (Largura Total vs 2 Colunas) -->
+                            {% for seg in pagina.segments %}
+                                {% if seg.type == 'full' %}
+                                    <div class="layout-segment-full">
+                                        {% with b=seg.item %}
+                                            {% if b.tipo == 'section_banner' %}
+                                                <div class="section-banner" style="background: {{ b.bg_color|default:'#111827' }};">
+                                                    <span class="section-banner-left">{{ b.titulo_esq }}</span>
+                                                    <span class="section-banner-right">{{ b.titulo_dir }}</span>
+                                                </div>
+                                            {% elif b.tipo == 'subject_subbanner' %}
+                                                <div class="subject-subbanner">{{ b.titulo }}</div>
+                                            {% else %}
+                                                <div class="question-block {% if b.opts.alt_cols == 2 %}alt-cols-2{% endif %}" data-img-size="{{ b.opts.img_size|default:'md' }}">
+                                                    <div class="question-header">
+                                                        <span class="question-header-left">{{ b.header_esq }}</span>
+                                                        <span class="question-header-right">{{ b.header_dir }}</span>
+                                                    </div>
+                                                    <div class="question-body">{{ b.html_corpo|safe }}</div>
+                                                    {% if b.is_dissertativa and b.opts.essay_lines > 0 %}
+                                                    <div class="essay-box">
+                                                        <div class="essay-box-header">
+                                                            <span class="essay-box-header-left">{{ b.essay_header_esq }}</span>
+                                                            <span class="essay-box-header-right">{{ b.essay_header_dir }}</span>
+                                                        </div>
+                                                        {% for lnum in b.linhas_range %}
+                                                        <div class="essay-line">{{ lnum }}</div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                {% else %}
+                                    <table class="layout-segment-2cols {% if diagramacao.config.column_rule %}with-rule{% else %}no-rule{% endif %}">
+                                        <tr class="layout-segment-2cols-row">
+                                            <td class="layout-col layout-col-left">
+                                                {% for b in seg.col1 %}
+                                                    {% if b.tipo == 'section_banner' %}
+                                                        <div class="section-banner" style="background: {{ b.bg_color|default:'#111827' }};">
+                                                            <span class="section-banner-left">{{ b.titulo_esq }}</span>
+                                                            <span class="section-banner-right">{{ b.titulo_dir }}</span>
+                                                        </div>
+                                                    {% elif b.tipo == 'subject_subbanner' %}
+                                                        <div class="subject-subbanner">{{ b.titulo }}</div>
+                                                    {% else %}
+                                                        <div class="question-block {% if b.opts.alt_cols == 2 %}alt-cols-2{% endif %}" data-img-size="{{ b.opts.img_size|default:'md' }}">
+                                                            <div class="question-header">
+                                                                <span class="question-header-left">{{ b.header_esq }}</span>
+                                                                <span class="question-header-right">{{ b.header_dir }}</span>
+                                                            </div>
+                                                            <div class="question-body">{{ b.html_corpo|safe }}</div>
+                                                            {% if b.is_dissertativa and b.opts.essay_lines > 0 %}
+                                                            <div class="essay-box">
+                                                                <div class="essay-box-header">
+                                                                    <span class="essay-box-header-left">{{ b.essay_header_esq }}</span>
+                                                                    <span class="essay-box-header-right">{{ b.essay_header_dir }}</span>
+                                                                </div>
+                                                                {% for lnum in b.linhas_range %}
+                                                                <div class="essay-line">{{ lnum }}</div>
+                                                                {% endfor %}
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td class="layout-col layout-col-right">
+                                                {% for b in seg.col2 %}
+                                                    {% if b.tipo == 'section_banner' %}
+                                                        <div class="section-banner" style="background: {{ b.bg_color|default:'#111827' }};">
+                                                            <span class="section-banner-left">{{ b.titulo_esq }}</span>
+                                                            <span class="section-banner-right">{{ b.titulo_dir }}</span>
+                                                        </div>
+                                                    {% elif b.tipo == 'subject_subbanner' %}
+                                                        <div class="subject-subbanner">{{ b.titulo }}</div>
+                                                    {% else %}
+                                                        <div class="question-block {% if b.opts.alt_cols == 2 %}alt-cols-2{% endif %}" data-img-size="{{ b.opts.img_size|default:'md' }}">
+                                                            <div class="question-header">
+                                                                <span class="question-header-left">{{ b.header_esq }}</span>
+                                                                <span class="question-header-right">{{ b.header_dir }}</span>
+                                                            </div>
+                                                            <div class="question-body">{{ b.html_corpo|safe }}</div>
+                                                            {% if b.is_dissertativa and b.opts.essay_lines > 0 %}
+                                                            <div class="essay-box">
+                                                                <div class="essay-box-header">
+                                                                    <span class="essay-box-header-left">{{ b.essay_header_esq }}</span>
+                                                                    <span class="essay-box-header-right">{{ b.essay_header_dir }}</span>
+                                                                </div>
+                                                                {% for lnum in b.linhas_range %}
+                                                                <div class="essay-line">{{ lnum }}</div>
+                                                                {% endfor %}
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <!-- Marcadores Fiduciais Inferiores em cada folha -->
+                        <div class="fiducial-row" style="margin-top: 10px;">
+                            <div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>
+                            <div class="fiducial-cell-center" style="font-weight:normal; color:#4b5563;">
+                                Gerado pelo Mimir (OpenSCC) • Página {{ pagina.numero }} de {{ diagramacao.paginas_render|length }}
+                            </div>
+                            <div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+    </main>
+</div>
+
+{% if not is_pdf_export %}
+<!-- Templates de Cabeçalho da Página 1 para o Motor JS do Estúdio -->
+<template id="tplPage1Header">
     <div class="header-box">
         <div class="header-top">
-            <div>
+            <div class="header-top-left">
                 <div class="exam-title">{{ prova.titulo }}</div>
                 <div class="exam-subtitle">
                     <strong>{{ estrutura.modulo_nome }}</strong> •
@@ -301,275 +1406,980 @@
                     {% for a in estrutura.assuntos %}{{ a.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
                 </div>
             </div>
-            <div class="code-box">
-                <div><strong>PROVA #{{ prova.id }}</strong></div>
-                <div>Itens: {{ estrutura.total_atual }}</div>
-                <div>{{ data_impressao|date:"d/m/Y" }}</div>
+            <div class="header-top-right">
+                <div class="code-box">
+                    <div><strong>PROVA #{{ prova.id }}</strong></div>
+                    <div>Itens: {{ estrutura.total_atual }}</div>
+                    <div>{{ data_impressao|date:"d/m/Y" }}</div>
+                </div>
             </div>
         </div>
-
-        {% if tipo_documento != 'gabarito' %}
         <div class="student-fields">
             <div class="student-row">
-                <div class="student-cell" style="width: 58%;"><strong>NOME DO(A) ALUNO(A):</strong> ______________________________________________________</div>
-                <div class="student-cell" style="width: 22%;"><strong>RA / MATRÍCULA:</strong> _______________</div>
-                <div class="student-cell" style="width: 20%;"><strong>TURMA:</strong> ___________</div>
+                <div class="student-cell" style="width: 58%;"><strong>NOME DO(A) ALUNO(A):</strong> __________________________________________________</div>
+                <div class="student-cell" style="width: 22%;"><strong>RA / MATRÍCULA:</strong> _____________</div>
+                <div class="student-cell" style="width: 20%;"><strong>TURMA:</strong> _________</div>
             </div>
             <div class="student-row">
-                <div class="student-cell"><strong>ASSINATURA:</strong> ___________________________________________________________</div>
+                <div class="student-cell"><strong>ASSINATURA:</strong> _______________________________________________________</div>
                 <div class="student-cell"><strong>DATA:</strong> ____/____/202___</div>
                 <div class="student-cell"><strong>NOTA:</strong> ______ / 10,0</div>
             </div>
         </div>
-        {% endif %}
     </div>
-
-    {% if tipo_documento == 'folha_resposta' %}
-        <!-- =================================================================== -->
-        <!-- MODO 2: FOLHA DE RESPOSTAS OMR / FOTO PARA CORREÇÃO AUTOMÁTICA     -->
-        <!-- =================================================================== -->
-        <div style="border: 1.5px solid #111827; background: #f8fafc; padding: 8px 12px; border-radius: 5px; font-size: 9pt; margin-bottom: 12px;">
-            <strong>INSTRUÇÕES PARA LEITURA POR FOTO (Mimir OMR + Visão Computacional):</strong>
-            1. Preencha completamente o círculo da alternativa escolhida com caneta azul ou preta.
-            2. Redija as respostas dissertativas exclusivamente dentro das caixas delimitadas abaixo.
-            3. Ao fotografar esta folha para correção no Mimir, enquadre os 4 quadrados pretos dos cantos.
-        </div>
-
-        <!-- Grade de Questões Objetivas (Partes I e III) -->
-        <div class="section-banner">
-            <span>BLOCO 1 • QUESTÕES OBJETIVAS (CONHECIMENTOS GERAIS E MATÉRIAS DO MÓDULO)</span>
-            <span>MARQUE APENAS 1 OPÇÃO POR QUESTÃO</span>
-        </div>
-
-        <div class="omr-grid">
-            {% for item in itens_objetivos %}
-            <div class="omr-row">
-                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
-                <div class="omr-cell-meta">
-                    <strong>{{ item.assunto_nome }}</strong><br>
-                    <span>{{ item.secao_titulo }}</span>
-                </div>
-                <div class="omr-cell-bubbles">
-                    {% for letra in alternativas %}
-                        <span class="bubble">{{ letra }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Caixas Delimitadas para as Questões Dissertativas (Partes II e IV) -->
-        {% if itens_dissertativos %}
-        <div class="section-banner">
-            <span>BLOCO 2 • QUESTÕES DISSERTATIVAS (TRANSCRIÇÃO E AVALIAÇÃO POR FOTO)</span>
-            <span>ESCREVA COM LETRA LEGÍVEL DENTRO DO QUADRO</span>
-        </div>
-
-        {% for item in itens_dissertativos %}
-        <div class="essay-box" style="margin-bottom: 12px; page-break-inside: avoid;">
-            <div class="essay-box-header">
-                <span>[QUESTÃO Q{{ item.numero|stringformat:"02d" }} • {{ item.secao_titulo|upper }}]</span>
-                <span>MATÉRIA/EIXO: {{ item.assunto_nome|upper }}</span>
-            </div>
-            <div style="font-size: 8.5pt; color: #374151; margin-bottom: 4px;">
-                {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:220 }}
-            </div>
-            {% for linha in linhas_dissertativa %}
-                <div class="essay-line">{{ linha }}</div>
-            {% endfor %}
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        <!-- Bloco 3: Sensação do Aluno (Parte V) -->
-        {% if itens_sensacao %}
-        <div class="section-banner" style="background: #374151;">
-            <span>BLOCO 3 • SENSAÇÃO DO ALUNO SOBRE A AVALIAÇÃO (AUTOAVALIAÇÃO / PESO ZERO)</span>
-            <span>DIAGNÓSTICO PEDAGÓGICO</span>
-        </div>
-        <div class="omr-grid">
-            {% for item in itens_sensacao %}
-            <div class="omr-row">
-                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
-                <div class="omr-cell-meta">
-                    {{ item.pergunta.get_texto_com_feedback|striptags|truncatechars:110 }}
-                </div>
-                <div class="omr-cell-bubbles">
-                    {% for letra in alternativas %}
-                        <span class="bubble">{{ letra }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-    {% elif tipo_documento == 'gabarito' %}
-        <!-- =================================================================== -->
-        <!-- MODO 3: GABARITO OFICIAL E CRITÉRIOS DE CORREÇÃO                    -->
-        <!-- =================================================================== -->
-        <div class="section-banner">
-            <span>GABARITO OFICIAL E MATRIZ DE CORREÇÃO • {{ prova.titulo }}</span>
-            <span>TOTAL: {{ estrutura.total_atual }} ITENS</span>
-        </div>
-
-        <div class="omr-grid">
-            {% for item in estrutura.questoes_numeradas %}
-            <div class="omr-row">
-                <div class="omr-cell-num">Q{{ item.numero|stringformat:"02d" }}</div>
-                <div class="omr-cell-meta">
-                    <strong>{{ item.secao_titulo }}</strong><br>
-                    Matéria: {{ item.assunto_nome }} • Peso sugerido: {{ item.peso_sugerido }}
-                </div>
-                <div class="omr-cell-bubbles" style="text-align: left;">
-                    {% if item.is_dissertativa %}
-                        <strong>Critério Dissertativo:</strong>
-                        <div style="margin-top: 3px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
-                    {% elif item.secao == 'sensacao_aluno' %}
-                        <em>Questão Diagnóstica (Sensação do Aluno) — Qualquer alternativa válida (A-E), Peso 0 na nota.</em>
-                    {% else %}
-                        {% for letra in alternativas %}
-                            <span class="bubble {% if item.letra_gabarito == letra %}bubble-filled{% endif %}">{{ letra }}</span>
-                        {% endfor %}
-                        <div style="font-size: 8.5pt; margin-top: 4px; color: #374151;">
-                            <strong>Gabarito:</strong>
-                            <div style="margin-top: 2px;">{{ item.pergunta.gabarito_com_syntax_highlight }}</div>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-    {% else %}
-        <!-- =================================================================== -->
-        <!-- MODO 1: CADERNO COMPLETO DA AVALIAÇÃO UNIFICADA (5 PARTES)          -->
-        <!-- =================================================================== -->
-        {% if estrutura.descricao_limpa %}
-        <div style="border: 1px solid #d1d5db; background: #f9fafb; padding: 8px 12px; border-radius: 5px; font-size: 9.5pt; margin-bottom: 14px;">
-            <strong>Instruções Gerais:</strong> {{ estrutura.descricao_limpa }}
-        </div>
-        {% endif %}
-
-        <!-- PARTE I: Conhecimentos Gerais (Objetivas) -->
-        {% if estrutura.secoes.cg_objetivas.perguntas %}
-        <div class="section-banner">
-            <span>PARTE I — CONHECIMENTOS GERAIS (QUESTÕES OBJETIVAS)</span>
-            <span>{{ estrutura.secoes.cg_objetivas.atual }} QUESTÃO(ÕES)</span>
-        </div>
-        {% for item in estrutura.secoes.cg_objetivas.perguntas %}
-        <div class="question-block">
-            <div class="question-header">
-                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • CONHECIMENTOS GERAIS</span>
-                <span>MÚLTIPLA ESCOLHA</span>
-            </div>
-            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        <!-- PARTE II: Questão Dissertativa (Conhecimento Geral) -->
-        {% if estrutura.secoes.cg_dissertativa.perguntas %}
-        <div class="section-banner">
-            <span>PARTE II — QUESTÃO DISSERTATIVA (CONHECIMENTO GERAL)</span>
-            <span>{{ estrutura.secoes.cg_dissertativa.atual }} QUESTÃO(ÕES)</span>
-        </div>
-        {% for item in estrutura.secoes.cg_dissertativa.perguntas %}
-        <div class="question-block">
-            <div class="question-header">
-                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA DE CONHECIMENTO GERAL</span>
-                <span>RESPOSTA ARGUMENTATIVA</span>
-            </div>
-            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
-            <div class="essay-box">
-                <div class="essay-box-header">
-                    <span>ESPAÇO PARA RESPOSTA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
-                    <span>[DISSERTATIVA Q{{ item.numero|stringformat:"02d" }}]</span>
-                </div>
-                {% for linha in linhas_dissertativa %}
-                <div class="essay-line">{{ linha }}</div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        <!-- PARTE III: Questões Objetivas por Matéria do Módulo -->
-        <div class="section-banner">
-            <span>PARTE III — CONHECIMENTOS ESPECÍFICOS POR MATÉRIA DO MÓDULO</span>
-            <span>{{ estrutura.secoes.materia_objetivas.atual }} QUESTÃO(ÕES)</span>
-        </div>
-        {% for mat in estrutura.secoes.materia_objetivas.por_materia %}
-            {% if mat.perguntas %}
-            <div class="subject-subbanner">
-                DISCIPLINA / ASSUNTO: {{ mat.assunto.nome|upper }} ({{ mat.atual }} questão(ões))
-            </div>
-            {% for item in mat.perguntas %}
-            <div class="question-block">
-                <div class="question-header">
-                    <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • {{ mat.assunto.nome|upper }}</span>
-                    <span>MÚLTIPLA ESCOLHA</span>
-                </div>
-                <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
-            </div>
-            {% endfor %}
-            {% endif %}
-        {% endfor %}
-
-        <!-- PARTE IV: Questão Dissertativa Técnica -->
-        {% if estrutura.secoes.dissertativa_tecnica.perguntas %}
-        <div class="section-banner">
-            <span>PARTE IV — QUESTÃO DISSERTATIVA TÉCNICA DO MÓDULO</span>
-            <span>{{ estrutura.secoes.dissertativa_tecnica.atual }} QUESTÃO(ÕES)</span>
-        </div>
-        {% for item in estrutura.secoes.dissertativa_tecnica.perguntas %}
-        <div class="question-block">
-            <div class="question-header">
-                <span>QUESTÃO {{ item.numero|stringformat:"02d" }} • DISSERTATIVA TÉCNICA ({{ item.assunto_nome|upper }})</span>
-                <span>RESPOSTA TÉCNICA</span>
-            </div>
-            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
-            <div class="essay-box">
-                <div class="essay-box-header">
-                    <span>ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {{ item.numero|stringformat:"02d" }}</span>
-                    <span>[DISSERTATIVA Q{{ item.numero|stringformat:"02d" }}]</span>
-                </div>
-                {% for linha in linhas_dissertativa %}
-                <div class="essay-line">{{ linha }}</div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        <!-- PARTE V: Questões sobre a Sensação do Aluno -->
-        {% if estrutura.secoes.sensacao_aluno.perguntas %}
-        <div class="section-banner" style="background: #374151;">
-            <span>PARTE V — SENSAÇÃO DO ALUNO SOBRE A PROVA (AUTOAVALIAÇÃO • PESO ZERO)</span>
-            <span>{{ estrutura.secoes.sensacao_aluno.atual }} ITEM(NS)</span>
-        </div>
-        {% for item in estrutura.secoes.sensacao_aluno.perguntas %}
-        <div class="question-block">
-            <div class="question-header">
-                <span>ITEM {{ item.numero|stringformat:"02d" }} • PERCEPÇÃO E AUTOAVALIAÇÃO DO ESTUDANTE</span>
-                <span>NÃO PENALIZA A NOTA</span>
-            </div>
-            <div class="question-body">{{ item.pergunta.texto_com_imagens_e_syntax_highlight }}</div>
-        </div>
-        {% endfor %}
-        {% endif %}
+    {% if estrutura.descricao_limpa %}
+    <div style="border: 1px solid #d1d5db; background: #f9fafb; padding: 6px 10px; border-radius: 5px; font-size: 9pt; margin-bottom: 10px;">
+        <strong>Instruções Gerais:</strong> {{ estrutura.descricao_limpa }}
+    </div>
     {% endif %}
+</template>
 
-    <!-- Marcadores Fiduciais Inferiores -->
-    <div class="fiducial-row" style="margin-top: 14px;">
-        <span class="fiducial-mark"></span>
-        <span style="font-family: monospace; font-size: 8pt; color: #4b5563;">
-            Gerado pelo Mimir (OpenSCC) • Suporte a Correção por Foto e Visão Computacional
-        </span>
-        <span class="fiducial-mark"></span>
-    </div>
-</div>
+<script id="studioInitialData" type="application/json">{{ diagramacao_json|safe }}</script>
+
+<script>
+(function() {
+    const TIPO_DOC = "{{ tipo_documento }}";
+    const URL_SALVAR = "{% url 'mimir:salvarDiagramacaoUnificadaAjax' prova.id %}";
+    const CSRF_TOKEN = "{{ csrf_token }}";
+    const PROVA_ID = "{{ prova.id }}";
+    const PROVA_TITULO = "{{ prova.titulo|escapejs }}";
+    const MODULO_NOME = "{{ estrutura.modulo_nome|escapejs }}";
+
+    const rawDataEl = document.getElementById('studioInitialData');
+    if (!rawDataEl) return;
+
+    const studioState = JSON.parse(rawDataEl.textContent);
+    const blocosMap = {};
+    (studioState.blocos || []).forEach(function(b) {
+        blocosMap[b.id] = b;
+    });
+
+    let dirty = false;
+    let saveTimer = null;
+    let draggedInfo = null;
+
+    function setSaveStatus(text, color) {
+        const el = document.getElementById('studioSaveStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = color || '#94a3b8';
+    }
+
+    function markDirty() {
+        dirty = true;
+        setSaveStatus('● Alterações não salvas...', '#fbbf24');
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(function() {
+            salvarDiagramacaoServidor(false);
+        }, 900);
+    }
+
+    window.salvarDiagramacaoServidor = function(manual) {
+        if (saveTimer) clearTimeout(saveTimer);
+        setSaveStatus('Salvando diagramação...', '#60a5fa');
+        return fetch(URL_SALVAR, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({
+                config: studioState.config,
+                block_opts: studioState.block_opts,
+                pages: studioState.pages
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.status === 'success') {
+                dirty = false;
+                setSaveStatus('✔ Diagramação salva', '#34d399');
+            } else {
+                setSaveStatus('⚠ Erro ao salvar', '#f87171');
+            }
+            return res;
+        })
+        .catch(function() {
+            setSaveStatus('⚠ Falha de conexão ao salvar', '#f87171');
+        });
+    };
+
+    window.baixarPdfDiagramado = function() {
+        salvarDiagramacaoServidor(true).finally(function() {
+            window.open('?tipo=' + encodeURIComponent(TIPO_DOC) + '&pdf=1', '_blank');
+        });
+    };
+
+    window.toggleStudioPreviewMode = function() {
+        document.body.classList.toggle('studio-edit-mode');
+    };
+
+    window.setOmrCols = function(cols) {
+        studioState.config.omr_cols = cols;
+        const g1 = document.getElementById('omrGrid1Col');
+        const g2 = document.getElementById('omrGrid2Col');
+        const b1 = document.getElementById('btnOmr1Col');
+        const b2 = document.getElementById('btnOmr2Col');
+        if (g1 && g2) {
+            g1.style.display = (cols === 2) ? 'none' : '';
+            g2.style.display = (cols === 2) ? '' : 'none';
+        }
+        if (b1 && b2) {
+            b1.classList.toggle('active', cols !== 2);
+            b2.classList.toggle('active', cols === 2);
+        }
+        salvarDiagramacaoServidor(false);
+    };
+
+    if (TIPO_DOC !== 'prova') return;
+
+    function syncSidebarControlsFromConfig() {
+        const cfg = studioState.config;
+        const elFont = document.getElementById('cfgFontSize');
+        const elMargin = document.getElementById('cfgMarginMm');
+        const elGap = document.getElementById('cfgQuestionGap');
+        const elStyle = document.getElementById('cfgCardStyle');
+        const elAltCols = document.getElementById('cfgDefaultAltCols');
+        const elRule = document.getElementById('cfgColumnRule');
+        const elMini = document.getElementById('cfgRepeatMiniHeader');
+
+        if (elFont) elFont.value = cfg.font_size || '10pt';
+        if (elMargin) elMargin.value = String(cfg.margin_mm || 12);
+        if (elGap) elGap.value = String(cfg.question_gap || 10);
+        if (elStyle) elStyle.value = cfg.card_style || 'bordered';
+        if (elAltCols) elAltCols.value = String(cfg.default_alt_cols || 1);
+        if (elRule) elRule.checked = cfg.column_rule !== false;
+        if (elMini) elMini.checked = cfg.repeat_mini_header !== false;
+
+        document.documentElement.style.setProperty('--exam-font-size', cfg.font_size || '10pt');
+        document.documentElement.style.setProperty('--exam-margin-mm', (cfg.margin_mm || 12) + 'mm');
+        document.documentElement.style.setProperty('--exam-question-gap', (cfg.question_gap || 10) + 'px');
+
+        document.body.classList.remove('card-style-bordered', 'card-style-clean', 'card-style-top_line');
+        document.body.classList.add('card-style-' + (cfg.card_style || 'bordered'));
+    }
+
+    window.atualizarConfigGlobal = function() {
+        const cfg = studioState.config;
+        cfg.font_size = document.getElementById('cfgFontSize').value;
+        cfg.margin_mm = parseInt(document.getElementById('cfgMarginMm').value, 10) || 12;
+        cfg.question_gap = parseInt(document.getElementById('cfgQuestionGap').value, 10) || 10;
+        cfg.card_style = document.getElementById('cfgCardStyle').value;
+        cfg.column_rule = document.getElementById('cfgColumnRule').checked;
+        cfg.repeat_mini_header = document.getElementById('cfgRepeatMiniHeader').checked;
+
+        syncSidebarControlsFromConfig();
+        renderAllPages();
+        markDirty();
+    };
+
+    window.aplicarColunasAlternativasTodas = function(val) {
+        const cols = parseInt(val, 10) === 2 ? 2 : 1;
+        studioState.config.default_alt_cols = cols;
+        Object.keys(studioState.block_opts).forEach(function(bid) {
+            studioState.block_opts[bid].alt_cols = cols;
+        });
+        renderAllPages();
+        markDirty();
+    };
+
+    function getBlockOpts(bid) {
+        if (!studioState.block_opts[bid]) {
+            const b = blocosMap[bid] || {};
+            studioState.block_opts[bid] = {
+                alt_cols: studioState.config.default_alt_cols || 1,
+                img_size: 'md',
+                essay_lines: b.is_dissertativa ? (b.linhas_default || 12) : 0
+            };
+        }
+        return studioState.block_opts[bid];
+    }
+
+    function buildBlockHtml(b, pageIdx, totalPages, pageCols, zone) {
+        const opts = getBlockOpts(b.id);
+        let innerHtml = '';
+
+        if (b.tipo === 'section_banner') {
+            innerHtml =
+                '<div class="section-banner" style="background:' + (b.bg_color || '#111827') + ';">' +
+                    '<span class="section-banner-left">' + b.titulo_esq + '</span>' +
+                    '<span class="section-banner-right">' + b.titulo_dir + '</span>' +
+                '</div>';
+        } else if (b.tipo === 'subject_subbanner') {
+            innerHtml = '<div class="subject-subbanner">' + b.titulo + '</div>';
+        } else {
+            let essayHtml = '';
+            if (b.is_dissertativa && opts.essay_lines > 0) {
+                let linesHtml = '';
+                for (let i = 1; i <= opts.essay_lines; i++) {
+                    linesHtml += '<div class="essay-line">' + i + '</div>';
+                }
+                essayHtml =
+                    '<div class="essay-box">' +
+                        '<div class="essay-box-header">' +
+                            '<span class="essay-box-header-left">' + b.essay_header_esq + '</span>' +
+                            '<span class="essay-box-header-right">' + b.essay_header_dir + '</span>' +
+                        '</div>' +
+                        linesHtml +
+                    '</div>';
+            }
+            const altClass = (opts.alt_cols === 2) ? ' alt-cols-2' : '';
+            innerHtml =
+                '<div class="question-block' + altClass + '" data-img-size="' + (opts.img_size || 'md') + '">' +
+                    '<div class="question-header">' +
+                        '<span class="question-header-left">' + b.header_esq + '</span>' +
+                        '<span class="question-header-right">' + b.header_dir + '</span>' +
+                    '</div>' +
+                    '<div class="question-body">' + b.html_corpo + '</div>' +
+                    essayHtml +
+                '</div>';
+        }
+
+        // Barra flutuante de ferramentas do bloco
+        let toolsHtml = '<div class="block-floating-tools">';
+        toolsHtml += '<span class="btool-drag" title="Arraste para mover este bloco">⠿</span>';
+
+        if (pageCols === 2) {
+            if (zone === 'full') {
+                toolsHtml += '<button type="button" class="btool-btn active" onclick="setBlockZone(\'' + b.id + '\', ' + pageIdx + ', \'col1\')" title="Colocar em 1 coluna (meia largura)">↔ 2 Cols (Total)</button>';
+            } else {
+                toolsHtml += '<button type="button" class="btool-btn" onclick="setBlockZone(\'' + b.id + '\', ' + pageIdx + ', \'full\')" title="Expandir este bloco nas 2 colunas (largura total)">↔ Expandir 2 Cols</button>';
+                toolsHtml += '<button type="button" class="btool-btn ' + (zone === 'col1' ? 'active' : '') + '" onclick="setBlockZone(\'' + b.id + '\', ' + pageIdx + ', \'col1\')" title="Mover para a Coluna 1 (Esquerda)">◀ Esq</button>';
+                toolsHtml += '<button type="button" class="btool-btn ' + (zone === 'col2' ? 'active' : '') + '" onclick="setBlockZone(\'' + b.id + '\', ' + pageIdx + ', \'col2\')" title="Mover para a Coluna 2 (Direita)">Dir ▶</button>';
+            }
+        }
+
+        if (b.tipo === 'question' && b.is_objetiva) {
+            const nextAlt = (opts.alt_cols === 2) ? 1 : 2;
+            toolsHtml += '<button type="button" class="btool-btn ' + (opts.alt_cols === 2 ? 'active' : '') + '" onclick="toggleBlockAltCols(\'' + b.id + '\', ' + nextAlt + ')" title="Alternar alternativas entre 1 coluna ou 2 colunas">Alt: ' + opts.alt_cols + 'x</button>';
+        }
+
+        if (b.tipo === 'question' && b.tem_imagem) {
+            toolsHtml += '<button type="button" class="btool-btn" onclick="cycleBlockImgSize(\'' + b.id + '\')" title="Ajustar tamanho da imagem (P / M / G / 100%)">🖼️ Img:' + (opts.img_size || 'md').toUpperCase() + '</button>';
+        }
+
+        if (b.tipo === 'question' && b.is_dissertativa) {
+            toolsHtml += '<button type="button" class="btool-btn" onclick="changeBlockEssayLines(\'' + b.id + '\', -3)" title="Reduzir linhas de resposta">-Linhas</button>';
+            toolsHtml += '<span style="padding:0 3px; color:#94a3b8;">' + opts.essay_lines + 'L</span>';
+            toolsHtml += '<button type="button" class="btool-btn" onclick="changeBlockEssayLines(\'' + b.id + '\', 3)" title="Aumentar linhas de resposta">+Linhas</button>';
+        }
+
+        toolsHtml += '<button type="button" class="btool-btn" onclick="moveBlockOrder(\'' + b.id + '\', ' + pageIdx + ', -1)" title="Subir na página">↑</button>';
+        toolsHtml += '<button type="button" class="btool-btn" onclick="moveBlockOrder(\'' + b.id + '\', ' + pageIdx + ', 1)" title="Descer na página">↓</button>';
+        toolsHtml += '<button type="button" class="btool-btn" onclick="splitPageBeforeBlock(\'' + b.id + '\', ' + pageIdx + ')" title="Quebrar página aqui (enviar este bloco e os seguintes para uma nova folha A4)">✂️ Quebrar Pág</button>';
+
+        if (pageIdx > 0) {
+            toolsHtml += '<button type="button" class="btool-btn" onclick="moveBlockToAdjacentPage(\'' + b.id + '\', ' + pageIdx + ', -1)" title="Enviar para a página anterior">▲ Pág Ant</button>';
+        }
+        if (pageIdx < totalPages - 1) {
+            toolsHtml += '<button type="button" class="btool-btn" onclick="moveBlockToAdjacentPage(\'' + b.id + '\', ' + pageIdx + ', 1)" title="Enviar para a próxima página">▼ Próx Pág</button>';
+        }
+
+        toolsHtml += '</div>';
+
+        return (
+            '<div class="diagram-block-wrap" draggable="true" data-block-id="' + b.id + '" data-page-idx="' + pageIdx + '" data-zone="' + zone + '">' +
+                toolsHtml +
+                innerHtml +
+            '</div>'
+        );
+    }
+
+    function buildSegmentsForPage(pg) {
+        const cols = pg.cols === 2 ? 2 : 1;
+        const segments = [];
+        (pg.items || []).forEach(function(it) {
+            const b = blocosMap[it.id];
+            if (!b) return;
+            const zone = (cols === 1) ? 'full' : (it.zone || 'full');
+            if (zone === 'full') {
+                segments.push({ type: 'full', item: b, zone: 'full' });
+            } else {
+                if (!segments.length || segments[segments.length - 1].type !== 'two_cols') {
+                    segments.push({ type: 'two_cols', col1: [], col2: [] });
+                }
+                if (zone === 'col2') {
+                    segments[segments.length - 1].col2.push(b);
+                } else {
+                    segments[segments.length - 1].col1.push(b);
+                }
+            }
+        });
+        if (cols === 2 && segments.every(function(s) { return s.type === 'full'; })) {
+            segments.push({ type: 'two_cols', col1: [], col2: [] });
+        }
+        return segments;
+    }
+
+    window.renderAllPages = function() {
+        const root = document.getElementById('studioPagesRoot');
+        if (!root) return;
+
+        const totalPages = studioState.pages.length;
+        const cfg = studioState.config;
+        const tplHeader = document.getElementById('tplPage1Header');
+        const header1Html = tplHeader ? tplHeader.innerHTML : '';
+
+        let htmlOut = '';
+
+        studioState.pages.forEach(function(pg, pageIdx) {
+            const pageNum = pageIdx + 1;
+            const cols = pg.cols === 2 ? 2 : 1;
+            const isLast = (pageIdx === totalPages - 1);
+            const segments = buildSegmentsForPage(pg);
+
+            // Barra de ferramentas da Folha A4
+            let toolbarHtml =
+                '<div class="sheet-studio-toolbar">' +
+                    '<div class="sheet-toolbar-group">' +
+                        '<strong>📄 PÁGINA ' + pageNum + ' DE ' + totalPages + '</strong>' +
+                        '<span id="fillBadge_' + pageIdx + '" class="fill-badge fill-ok">Medindo A4...</span>' +
+                    '</div>' +
+                    '<div class="sheet-toolbar-group">' +
+                        '<span>Layout da Folha:</span>' +
+                        '<button type="button" class="sheet-btn ' + (cols === 1 ? 'active' : '') + '" onclick="setPageColumns(' + pageIdx + ', 1)">▭ 1 Coluna</button>' +
+                        '<button type="button" class="sheet-btn ' + (cols === 2 ? 'active' : '') + '" onclick="setPageColumns(' + pageIdx + ', 2)">◫ 2 Colunas</button>';
+
+            if (cols === 2) {
+                toolbarHtml += '<button type="button" class="sheet-btn" onclick="balancearColunasPagina(' + pageIdx + ')" title="Distribuir questões equilibradamente entre Coluna 1 e Coluna 2">⚖️ Equilibrar Colunas</button>';
+            }
+
+            toolbarHtml +=
+                        '<button type="button" class="sheet-btn" onclick="inserirNovaPaginaApos(' + pageIdx + ')" title="Inserir uma nova folha A4 logo abaixo">+ Página Abaixo</button>';
+
+            if (pageIdx > 0) {
+                toolbarHtml += '<button type="button" class="sheet-btn" onclick="mesclarComPaginaAnterior(' + pageIdx + ')" title="Juntar os itens desta página na página anterior">⬆️ Juntar c/ Anterior</button>';
+            }
+            if (totalPages > 1 && (!pg.items || pg.items.length === 0)) {
+                toolbarHtml += '<button type="button" class="sheet-btn danger" onclick="removerPagina(' + pageIdx + ')">🗑️ Excluir Folha Vazia</button>';
+            }
+
+            toolbarHtml += '</div></div>';
+
+            // Conteúdo interno da folha A4
+            let bodyHtml = '';
+            segments.forEach(function(seg) {
+                if (seg.type === 'full') {
+                    bodyHtml +=
+                        '<div class="layout-segment-full col-dropzone" data-page-idx="' + pageIdx + '" data-target-zone="full">' +
+                            buildBlockHtml(seg.item, pageIdx, totalPages, cols, 'full') +
+                        '</div>';
+                } else {
+                    const ruleClass = (cfg.column_rule !== false) ? 'with-rule' : 'no-rule';
+                    let col1Html = '<div class="col-zone-label">Coluna 1 (Esquerda)</div>';
+                    seg.col1.forEach(function(b) {
+                        col1Html += buildBlockHtml(b, pageIdx, totalPages, cols, 'col1');
+                    });
+                    let col2Html = '<div class="col-zone-label">Coluna 2 (Direita)</div>';
+                    seg.col2.forEach(function(b) {
+                        col2Html += buildBlockHtml(b, pageIdx, totalPages, cols, 'col2');
+                    });
+
+                    bodyHtml +=
+                        '<table class="layout-segment-2cols ' + ruleClass + '">' +
+                            '<tr class="layout-segment-2cols-row">' +
+                                '<td class="layout-col layout-col-left col-dropzone" data-page-idx="' + pageIdx + '" data-target-zone="col1">' +
+                                    col1Html +
+                                '</td>' +
+                                '<td class="layout-col layout-col-right col-dropzone" data-page-idx="' + pageIdx + '" data-target-zone="col2">' +
+                                    col2Html +
+                                '</td>' +
+                            '</tr>' +
+                        '</table>';
+                }
+            });
+
+            if (!segments.length) {
+                const targetZone = cols === 2 ? 'col1' : 'full';
+                bodyHtml +=
+                    '<div class="col-dropzone" data-page-idx="' + pageIdx + '" data-target-zone="' + targetZone + '" style="padding:28px; text-align:center; color:#64748b; font-size:9pt;">' +
+                        'Folha vazia — Arraste questões para cá ou use o botão excluir folha.' +
+                    '</div>';
+            }
+
+            let topHeaderHtml = '';
+            if (pageIdx === 0) {
+                topHeaderHtml = header1Html;
+            } else if (cfg.repeat_mini_header !== false) {
+                topHeaderHtml =
+                    '<div class="mini-running-header">' +
+                        '<span class="mini-running-header-left">' + PROVA_TITULO + ' • ' + MODULO_NOME + '</span>' +
+                        '<span class="mini-running-header-right">PROVA #' + PROVA_ID + ' • PÁGINA ' + pageNum + ' DE ' + totalPages + '</span>' +
+                    '</div>';
+            }
+
+            htmlOut +=
+                '<div class="exam-sheet-wrapper" id="sheet_wrap_' + pageNum + '">' +
+                    toolbarHtml +
+                    '<div class="exam-sheet ' + (isLast ? 'last-sheet' : '') + '" id="exam_sheet_' + pageIdx + '" data-page-idx="' + pageIdx + '">' +
+                        '<div class="exam-sheet-content">' +
+                            '<div class="fiducial-row">' +
+                                '<div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>' +
+                                '<div class="fiducial-cell-center">' +
+                                    '[MIMIR-UNIFICADA-ID:' + PROVA_ID + ' | MODULO:' + MODULO_NOME.toUpperCase() + ' | PÁG:' + pageNum + '/' + totalPages + ']' +
+                                '</div>' +
+                                '<div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>' +
+                            '</div>' +
+                            topHeaderHtml +
+                            bodyHtml +
+                        '</div>' +
+                        '<div class="fiducial-row" style="margin-top: 10px;">' +
+                            '<div class="fiducial-cell-mark"><span class="fiducial-mark"></span></div>' +
+                            '<div class="fiducial-cell-center" style="font-weight:normal; color:#4b5563;">' +
+                                'Gerado pelo Mimir (OpenSCC) • Página ' + pageNum + ' de ' + totalPages +
+                            '</div>' +
+                            '<div class="fiducial-cell-mark" style="text-align:right;"><span class="fiducial-mark"></span></div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+        });
+
+        root.innerHTML = htmlOut;
+        bindDragAndDropEvents();
+        requestAnimationFrame(updatePageFillIndicators);
+    };
+
+    function updatePageFillIndicators() {
+        const totalPages = studioState.pages.length;
+        const lblTotal = document.getElementById('lblTotalPaginas');
+        if (lblTotal) lblTotal.textContent = String(totalPages);
+
+        const sidebarList = document.getElementById('sidebarPagesList');
+        let navHtml = '';
+
+        // Converte 297mm em pixels reais no navegador usando uma régua temporária ou a largura de 210mm da folha
+        const firstSheet = document.querySelector('.exam-sheet');
+        const pxPerMm = firstSheet ? (firstSheet.offsetWidth / 210.0) : 3.78;
+        const marginMm = studioState.config.margin_mm || 12;
+        const maxContentPx = (297 - (marginMm * 2)) * pxPerMm;
+
+        studioState.pages.forEach(function(pg, idx) {
+            const sheetEl = document.getElementById('exam_sheet_' + idx);
+            const badgeEl = document.getElementById('fillBadge_' + idx);
+            let pct = 0;
+            if (sheetEl) {
+                const contentEl = sheetEl.querySelector('.exam-sheet-content');
+                const usedPx = (contentEl ? contentEl.offsetHeight : sheetEl.offsetHeight) + 28;
+                pct = Math.round((usedPx / Math.max(1, maxContentPx)) * 100);
+            }
+
+            if (badgeEl) {
+                badgeEl.className = 'fill-badge ' + (pct > 102 ? 'fill-over' : (pct > 88 ? 'fill-warn' : 'fill-ok'));
+                if (pct > 102) {
+                    badgeEl.innerHTML = '⚠️ ' + pct + '% A4 (Passou de 1 folha) <button type="button" class="btool-btn" style="margin-left:4px;" onclick="dividirExcedentePagina(' + idx + ')">✂️ Dividir</button>';
+                } else {
+                    badgeEl.textContent = 'Ocupação A4: ' + pct + '%';
+                }
+            }
+
+            const colsTag = (pg.cols === 2) ? '2 Cols' : '1 Col';
+            navHtml +=
+                '<div class="page-nav-item">' +
+                    '<a href="#sheet_wrap_' + (idx + 1) + '" style="color:#f8fafc; text-decoration:none; font-weight:600;">' +
+                        'Pág. ' + (idx + 1) + ' <span style="color:#94a3b8; font-weight:400;">(' + (pg.items ? pg.items.length : 0) + ' blocos)</span>' +
+                    '</a>' +
+                    '<div style="display:flex; align-items:center; gap:4px;">' +
+                        '<span style="font-size:7.5pt; color:' + (pct > 102 ? '#fca5a5' : '#6ee7b7') + ';">' + pct + '%</span>' +
+                        '<button type="button" class="btool-btn ' + (pg.cols === 2 ? 'active' : '') + '" onclick="setPageColumns(' + idx + ', ' + (pg.cols === 2 ? 1 : 2) + ')" title="Alternar entre 1 e 2 colunas">' + colsTag + '</button>' +
+                    '</div>' +
+                '</div>';
+        });
+
+        if (sidebarList) sidebarList.innerHTML = navHtml;
+    }
+
+    // =======================================================================
+    // AÇÕES INTERATIVAS DE PÁGINA, COLUNAS E BLOCOS
+    // =======================================================================
+    window.setPageColumns = function(pageIdx, cols) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg) return;
+        pg.cols = (cols === 2) ? 2 : 1;
+        if (pg.cols === 1) {
+            (pg.items || []).forEach(function(it) { it.zone = 'full'; });
+        } else {
+            balancearItensEmDuasColunas(pg);
+        }
+        renderAllPages();
+        markDirty();
+    };
+
+    function balancearItensEmDuasColunas(pg) {
+        const items = pg.items || [];
+        // Agrupa blocos contínuos que não sejam section_banner nem dissertativa larga e divide equilibradamente entre col1 e col2
+        let buffer = [];
+        function flushBuffer() {
+            if (!buffer.length) return;
+            // Calcula peso estimado para equilibrar altura entre Coluna 1 e Coluna 2
+            let totalW = 0;
+            const weights = buffer.map(function(it) {
+                const b = blocosMap[it.id] || {};
+                const w = (b.tipo === 'subject_subbanner') ? 1 : (2 + Math.min(4, Math.floor((b.texto_plano || '').length / 140)));
+                totalW += w;
+                return w;
+            });
+            let acc = 0;
+            buffer.forEach(function(it, i) {
+                if (i === 0 || (acc + weights[i] / 2) <= totalW / 2) {
+                    it.zone = 'col1';
+                } else {
+                    it.zone = 'col2';
+                }
+                acc += weights[i];
+            });
+            buffer = [];
+        }
+
+        items.forEach(function(it) {
+            const b = blocosMap[it.id] || {};
+            if (b.tipo === 'section_banner' || b.is_dissertativa) {
+                flushBuffer();
+                it.zone = 'full';
+            } else {
+                buffer.push(it);
+            }
+        });
+        flushBuffer();
+    }
+
+    window.balancearColunasPagina = function(pageIdx) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg) return;
+        pg.cols = 2;
+        balancearItensEmDuasColunas(pg);
+        renderAllPages();
+        markDirty();
+    };
+
+    window.setBlockZone = function(blockId, pageIdx, newZone) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg) return;
+        const found = (pg.items || []).find(function(it) { return it.id === blockId; });
+        if (found) {
+            found.zone = newZone;
+            renderAllPages();
+            markDirty();
+        }
+    };
+
+    window.toggleBlockAltCols = function(blockId, cols) {
+        const opts = getBlockOpts(blockId);
+        opts.alt_cols = cols;
+        renderAllPages();
+        markDirty();
+    };
+
+    window.cycleBlockImgSize = function(blockId) {
+        const order = ['sm', 'md', 'lg', 'full'];
+        const opts = getBlockOpts(blockId);
+        const curIdx = order.indexOf(opts.img_size || 'md');
+        opts.img_size = order[(curIdx + 1) % order.length];
+        renderAllPages();
+        markDirty();
+    };
+
+    window.changeBlockEssayLines = function(blockId, delta) {
+        const opts = getBlockOpts(blockId);
+        opts.essay_lines = Math.max(0, Math.min(30, (opts.essay_lines || 12) + delta));
+        renderAllPages();
+        markDirty();
+    };
+
+    window.moveBlockOrder = function(blockId, pageIdx, dir) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg || !pg.items) return;
+        const idx = pg.items.findIndex(function(it) { return it.id === blockId; });
+        if (idx === -1) return;
+        const targetIdx = idx + dir;
+        if (targetIdx < 0 || targetIdx >= pg.items.length) return;
+        const temp = pg.items[idx];
+        pg.items[idx] = pg.items[targetIdx];
+        pg.items[targetIdx] = temp;
+        renderAllPages();
+        markDirty();
+    };
+
+    window.splitPageBeforeBlock = function(blockId, pageIdx) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg || !pg.items) return;
+        const idx = pg.items.findIndex(function(it) { return it.id === blockId; });
+        if (idx <= 0) return;
+
+        // Se o bloco imediatamente anterior for um banner/subbanner, leva o banner junto para a nova página
+        let splitIdx = idx;
+        while (splitIdx > 1) {
+            const prevB = blocosMap[pg.items[splitIdx - 1].id];
+            if (prevB && (prevB.tipo === 'section_banner' || prevB.tipo === 'subject_subbanner')) {
+                splitIdx--;
+            } else {
+                break;
+            }
+        }
+
+        const movedItems = pg.items.splice(splitIdx);
+        const newPage = {
+            id: 'page_' + Date.now(),
+            cols: pg.cols,
+            items: movedItems
+        };
+        studioState.pages.splice(pageIdx + 1, 0, newPage);
+        renderAllPages();
+        markDirty();
+    };
+
+    window.moveBlockToAdjacentPage = function(blockId, pageIdx, deltaPage) {
+        const targetPageIdx = pageIdx + deltaPage;
+        if (targetPageIdx < 0 || targetPageIdx >= studioState.pages.length) return;
+        const curPg = studioState.pages[pageIdx];
+        const targetPg = studioState.pages[targetPageIdx];
+        const idx = curPg.items.findIndex(function(it) { return it.id === blockId; });
+        if (idx === -1) return;
+
+        const [item] = curPg.items.splice(idx, 1);
+        if (targetPg.cols === 1) {
+            item.zone = 'full';
+        } else if (item.zone === 'full') {
+            const b = blocosMap[item.id] || {};
+            if (b.tipo === 'question' && !b.is_dissertativa) item.zone = 'col1';
+        }
+
+        if (deltaPage < 0) {
+            targetPg.items.push(item);
+        } else {
+            targetPg.items.unshift(item);
+        }
+        renderAllPages();
+        markDirty();
+    };
+
+    window.inserirNovaPaginaApos = function(pageIdx) {
+        const curPg = studioState.pages[pageIdx];
+        studioState.pages.splice(pageIdx + 1, 0, {
+            id: 'page_' + Date.now(),
+            cols: curPg ? curPg.cols : 1,
+            items: []
+        });
+        renderAllPages();
+        markDirty();
+    };
+
+    window.adicionarNovaPaginaFinal = function() {
+        inserirNovaPaginaApos(studioState.pages.length - 1);
+    };
+
+    window.mesclarComPaginaAnterior = function(pageIdx) {
+        if (pageIdx <= 0 || pageIdx >= studioState.pages.length) return;
+        const prevPg = studioState.pages[pageIdx - 1];
+        const curPg = studioState.pages[pageIdx];
+        (curPg.items || []).forEach(function(it) {
+            if (prevPg.cols === 1) it.zone = 'full';
+            prevPg.items.push(it);
+        });
+        studioState.pages.splice(pageIdx, 1);
+        renderAllPages();
+        markDirty();
+    };
+
+    window.removerPagina = function(pageIdx) {
+        if (studioState.pages.length <= 1) return;
+        const pg = studioState.pages[pageIdx];
+        if (pg && pg.items && pg.items.length > 0) {
+            mesclarComPaginaAnterior(pageIdx > 0 ? pageIdx : 1);
+            return;
+        }
+        studioState.pages.splice(pageIdx, 1);
+        renderAllPages();
+        markDirty();
+    };
+
+    window.dividirExcedentePagina = function(pageIdx) {
+        const pg = studioState.pages[pageIdx];
+        if (!pg || !pg.items || pg.items.length < 2) return;
+        const half = Math.max(1, Math.ceil(pg.items.length / 2));
+        const bId = pg.items[half].id;
+        splitPageBeforeBlock(bId, pageIdx);
+    };
+
+    // =======================================================================
+    // PRESETS INTELIGENTES E AUTO-PAGINAÇÃO A4 REAL
+    // =======================================================================
+    window.aplicarPresetDiagramacao = function(presetName) {
+        const todosBlocos = studioState.blocos || [];
+        if (!todosBlocos.length) return;
+
+        if (presetName === 'classico_1col') {
+            studioState.pages = [{
+                id: 'page_1',
+                cols: 1,
+                items: todosBlocos.map(function(b) { return { id: b.id, zone: 'full' }; })
+            }];
+            renderAllPages();
+            autoPaginarFolhasA4();
+            return;
+        }
+
+        if (presetName === 'tudo_2col') {
+            studioState.config.font_size = '9.5pt';
+            studioState.config.margin_mm = 10;
+            studioState.config.question_gap = 8;
+            studioState.config.column_rule = true;
+            syncSidebarControlsFromConfig();
+
+            const pg = {
+                id: 'page_1',
+                cols: 2,
+                items: todosBlocos.map(function(b) {
+                    return { id: b.id, zone: (b.tipo === 'section_banner') ? 'full' : 'col1' };
+                })
+            };
+            studioState.pages = [pg];
+            renderAllPages();
+            autoPaginarFolhasA4();
+            return;
+        }
+
+        if (presetName === 'enem_2col') {
+            studioState.config.font_size = '10pt';
+            studioState.config.margin_mm = 12;
+            studioState.config.question_gap = 10;
+            studioState.config.column_rule = true;
+            syncSidebarControlsFromConfig();
+
+            const pg = {
+                id: 'page_1',
+                cols: 2,
+                items: todosBlocos.map(function(b) {
+                    const isFull = (b.tipo === 'section_banner' || b.is_dissertativa);
+                    return { id: b.id, zone: isFull ? 'full' : 'col1' };
+                })
+            };
+            studioState.pages = [pg];
+            renderAllPages();
+            autoPaginarFolhasA4();
+            return;
+        }
+
+        if (presetName === 'por_parte') {
+            const pagesBySec = [];
+            let curSec = null;
+            let curPage = null;
+
+            todosBlocos.forEach(function(b) {
+                if (b.secao !== curSec || !curPage) {
+                    curSec = b.secao;
+                    const isDissSec = (curSec === 'cg_dissertativa' || curSec === 'dissertativa_tecnica');
+                    curPage = {
+                        id: 'page_' + (pagesBySec.length + 1),
+                        cols: isDissSec ? 1 : 2,
+                        items: []
+                    };
+                    pagesBySec.push(curPage);
+                }
+                const zone = (curPage.cols === 1 || b.tipo === 'section_banner' || b.is_dissertativa) ? 'full' : 'col1';
+                curPage.items.push({ id: b.id, zone: zone });
+            });
+
+            pagesBySec.forEach(function(p) {
+                if (p.cols === 2) balancearItensEmDuasColunas(p);
+            });
+            studioState.pages = pagesBySec;
+            renderAllPages();
+            markDirty();
+        }
+    };
+
+    window.autoPaginarFolhasA4 = function() {
+        // Mede a altura real em pixels de cada bloco renderizado na tela e distribui em folhas A4
+        const firstSheet = document.querySelector('.exam-sheet');
+        const pxPerMm = firstSheet ? (firstSheet.offsetWidth / 210.0) : 3.78;
+        const marginMm = studioState.config.margin_mm || 12;
+        const usablePageHeightPx = (297 - (marginMm * 2) - 16) * pxPerMm;
+
+        // Coleta a ordem atual dos blocos e o modo preferido de colunas
+        const preferredCols = studioState.pages.some(function(p) { return p.cols === 2; }) ? 2 : 1;
+        const orderedItems = [];
+        studioState.pages.forEach(function(p) {
+            (p.items || []).forEach(function(it) {
+                orderedItems.push(it);
+            });
+        });
+
+        // Mede cada bloco no DOM
+        const heightsMap = {};
+        document.querySelectorAll('.diagram-block-wrap').forEach(function(el) {
+            const bid = el.getAttribute('data-block-id');
+            if (bid) heightsMap[bid] = el.offsetHeight + (studioState.config.question_gap || 10);
+        });
+
+        const newPages = [];
+        let pageIdx = 0;
+        let curPage = {
+            id: 'page_1',
+            cols: preferredCols,
+            items: []
+        };
+        let usedHeightPx = 145 * (pxPerMm / 3.78); // Espaço do cabeçalho da Página 1
+
+        function finalizeAndStartNewPage(carryItems) {
+            if (curPage.cols === 2) balancearItensEmDuasColunas(curPage);
+            newPages.push(curPage);
+            pageIdx++;
+            curPage = {
+                id: 'page_' + (pageIdx + 1),
+                cols: preferredCols,
+                items: carryItems || []
+            };
+            usedHeightPx = (studioState.config.repeat_mini_header !== false) ? 34 : 12;
+            (curPage.items || []).forEach(function(ci) {
+                usedHeightPx += estimateEffectiveHeight(ci);
+            });
+        }
+
+        function estimateEffectiveHeight(it) {
+            const b = blocosMap[it.id] || {};
+            const rawH = heightsMap[it.id] || 110;
+            if (preferredCols === 2 && it.zone !== 'full' && b.tipo !== 'section_banner' && !b.is_dissertativa) {
+                // Em 2 colunas, cada bloco de 1 coluna consome cerca de metade da altura vertical da folha
+                return rawH * 0.54;
+            }
+            return rawH;
+        }
+
+        orderedItems.forEach(function(it) {
+            const b = blocosMap[it.id];
+            if (!b) return;
+            if (preferredCols === 2) {
+                it.zone = (b.tipo === 'section_banner' || b.is_dissertativa) ? 'full' : 'col1';
+            } else {
+                it.zone = 'full';
+            }
+
+            const effH = estimateEffectiveHeight(it);
+            if (curPage.items.length > 0 && (usedHeightPx + effH > usablePageHeightPx)) {
+                // Não deixa títulos/banners órfãos no final da folha anterior
+                const carry = [];
+                while (curPage.items.length > 1) {
+                    const lastIt = curPage.items[curPage.items.length - 1];
+                    const lastB = blocosMap[lastIt.id];
+                    if (lastB && (lastB.tipo === 'section_banner' || lastB.tipo === 'subject_subbanner')) {
+                        carry.unshift(curPage.items.pop());
+                    } else {
+                        break;
+                    }
+                }
+                if (curPage.items.length > 0) {
+                    finalizeAndStartNewPage(carry);
+                } else {
+                    curPage.items = carry;
+                }
+            }
+            curPage.items.push(it);
+            usedHeightPx += effH;
+        });
+
+        if (curPage.items.length > 0 || newPages.length === 0) {
+            if (curPage.cols === 2) balancearItensEmDuasColunas(curPage);
+            newPages.push(curPage);
+        }
+
+        studioState.pages = newPages;
+        renderAllPages();
+        markDirty();
+    };
+
+    // =======================================================================
+    // DRAG AND DROP ENTRE COLUNAS E PÁGINAS
+    // =======================================================================
+    function bindDragAndDropEvents() {
+        const blocks = document.querySelectorAll('.diagram-block-wrap');
+        blocks.forEach(function(el) {
+            el.addEventListener('dragstart', function(e) {
+                e.stopPropagation();
+                draggedInfo = {
+                    blockId: el.getAttribute('data-block-id'),
+                    fromPageIdx: parseInt(el.getAttribute('data-page-idx'), 10)
+                };
+                el.classList.add('dragging');
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', draggedInfo.blockId);
+                }
+            });
+            el.addEventListener('dragend', function() {
+                el.classList.remove('dragging');
+                document.querySelectorAll('.col-dropzone.drag-over').forEach(function(z) {
+                    z.classList.remove('drag-over');
+                });
+            });
+            el.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            el.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!draggedInfo) return;
+                const targetBlockId = el.getAttribute('data-block-id');
+                const toPageIdx = parseInt(el.getAttribute('data-page-idx'), 10);
+                const toZone = el.getAttribute('data-zone') || 'full';
+                moveBlockByDrop(draggedInfo.blockId, draggedInfo.fromPageIdx, toPageIdx, toZone, targetBlockId);
+                draggedInfo = null;
+            });
+        });
+
+        const zones = document.querySelectorAll('.col-dropzone');
+        zones.forEach(function(z) {
+            z.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                z.classList.add('drag-over');
+            });
+            z.addEventListener('dragleave', function() {
+                z.classList.remove('drag-over');
+            });
+            z.addEventListener('drop', function(e) {
+                e.preventDefault();
+                z.classList.remove('drag-over');
+                if (!draggedInfo) return;
+                const toPageIdx = parseInt(z.getAttribute('data-page-idx'), 10);
+                const toZone = z.getAttribute('data-target-zone') || 'full';
+                moveBlockByDrop(draggedInfo.blockId, draggedInfo.fromPageIdx, toPageIdx, toZone, null);
+                draggedInfo = null;
+            });
+        });
+    }
+
+    function moveBlockByDrop(blockId, fromPageIdx, toPageIdx, toZone, beforeBlockId) {
+        if (blockId === beforeBlockId) return;
+        const fromPg = studioState.pages[fromPageIdx];
+        const toPg = studioState.pages[toPageIdx];
+        if (!fromPg || !toPg) return;
+
+        const oldIdx = fromPg.items.findIndex(function(it) { return it.id === blockId; });
+        if (oldIdx === -1) return;
+        const [movedItem] = fromPg.items.splice(oldIdx, 1);
+        movedItem.zone = (toPg.cols === 1) ? 'full' : toZone;
+
+        if (beforeBlockId) {
+            const targetIdx = toPg.items.findIndex(function(it) { return it.id === beforeBlockId; });
+            if (targetIdx !== -1) {
+                toPg.items.splice(targetIdx, 0, movedItem);
+            } else {
+                toPg.items.push(movedItem);
+            }
+        } else {
+            toPg.items.push(movedItem);
+        }
+
+        renderAllPages();
+        markDirty();
+    }
+
+    // Inicializa controles e renderiza páginas interativas
+    syncSidebarControlsFromConfig();
+    renderAllPages();
+})();
+</script>
+{% endif %}
 
 </body>
 </html>
-
