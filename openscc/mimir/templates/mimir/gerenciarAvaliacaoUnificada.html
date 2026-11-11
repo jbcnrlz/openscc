@@ -257,18 +257,22 @@
 
             <!-- PARTE I: Conhecimentos Gerais (Objetivas) -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
                         <span class="badge bg-primary me-2">Parte I</span>
                         <strong class="text-dark">Conhecimentos Gerais (Objetivas)</strong>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center flex-wrap gap-2">
                         <span class="badge {% if estrutura.secoes.cg_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
                             {{ estrutura.secoes.cg_objetivas.atual }} / {{ estrutura.secoes.cg_objetivas.meta }} questões
                         </span>
+                        <button class="btn btn-sm btn-primary" type="button"
+                                onclick="abrirExploradorBanco('cg_objetivas', 'auto', 'todas', 'objetiva')">
+                            <i class="fas fa-search me-1"></i> Buscar no Banco
+                        </button>
                         <button class="btn btn-sm btn-outline-primary" type="button"
                                 onclick="abrirModalNovaQuestao('cg_objetivas', '', 'Parte I - Conhecimentos Gerais (Objetiva)', true)">
-                            <i class="fas fa-plus me-1"></i> Nova Questão
+                            <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
                 </div>
@@ -283,18 +287,22 @@
 
             <!-- PARTE II: Questão Dissertativa (Conhecimento Geral) -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
                         <span class="badge bg-info text-dark me-2">Parte II</span>
                         <strong class="text-dark">Questão Dissertativa (Conhecimento Geral)</strong>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center flex-wrap gap-2">
                         <span class="badge {% if estrutura.secoes.cg_dissertativa.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
                             {{ estrutura.secoes.cg_dissertativa.atual }} / {{ estrutura.secoes.cg_dissertativa.meta }} questão(ões)
                         </span>
+                        <button class="btn btn-sm btn-primary" type="button"
+                                onclick="abrirExploradorBanco('cg_dissertativa', 'auto', 'todas', 'dissertativa')">
+                            <i class="fas fa-search me-1"></i> Buscar no Banco
+                        </button>
                         <button class="btn btn-sm btn-outline-primary" type="button"
                                 onclick="abrirModalNovaQuestao('cg_dissertativa', '', 'Parte II - Dissertativa de Conhecimento Geral', false)">
-                            <i class="fas fa-plus me-1"></i> Nova Dissertativa
+                            <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
                 </div>
@@ -309,30 +317,40 @@
 
             <!-- PARTE III: Questões Objetivas por Matéria do Módulo (Assunto) -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
                         <span class="badge bg-success me-2">Parte III</span>
                         <strong class="text-dark">Questões Objetivas por Matéria do Módulo ({{ estrutura.quotas.materia_objetivas }} por Assunto)</strong>
                     </div>
-                    <span class="badge {% if estrutura.secoes.materia_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                        Total: {{ estrutura.secoes.materia_objetivas.atual }} / {{ estrutura.secoes.materia_objetivas.meta }} questões
-                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if estrutura.secoes.materia_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            Total: {{ estrutura.secoes.materia_objetivas.atual }} / {{ estrutura.secoes.materia_objetivas.meta }} questões
+                        </span>
+                        <button class="btn btn-sm btn-success" type="button"
+                                onclick="abrirExploradorBanco('materia_objetivas', 'auto', 'modulo', 'objetiva')">
+                            <i class="fas fa-search me-1"></i> Buscar p/ Módulo
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-3">
                     {% for mat in estrutura.secoes.materia_objetivas.por_materia %}
                     <div class="border rounded-3 p-3 mb-3 bg-light bg-opacity-50">
-                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom">
                             <div>
                                 <i class="fas fa-book text-success me-1"></i>
                                 <strong class="text-dark">{{ mat.assunto.nome }}</strong>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center flex-wrap gap-2">
                                 <span class="badge {% if mat.completa %}bg-success{% else %}bg-secondary{% endif %}">
                                     {{ mat.atual }} / {{ mat.meta }}
                                 </span>
+                                <button class="btn btn-sm btn-success" type="button"
+                                        onclick="abrirExploradorBanco('materia_objetivas', '{{ mat.assunto.id }}', '{{ mat.assunto.id }}', 'objetiva')">
+                                    <i class="fas fa-search me-1"></i> Buscar no Banco ({{ mat.assunto.nome|truncatechars:16 }})
+                                </button>
                                 <button class="btn btn-sm btn-outline-success" type="button"
                                         onclick="abrirModalNovaQuestao('materia_objetivas', '{{ mat.assunto.id }}', 'Matéria: {{ mat.assunto.nome|escapejs }}', true)">
-                                    <i class="fas fa-plus me-1"></i> Adicionar em {{ mat.assunto.nome|truncatechars:18 }}
+                                    <i class="fas fa-plus me-1"></i> Criar Nova
                                 </button>
                             </div>
                         </div>
@@ -348,18 +366,22 @@
 
             <!-- PARTE IV: Questão Dissertativa Técnica -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
                         <span class="badge bg-warning text-dark me-2">Parte IV</span>
                         <strong class="text-dark">Questão Dissertativa Técnica</strong>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center flex-wrap gap-2">
                         <span class="badge {% if estrutura.secoes.dissertativa_tecnica.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
                             {{ estrutura.secoes.dissertativa_tecnica.atual }} / {{ estrutura.secoes.dissertativa_tecnica.meta }} questão(ões)
                         </span>
+                        <button class="btn btn-sm btn-primary" type="button"
+                                onclick="abrirExploradorBanco('dissertativa_tecnica', '{{ prova.assunto_id }}', 'modulo', 'dissertativa')">
+                            <i class="fas fa-search me-1"></i> Buscar no Banco
+                        </button>
                         <button class="btn btn-sm btn-outline-primary" type="button"
                                 onclick="abrirModalNovaQuestao('dissertativa_tecnica', '{{ prova.assunto_id }}', 'Parte IV - Dissertativa Técnica do Módulo', false)">
-                            <i class="fas fa-plus me-1"></i> Nova Dissertativa Técnica
+                            <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
                 </div>
@@ -374,18 +396,22 @@
 
             <!-- PARTE V: Sensação do Aluno -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
                         <span class="badge bg-secondary me-2">Parte V</span>
                         <strong class="text-dark">Questões sobre a Sensação do Aluno (Autoavaliação / Percepção)</strong>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center flex-wrap gap-2">
                         <span class="badge {% if estrutura.secoes.sensacao_aluno.completa %}bg-success{% else %}bg-secondary{% endif %}">
                             {{ estrutura.secoes.sensacao_aluno.atual }} / {{ estrutura.secoes.sensacao_aluno.meta }} questões
                         </span>
+                        <button class="btn btn-sm btn-secondary" type="button"
+                                onclick="abrirExploradorBanco('sensacao_aluno', 'auto', 'todas', 'todas')">
+                            <i class="fas fa-search me-1"></i> Buscar no Banco
+                        </button>
                         <button class="btn btn-sm btn-outline-secondary" type="button"
                                 onclick="abrirModalNovaQuestao('sensacao_aluno', '', 'Parte V - Sensação do Aluno', true)">
-                            <i class="fas fa-plus me-1"></i> Nova Pergunta de Sensação
+                            <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
                 </div>
@@ -410,55 +436,53 @@
 
         <!-- Coluna Direita: Banco de Questões e Correções Recentes -->
         <div class="col-lg-4">
-            <!-- Vincular Questão Existente do Banco -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 border-bottom">
+            <!-- Explorador do Banco de Questões -->
+            <div class="card border-0 shadow-sm mb-4 border-top border-4 border-primary">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
                     <h6 class="mb-0 fw-bold text-dark">
-                        <i class="fas fa-search-plus text-primary me-2"></i>Vincular Questão Existente do Banco
+                        <i class="fas fa-database text-primary me-2"></i>Banco de Questões do Mimir
                     </h6>
+                    <span class="badge bg-primary rounded-pill" id="badge_total_disponiveis_sidebar">
+                        {{ total_disponiveis_banco }} disponíveis
+                    </span>
                 </div>
                 <div class="card-body p-3">
-                    {% if perguntas_banco %}
-                    <form method="post">
-                        {% csrf_token %}
-                        <input type="hidden" name="acao" value="adicionar_existente">
-                        <div class="mb-2">
-                            <label class="form-label small fw-semibold">Escolher Questão do Banco</label>
-                            <select name="pergunta_id" class="form-select form-select-sm" required>
-                                {% for pb in perguntas_banco %}
-                                <option value="{{ pb.id }}">
-                                    [{{ pb.assunto.nome|truncatechars:18 }}] #{{ pb.id }} - {{ pb.pergunta|striptags|truncatechars:55 }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-7">
-                                <label class="form-label small fw-semibold">Seção de Destino</label>
-                                <select name="secao_destino" class="form-select form-select-sm">
-                                    <option value="materia_objetivas">Parte III - Matéria do Módulo</option>
-                                    <option value="cg_objetivas">Parte I - CG Objetiva</option>
-                                    <option value="cg_dissertativa">Parte II - CG Dissertativa</option>
-                                    <option value="dissertativa_tecnica">Parte IV - Dissertativa Técnica</option>
-                                    <option value="sensacao_aluno">Parte V - Sensação do Aluno</option>
-                                </select>
-                            </div>
-                            <div class="col-5">
-                                <label class="form-label small fw-semibold">Matéria (Parte III)</label>
-                                <select name="assunto_destino_id" class="form-select form-select-sm">
-                                    {% for a in estrutura.assuntos %}
-                                    <option value="{{ a.id }}">{{ a.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary w-100 fw-semibold">
-                            <i class="fas fa-link me-1"></i> Adicionar Questão Selecionada
+                    <p class="small text-muted mb-2">
+                        Pesquise em <strong>todas as questões cadastradas no sistema</strong> por texto, código, assunto, tipo ou <code>#ID</code>, visualize o enunciado completo e vincule em lote.
+                    </p>
+
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text bg-light"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" id="input_busca_rapida_sidebar" class="form-control"
+                               placeholder="Buscar por texto, assunto ou #ID..."
+                               onkeydown="if(event.key==='Enter'){event.preventDefault(); abrirExploradorComTermoSidebar();}">
+                        <button type="button" class="btn btn-primary fw-semibold" onclick="abrirExploradorComTermoSidebar()">
+                            Buscar
                         </button>
-                    </form>
-                    {% else %}
-                    <p class="text-muted small mb-0">Todas as questões disponíveis já foram adicionadas ou o banco está vazio.</p>
-                    {% endif %}
+                    </div>
+
+                    <button type="button" class="btn btn-primary w-100 fw-bold mb-3 shadow-xs"
+                            onclick="abrirExploradorBanco('materia_objetivas', 'auto', 'todas', 'todas')">
+                        <i class="fas fa-search-plus me-1"></i> Abrir Explorador Completo do Banco ({{ total_disponiveis_banco }})
+                    </button>
+
+                    <div class="small fw-semibold text-secondary mb-1">Atalhos por Matéria do Módulo:</div>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for a in estrutura.assuntos %}
+                        <button type="button" class="btn btn-xs btn-outline-success py-1 px-2 small"
+                                onclick="abrirExploradorBanco('materia_objetivas', '{{ a.id }}', '{{ a.id }}', 'objetiva')">
+                            <i class="fas fa-book-open me-1"></i>{{ a.nome|truncatechars:22 }}
+                        </button>
+                        {% endfor %}
+                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 small"
+                                onclick="abrirExploradorBanco('cg_objetivas', 'auto', 'todas', 'objetiva')">
+                            Parte I (CG)
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-dark py-1 px-2 small"
+                                onclick="abrirExploradorBanco('dissertativa_tecnica', 'auto', 'todas', 'dissertativa')">
+                            Parte IV (Dissertativa)
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -783,6 +807,556 @@ document.getElementById('formModalNovaQuestaoSecao').addEventListener('submit', 
         document.getElementById('modal_pergunta_texto_hidden').value = base;
     }
 });
+
+// =========================================================================
+// EXPLORADOR COMPLETO DO BANCO DE QUESTÕES (Busca, Filtros, Preview e Lote)
+// =========================================================================
+const URL_BUSCAR_BANCO_AJAX = "{% url 'mimir:buscarPerguntasBancoUnificadaAjax' prova.id %}";
+const URL_GERENCIAR_UNIFICADA = "{% url 'mimir:gerenciarAvaliacaoUnificada' prova.id %}";
+const CSRF_TOKEN_UNIFICADA = "{{ csrf_token }}";
+
+let bancoPaginaAtual = 1;
+let bancoSelecionadas = new Set();
+let bancoHouveVinculoAjax = false;
+let timerDebounceBanco = null;
+
+function abrirExploradorComTermoSidebar() {
+    const termo = (document.getElementById('input_busca_rapida_sidebar')?.value || '').trim();
+    abrirExploradorBanco('materia_objetivas', 'auto', 'todas', 'todas', termo);
+}
+
+function abrirExploradorBanco(secaoDestino = 'materia_objetivas', assuntoDestinoId = 'auto', filtroAssunto = 'todas', filtroFormato = 'todas', termoInicial = '') {
+    const selSecao = document.getElementById('exp_secao_destino');
+    const selAssuntoDest = document.getElementById('exp_assunto_destino_id');
+    const selFiltroAssunto = document.getElementById('exp_filtro_assunto');
+    const selFiltroFormato = document.getElementById('exp_filtro_formato');
+    const selFiltroEscopo = document.getElementById('exp_filtro_escopo');
+    const inpBusca = document.getElementById('exp_input_busca');
+
+    if (selSecao) selSecao.value = secaoDestino || 'materia_objetivas';
+    if (selAssuntoDest) {
+        if (assuntoDestinoId && String(assuntoDestinoId) !== 'auto') {
+            selAssuntoDest.value = String(assuntoDestinoId);
+        } else {
+            selAssuntoDest.value = 'auto';
+        }
+    }
+    atualizarVisibilidadeAssuntoDestinoExp();
+
+    if (selFiltroAssunto) {
+        if (filtroAssunto === 'todas' || !filtroAssunto) {
+            selFiltroAssunto.value = '';
+        } else {
+            selFiltroAssunto.value = String(filtroAssunto);
+        }
+    }
+    if (selFiltroFormato) selFiltroFormato.value = filtroFormato || 'todas';
+    if (selFiltroEscopo) selFiltroEscopo.value = 'todas';
+    if (inpBusca) inpBusca.value = termoInicial || '';
+
+    bancoSelecionadas.clear();
+    atualizarBarraSelecaoLote();
+
+    const modalEl = document.getElementById('modalExploradorBanco');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    carregarQuestoesBancoAjax(1);
+    setTimeout(() => inpBusca?.focus(), 200);
+}
+
+function atualizarVisibilidadeAssuntoDestinoExp() {
+    const secao = document.getElementById('exp_secao_destino')?.value || 'materia_objetivas';
+    const wrapAssunto = document.getElementById('wrap_exp_assunto_destino');
+    if (!wrapAssunto) return;
+    if (secao === 'materia_objetivas' || secao === 'dissertativa_tecnica') {
+        wrapAssunto.classList.remove('opacity-50');
+    } else {
+        wrapAssunto.classList.add('opacity-50');
+    }
+}
+
+function agendarBuscaBanco() {
+    if (timerDebounceBanco) clearTimeout(timerDebounceBanco);
+    timerDebounceBanco = setTimeout(() => carregarQuestoesBancoAjax(1), 220);
+}
+
+function limparFiltrosExploradorBanco() {
+    document.getElementById('exp_input_busca').value = '';
+    document.getElementById('exp_filtro_assunto').value = '';
+    document.getElementById('exp_filtro_formato').value = 'todas';
+    document.getElementById('exp_filtro_escopo').value = 'todas';
+    document.getElementById('exp_filtro_ordenacao').value = 'recentes';
+    carregarQuestoesBancoAjax(1);
+}
+
+function escaparHtmlSimples(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function carregarQuestoesBancoAjax(page = 1) {
+    bancoPaginaAtual = page;
+    const container = document.getElementById('exp_lista_resultados');
+    const statusLabel = document.getElementById('exp_status_contador');
+    const pagContainer = document.getElementById('exp_paginacao_container');
+
+    const q = (document.getElementById('exp_input_busca')?.value || '').trim();
+    const assunto_id = document.getElementById('exp_filtro_assunto')?.value || '';
+    const formato = document.getElementById('exp_filtro_formato')?.value || 'todas';
+    const escopo = document.getElementById('exp_filtro_escopo')?.value || 'todas';
+    const ordenacao = document.getElementById('exp_filtro_ordenacao')?.value || 'recentes';
+
+    container.innerHTML = `
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <div class="small fw-semibold">Consultando banco completo de questões...</div>
+        </div>
+    `;
+
+    const params = new URLSearchParams({
+        q,
+        assunto_id,
+        formato,
+        escopo,
+        ordenacao,
+        page: String(page),
+        per_page: '25'
+    });
+
+    try {
+        const resp = await fetch(`${URL_BUSCAR_BANCO_AJAX}?${params.toString()}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await resp.json();
+
+        if (!data.sucesso) {
+            container.innerHTML = `<div class="alert alert-danger m-3">Erro ao buscar questões no banco.</div>`;
+            return;
+        }
+
+        statusLabel.innerHTML = `
+            Encontradas <strong class="text-primary">${data.total_filtrado}</strong> questão(ões)
+            <span class="text-muted">(de ${data.total_disponivel_geral} disponíveis em todo o sistema)</span>
+        `;
+
+        const badgeSidebar = document.getElementById('badge_total_disponiveis_sidebar');
+        if (badgeSidebar) badgeSidebar.textContent = `${data.total_disponivel_geral} disponíveis`;
+
+        if (!data.itens || data.itens.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-search fa-2x text-muted mb-2 opacity-50"></i>
+                    <h6 class="fw-bold text-secondary mb-1">Nenhuma questão encontrada com estes filtros</h6>
+                    <p class="small text-muted mb-3">Tente ampliar o filtro de Assunto para "Todos os Assuntos do Sistema" ou limpar a busca.</p>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="limparFiltrosExploradorBanco()">
+                        <i class="fas fa-sync-alt me-1"></i> Mostrar Todas as Questões do Sistema
+                    </button>
+                </div>
+            `;
+            pagContainer.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = '';
+        data.itens.forEach(item => {
+            const checked = bancoSelecionadas.has(item.id);
+            const card = document.createElement('div');
+            card.id = `exp_card_q_${item.id}`;
+            card.className = `card border mb-2 shadow-xs transition-all ${checked ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary-subtle bg-white'}`;
+
+            const badgeTipo = item.is_objetiva
+                ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle"><i class="fas fa-list-ul me-1"></i>Objetiva</span>`
+                : `<span class="badge bg-warning text-dark"><i class="fas fa-pen-fancy me-1"></i>Dissertativa</span>`;
+
+            const badgeGab = item.letra_gabarito
+                ? `<span class="badge bg-success">Gabarito: ${escaparHtmlSimples(item.letra_gabarito)}</span>`
+                : '';
+
+            const badgeImg = item.qtd_imagens > 0
+                ? `<span class="badge bg-info bg-opacity-10 text-info border border-info-subtle"><i class="fas fa-image me-1"></i>${item.qtd_imagens} img</span>`
+                : '';
+
+            const badgeCod = item.tem_codigo
+                ? `<span class="badge bg-dark"><i class="fas fa-code me-1"></i>Código</span>`
+                : '';
+
+            const badgeModulo = item.no_modulo
+                ? `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">Matéria do Módulo</span>`
+                : '';
+
+            const badgeAutor = item.autor_nome
+                ? `<span class="text-muted small"><i class="fas fa-user-edit me-1"></i>${escaparHtmlSimples(item.autor_nome)}</span>`
+                : '';
+
+            card.innerHTML = `
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div class="d-flex align-items-start gap-2 flex-grow-1" style="min-width: 0;">
+                            <div class="form-check mt-1">
+                                <input class="form-check-input exp-chk-questao" type="checkbox"
+                                       value="${item.id}" id="exp_chk_${item.id}" ${checked ? 'checked' : ''}
+                                       onchange="alternarSelecaoQuestaoBanco(${item.id}, this.checked)">
+                            </div>
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                    <label for="exp_chk_${item.id}" class="badge bg-dark cursor-pointer">#${item.id}</label>
+                                    <span class="badge bg-light text-dark border fw-semibold">
+                                        <i class="fas fa-book text-primary me-1"></i>${escaparHtmlSimples(item.assunto_nome)}
+                                    </span>
+                                    ${badgeModulo}
+                                    ${badgeTipo}
+                                    ${badgeGab}
+                                    ${badgeCod}
+                                    ${badgeImg}
+                                    ${badgeAutor}
+                                </div>
+                                <div class="small text-dark mb-1" id="exp_resumo_${item.id}">
+                                    ${escaparHtmlSimples(item.resumo_texto)}
+                                </div>
+                                <div class="collapse mt-2 pt-2 border-top" id="exp_detalhe_${item.id}">
+                                    <div class="p-2 rounded bg-light border small text-dark mb-2">
+                                        ${item.html_completo}
+                                    </div>
+                                    <div class="p-2 rounded bg-success bg-opacity-10 border border-success-subtle small text-dark">
+                                        <strong class="text-success"><i class="fas fa-key me-1"></i>Gabarito / Critério:</strong>
+                                        <div class="mt-1">${item.html_gabarito}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2"
+                                    data-bs-toggle="collapse" data-bs-target="#exp_detalhe_${item.id}"
+                                    title="Expandir enunciado completo, alternativas, código e imagens">
+                                <i class="fas fa-eye me-1"></i> Ver Completa
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary fw-bold py-1 px-3"
+                                    id="exp_btn_vincular_${item.id}"
+                                    onclick="vincularQuestaoIndividualAjax(${item.id})">
+                                <i class="fas fa-plus-circle me-1"></i> Vincular
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        // Paginação
+        pagContainer.innerHTML = `
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        ${!data.has_prev ? 'disabled' : ''}
+                        onclick="carregarQuestoesBancoAjax(${data.page - 1})">
+                    <i class="fas fa-chevron-left me-1"></i> Anterior
+                </button>
+                <span class="small fw-semibold text-secondary">
+                    Página ${data.page} de ${data.total_pages}
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        ${!data.has_next ? 'disabled' : ''}
+                        onclick="carregarQuestoesBancoAjax(${data.page + 1})">
+                    Próxima <i class="fas fa-chevron-right ms-1"></i>
+                </button>
+            </div>
+        `;
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="alert alert-danger m-3">Falha de comunicação ao consultar o banco de questões.</div>`;
+    }
+}
+
+function alternarSelecaoQuestaoBanco(id, marcado) {
+    if (marcado) bancoSelecionadas.add(id);
+    else bancoSelecionadas.delete(id);
+
+    const card = document.getElementById(`exp_card_q_${id}`);
+    if (card) {
+        card.className = `card border mb-2 shadow-xs transition-all ${marcado ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary-subtle bg-white'}`;
+    }
+    atualizarBarraSelecaoLote();
+}
+
+function selecionarTodasVisiveisBanco(marcar) {
+    document.querySelectorAll('.exp-chk-questao:not(:disabled)').forEach(chk => {
+        chk.checked = marcar;
+        alternarSelecaoQuestaoBanco( parseInt(chk.value, 10), marcar );
+    });
+}
+
+function atualizarBarraSelecaoLote() {
+    const qtd = bancoSelecionadas.size;
+    const btnLote = document.getElementById('exp_btn_vincular_lote');
+    const spanQtd = document.getElementById('exp_qtd_selecionadas');
+    if (spanQtd) spanQtd.textContent = String(qtd);
+    if (btnLote) btnLote.disabled = qtd === 0;
+}
+
+async function vincularQuestaoIndividualAjax(perguntaId) {
+    const btn = document.getElementById(`exp_btn_vincular_${perguntaId}`);
+    const secaoDestino = document.getElementById('exp_secao_destino')?.value || 'materia_objetivas';
+    const assuntoDestinoId = document.getElementById('exp_assunto_destino_id')?.value || 'auto';
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Vinculando...`;
+    }
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', CSRF_TOKEN_UNIFICADA);
+    formData.append('acao', 'adicionar_existente');
+    formData.append('ajax', '1');
+    formData.append('pergunta_id', String(perguntaId));
+    formData.append('secao_destino', secaoDestino);
+    formData.append('assunto_destino_id', assuntoDestinoId);
+
+    try {
+        const resp = await fetch(URL_GERENCIAR_UNIFICADA, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const res = await resp.json();
+        if (res.sucesso) {
+            bancoHouveVinculoAjax = true;
+            bancoSelecionadas.delete(perguntaId);
+            atualizarBarraSelecaoLote();
+
+            const chk = document.getElementById(`exp_chk_${perguntaId}`);
+            if (chk) {
+                chk.checked = false;
+                chk.disabled = true;
+            }
+            if (btn) {
+                btn.className = 'btn btn-sm btn-success fw-bold py-1 px-3';
+                btn.innerHTML = `<i class="fas fa-check me-1"></i> Vinculada!`;
+            }
+            const card = document.getElementById(`exp_card_q_${perguntaId}`);
+            if (card) {
+                card.className = 'card border border-success bg-success bg-opacity-10 mb-2';
+            }
+            const aviso = document.getElementById('exp_aviso_vinculo_recente');
+            if (aviso) {
+                aviso.classList.remove('d-none');
+                aviso.innerHTML = `<i class="fas fa-check-circle me-1"></i> ${escaparHtmlSimples(res.mensagem)}`;
+            }
+        } else {
+            alert(res.erro || 'Não foi possível vincular a questão.');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-plus-circle me-1"></i> Vincular`;
+            }
+        }
+    } catch (e) {
+        alert('Erro ao vincular questão.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-plus-circle me-1"></i> Vincular`;
+        }
+    }
+}
+
+async function vincularQuestoesSelecionadasLote() {
+    if (bancoSelecionadas.size === 0) return;
+    const btnLote = document.getElementById('exp_btn_vincular_lote');
+    const secaoDestino = document.getElementById('exp_secao_destino')?.value || 'materia_objetivas';
+    const assuntoDestinoId = document.getElementById('exp_assunto_destino_id')?.value || 'auto';
+
+    if (btnLote) {
+        btnLote.disabled = true;
+        btnLote.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Vinculando ${bancoSelecionadas.size} questão(ões)...`;
+    }
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', CSRF_TOKEN_UNIFICADA);
+    formData.append('acao', 'adicionar_existente');
+    formData.append('ajax', '1');
+    formData.append('secao_destino', secaoDestino);
+    formData.append('assunto_destino_id', assuntoDestinoId);
+    bancoSelecionadas.forEach(pid => formData.append('pergunta_ids', String(pid)));
+
+    try {
+        const resp = await fetch(URL_GERENCIAR_UNIFICADA, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        const res = await resp.json();
+        if (res.sucesso) {
+            window.location.reload();
+        } else {
+            alert(res.erro || 'Erro ao vincular questões em lote.');
+            if (btnLote) btnLote.disabled = false;
+        }
+    } catch (e) {
+        alert('Erro de comunicação ao vincular questões em lote.');
+        if (btnLote) btnLote.disabled = false;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modalExpEl = document.getElementById('modalExploradorBanco');
+    if (modalExpEl) {
+        modalExpEl.addEventListener('hidden.bs.modal', function() {
+            if (bancoHouveVinculoAjax) {
+                window.location.reload();
+            }
+        });
+    }
+});
 </script>
+
+<!-- Modal XL: Explorador Completo do Banco de Questões -->
+<div class="modal fade" id="modalExploradorBanco" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-3">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-database text-info me-2"></i>Explorador do Banco de Questões
+                    </h5>
+                    <small class="text-white-50">
+                        Pesquise em todas as questões cadastradas no sistema, visualize o enunciado completo e vincule individualmente ou em lote.
+                    </small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- Barra Superior Fixa: Onde Vincular + Filtros de Busca -->
+            <div class="bg-light border-bottom p-3">
+                <!-- Destino do Vínculo -->
+                <div class="row g-2 align-items-center mb-3 p-2 rounded bg-primary bg-opacity-10 border border-primary border-opacity-25">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold text-primary mb-1">
+                            <i class="fas fa-bullseye me-1"></i> 1. Seção de Destino na Prova Unificada:
+                        </label>
+                        <select id="exp_secao_destino" class="form-select form-select-sm fw-semibold border-primary"
+                                onchange="atualizarVisibilidadeAssuntoDestinoExp()">
+                            <option value="materia_objetivas">Parte III — Questões Objetivas por Matéria do Módulo</option>
+                            <option value="cg_objetivas">Parte I — Conhecimentos Gerais (Objetivas)</option>
+                            <option value="cg_dissertativa">Parte II — Dissertativa de Conhecimento Geral</option>
+                            <option value="dissertativa_tecnica">Parte IV — Questão Dissertativa Técnica do Módulo</option>
+                            <option value="sensacao_aluno">Parte V — Sensação e Autoavaliação do Aluno</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4" id="wrap_exp_assunto_destino">
+                        <label class="form-label small fw-bold text-primary mb-1">
+                            <i class="fas fa-book me-1"></i> 2. Matéria de Destino (Parte III / IV):
+                        </label>
+                        <select id="exp_assunto_destino_id" class="form-select form-select-sm fw-semibold border-primary">
+                            <option value="auto">Automático (vincular à matéria correspondente da questão)</option>
+                            {% for a in estrutura.assuntos %}
+                            <option value="{{ a.id }}">Forçar vínculo em: {{ a.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-md-end">
+                        <div id="exp_aviso_vinculo_recente" class="badge bg-success p-2 d-none text-wrap"></div>
+                    </div>
+                </div>
+
+                <!-- Filtros de Busca Instantânea -->
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Buscar por Texto, Código, Gabarito ou #ID</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-primary"></i></span>
+                            <input type="text" id="exp_input_busca" class="form-control"
+                                   placeholder="Ex: recursão, SELECT, #42, fotossíntese..."
+                                   oninput="agendarBuscaBanco()">
+                            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('exp_input_busca').value=''; carregarQuestoesBancoAjax(1);" title="Limpar texto">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Filtrar por Assunto / Disciplina</label>
+                        <select id="exp_filtro_assunto" class="form-select form-select-sm" onchange="carregarQuestoesBancoAjax(1)">
+                            <option value="">Todos os Assuntos do Sistema</option>
+                            <option value="modulo">★ Apenas Matérias deste Módulo</option>
+                            <optgroup label="Matérias vinculadas a este Módulo">
+                                {% for a in estrutura.assuntos %}
+                                <option value="{{ a.id }}">{{ a.nome }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Todos os Assuntos Cadastrados">
+                                {% for a in assuntos_professor %}
+                                <option value="{{ a.id }}">{{ a.nome }}{% if a.user %} ({{ a.user.username }}){% endif %}</option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Formato da Questão</label>
+                        <select id="exp_filtro_formato" class="form-select form-select-sm" onchange="carregarQuestoesBancoAjax(1)">
+                            <option value="todas">Todas (Obj + Diss)</option>
+                            <option value="objetiva">Apenas Objetivas</option>
+                            <option value="dissertativa">Apenas Dissertativas</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Escopo do Banco</label>
+                        <select id="exp_filtro_escopo" class="form-select form-select-sm" onchange="carregarQuestoesBancoAjax(1)">
+                            <option value="todas">Todo o Sistema</option>
+                            <option value="modulo">Matérias do Módulo</option>
+                            <option value="minhas">Apenas Minhas</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label small fw-semibold mb-1">Ordem</label>
+                        <select id="exp_filtro_ordenacao" class="form-select form-select-sm" onchange="carregarQuestoesBancoAjax(1)">
+                            <option value="recentes">Novas</option>
+                            <option value="assunto">Assunto</option>
+                            <option value="antigas">Antigas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Corpo Rolável com os Cards das Questões -->
+            <div class="modal-body p-3" style="background: #f8fafc; min-height: 380px;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom">
+                    <div class="small" id="exp_status_contador">Carregando questões...</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 small" onclick="selecionarTodasVisiveisBanco(true)">
+                            <i class="fas fa-check-square me-1"></i> Marcar Página
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="selecionarTodasVisiveisBanco(false)">
+                            Desmarcar
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-dark py-0 px-2 small" onclick="limparFiltrosExploradorBanco()">
+                            <i class="fas fa-filter me-1"></i> Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+
+                <div id="exp_lista_resultados"></div>
+            </div>
+
+            <!-- Rodapé com Paginação e Botão de Vínculo em Lote -->
+            <div class="modal-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
+                <div id="exp_paginacao_container"></div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Fechar / Atualizar Painel
+                    </button>
+                    <button type="button" class="btn btn-success fw-bold" id="exp_btn_vincular_lote" disabled
+                            onclick="vincularQuestoesSelecionadasLote()">
+                        <i class="fas fa-link me-1"></i> Vincular Selecionadas (<span id="exp_qtd_selecionadas">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 

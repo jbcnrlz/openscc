@@ -151,6 +151,7 @@ urlpatterns = [
      # Avaliação Unificada de Módulo (Criação, Gestão de Assuntos/Cotas, Impressão OMR/Foto e Correção por Foto)
      path('avaliacao-unificada/criar/', views.criarAvaliacaoUnificada, name='criarAvaliacaoUnificada'),
      path('avaliacao-unificada/<int:prova_id>/gerenciar/', views.gerenciarAvaliacaoUnificada, name='gerenciarAvaliacaoUnificada'),
+     path('avaliacao-unificada/<int:prova_id>/buscar-banco-ajax/', views.buscarPerguntasBancoUnificadaAjax, name='buscarPerguntasBancoUnificadaAjax'),
      path('avaliacao-unificada/<int:prova_id>/imprimir/', views.imprimirAvaliacaoUnificada, name='imprimirAvaliacaoUnificada'),
      path('avaliacao-unificada/<int:prova_id>/corrigir-foto/', views.corrigirAvaliacaoUnificadaFoto, name='corrigirAvaliacaoUnificadaFoto'),
      path('avaliacao-unificada/<int:prova_id>/processar-foto-ajax/', views.processarFotoUnificadaAjax, name='processarFotoUnificadaAjax'),
