@@ -153,6 +153,7 @@ urlpatterns = [
      path('avaliacao-unificada/<int:prova_id>/gerenciar/', views.gerenciarAvaliacaoUnificada, name='gerenciarAvaliacaoUnificada'),
      path('avaliacao-unificada/<int:prova_id>/buscar-banco-ajax/', views.buscarPerguntasBancoUnificadaAjax, name='buscarPerguntasBancoUnificadaAjax'),
      path('avaliacao-unificada/<int:prova_id>/imprimir/', views.imprimirAvaliacaoUnificada, name='imprimirAvaliacaoUnificada'),
+     path('avaliacao-unificada/<int:prova_id>/salvar-diagramacao-ajax/', views.salvarDiagramacaoUnificadaAjax, name='salvarDiagramacaoUnificadaAjax'),
      path('avaliacao-unificada/<int:prova_id>/corrigir-foto/', views.corrigirAvaliacaoUnificadaFoto, name='corrigirAvaliacaoUnificadaFoto'),
      path('avaliacao-unificada/<int:prova_id>/processar-foto-ajax/', views.processarFotoUnificadaAjax, name='processarFotoUnificadaAjax'),
      # Estúdio de Manipulação e Fatiamento de PDF para Fontes (Capítulos / Intervalos)
