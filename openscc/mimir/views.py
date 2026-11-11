@@ -3899,6 +3899,7 @@ from .avaliacao_unificada import (
     extrair_meta_unificada,
     empacotar_meta_unificada,
     construir_estrutura_unificada,
+    construir_diagramacao_unificada,
     inserir_questoes_sensacao_padrao,
     preencher_questoes_do_banco,
     gerar_questoes_faltantes_unificada,
@@ -4475,8 +4476,8 @@ def buscarPerguntasBancoUnificadaAjax(request, prova_id):
 @grupo_requerido('Professor')
 def imprimirAvaliacaoUnificada(request, prova_id):
     """
-    Renderiza ou exporta em PDF:
-    - ?tipo=prova : Caderno completo da Avaliação Unificada organizado nas 5 seções e por matéria
+    Renderiza o Estúdio Visual de Diagramação ou exporta em PDF:
+    - ?tipo=prova : Caderno completo da Avaliação Unificada com suporte a páginas de 1 ou 2 colunas
     - ?tipo=folha_resposta : Folha de Respostas OMR/Foto otimizada para leitura por foto/câmera
     - ?tipo=gabarito : Gabarito oficial estruturado por seção e matéria
     """
@@ -4486,6 +4487,8 @@ def imprimirAvaliacaoUnificada(request, prova_id):
         tipo = 'prova'
 
     estrutura = construir_estrutura_unificada(prova)
+    diagramacao = construir_diagramacao_unificada(prova, estrutura)
+    is_pdf = bool(request.GET.get('pdf'))
 
     # Separa itens para facilitar renderização da Folha OMR/Foto
     itens_objetivos = [
@@ -4501,11 +4504,28 @@ def imprimirAvaliacaoUnificada(request, prova_id):
         if item['secao'] == 'sensacao_aluno'
     ]
 
+    # Divide itens_objetivos ao meio para o modo Folha OMR em 2 Colunas
+    meio_omr = (len(itens_objetivos) + 1) // 2
+    itens_objetivos_col1 = itens_objetivos[:meio_omr]
+    itens_objetivos_col2 = itens_objetivos[meio_omr:]
+
+    diagramacao_payload = {
+        'config': diagramacao['config'],
+        'block_opts': diagramacao['block_opts'],
+        'pages': diagramacao['pages_state'],
+        'blocos': diagramacao['blocos_ordenados'],
+    }
+
     context = {
         'prova': prova,
         'estrutura': estrutura,
+        'diagramacao': diagramacao,
+        'diagramacao_json': json.dumps(diagramacao_payload, ensure_ascii=False).replace('</', '<\\/'),
+        'is_pdf_export': is_pdf,
         'tipo_documento': tipo,
         'itens_objetivos': itens_objetivos,
+        'itens_objetivos_col1': itens_objetivos_col1,
+        'itens_objetivos_col2': itens_objetivos_col2,
         'itens_dissertativos': itens_dissertativos,
         'itens_sensacao': itens_sensacao,
         'alternativas': ['A', 'B', 'C', 'D', 'E'],
@@ -4513,7 +4533,7 @@ def imprimirAvaliacaoUnificada(request, prova_id):
         'data_impressao': timezone.now(),
     }
 
-    if request.GET.get('pdf'):
+    if is_pdf:
         html_string = render_to_string('mimir/imprimirAvaliacaoUnificada.html', context)
         html = HTML(string=html_string, base_url=request.build_absolute_uri())
         pdf_file = html.write_pdf()
@@ -4523,6 +4543,48 @@ def imprimirAvaliacaoUnificada(request, prova_id):
         return response
 
     return render(request, 'mimir/imprimirAvaliacaoUnificada.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+@require_POST
+def salvarDiagramacaoUnificadaAjax(request, prova_id):
+    """
+    Salva o estado do Estúdio Visual de Diagramação (páginas em 1 ou 2 colunas,
+    posicionamento de blocos, margens, fonte e estilos) nos metadados da Prova.
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    descricao_humana, meta = extrair_meta_unificada(prova.descricao)
+    if not meta:
+        meta = {
+            'is_unificada': True,
+            'modulo_nome': f"Módulo - {prova.assunto.nome}" if prova.assunto_id else 'Módulo Integrado',
+            'assuntos_ids': [prova.assunto_id] if prova.assunto_id else [],
+            'quotas': dict(DEFAULT_QUOTAS),
+            'question_map': {},
+        }
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'JSON inválido: {e}'}, status=400)
+
+    if payload.get('reset'):
+        meta.pop('layout_diagramacao', None)
+    else:
+        meta['layout_diagramacao'] = {
+            'config': payload.get('config') or {},
+            'block_opts': payload.get('block_opts') or {},
+            'pages': payload.get('pages') or [],
+        }
+
+    prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+    prova.save(update_fields=['descricao'])
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Diagramação da prova salva com sucesso!',
+    })
 
 
 @login_required(login_url='/login')

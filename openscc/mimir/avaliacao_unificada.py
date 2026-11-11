@@ -1134,3 +1134,434 @@ def calcular_diagnostico_prova_aluno_unificada(prova_aluno) -> dict:
         "por_materia": por_materia,
         "sensacao_respostas": sensacao_respostas,
     }
+
+
+def _estimar_peso_altura_bloco(bloco: dict, em_duas_colunas: bool = False) -> float:
+    """
+    Estima a fração de altura de uma folha A4 (0.0 a 1.0) que um bloco ocupa,
+    para paginação inicial automática no servidor.
+    """
+    tipo = bloco.get("tipo")
+    if tipo == "section_banner":
+        return 0.055
+    if tipo == "subject_subbanner":
+        return 0.045
+
+    texto_limpo = bloco.get("texto_plano") or ""
+    chars_por_linha = 48 if em_duas_colunas else 95
+    linhas_texto = max(2, (len(texto_limpo) // chars_por_linha) + texto_limpo.count("\n"))
+    peso = 0.05 + (linhas_texto * 0.018)
+
+    if bloco.get("tem_codigo"):
+        peso += 0.10
+    if bloco.get("tem_imagem"):
+        peso += 0.16
+    if bloco.get("is_dissertativa"):
+        qtd_linhas = int(bloco.get("linhas_default") or 12)
+        peso += 0.04 + (qtd_linhas * 0.022)
+
+    return min(0.85, peso)
+
+
+def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> dict:
+    """
+    Constrói o catálogo de blocos diagramáveis da Avaliação Unificada e reconcilia
+    com o layout visual salvo em `meta['layout_diagramacao']` (páginas, 1 ou 2 colunas,
+    blocos em largura total vs coluna esquerda/direita, número de linhas dissertativas,
+    tamanho de imagens e colunas de alternativas).
+    """
+    if estrutura is None:
+        estrutura = construir_estrutura_unificada(prova)
+
+    secoes = estrutura.get("secoes") or {}
+    blocos_ordenados = []
+    blocos_map = {}
+
+    def _add_bloco(b: dict):
+        blocos_ordenados.append(b)
+        blocos_map[b["id"]] = b
+
+    # 1. PARTE I: CG Objetivas
+    sec_cg_obj = secoes.get("cg_objetivas") or {}
+    if sec_cg_obj.get("perguntas"):
+        _add_bloco({
+            "id": "banner:cg_objetivas",
+            "tipo": "section_banner",
+            "secao": "cg_objetivas",
+            "titulo_esq": "PARTE I — CONHECIMENTOS GERAIS (QUESTÕES OBJETIVAS)",
+            "titulo_dir": f"{sec_cg_obj.get('atual', 0)} QUESTÃO(ÕES)",
+            "bg_color": "#111827",
+            "default_zone_2col": "full",
+        })
+        for item in sec_cg_obj["perguntas"]:
+            p = item["pergunta"]
+            raw_txt = p.get_texto_com_feedback() or ""
+            _add_bloco({
+                "id": f"q:{p.id}",
+                "tipo": "question",
+                "secao": "cg_objetivas",
+                "pergunta_id": p.id,
+                "numero": item["numero"],
+                "numero_fmt": f"{item['numero']:02d}",
+                "header_esq": f"QUESTÃO {item['numero']:02d} • CONHECIMENTOS GERAIS",
+                "header_dir": "MÚLTIPLA ESCOLHA",
+                "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
+                "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
+                "is_objetiva": True,
+                "is_dissertativa": False,
+                "is_sensacao": False,
+                "tem_imagem": len(list(p.imagens.all())) > 0,
+                "tem_codigo": "```" in raw_txt,
+                "essay_header_esq": "",
+                "essay_header_dir": "",
+                "linhas_default": 0,
+                "default_zone_2col": "col",
+            })
+
+    # 2. PARTE II: CG Dissertativa
+    sec_cg_diss = secoes.get("cg_dissertativa") or {}
+    if sec_cg_diss.get("perguntas"):
+        _add_bloco({
+            "id": "banner:cg_dissertativa",
+            "tipo": "section_banner",
+            "secao": "cg_dissertativa",
+            "titulo_esq": "PARTE II — QUESTÃO DISSERTATIVA (CONHECIMENTO GERAL)",
+            "titulo_dir": f"{sec_cg_diss.get('atual', 0)} QUESTÃO(ÕES)",
+            "bg_color": "#111827",
+            "default_zone_2col": "full",
+        })
+        for item in sec_cg_diss["perguntas"]:
+            p = item["pergunta"]
+            raw_txt = p.get_texto_com_feedback() or ""
+            is_diss = bool(item.get("is_dissertativa", True))
+            _add_bloco({
+                "id": f"q:{p.id}",
+                "tipo": "question",
+                "secao": "cg_dissertativa",
+                "pergunta_id": p.id,
+                "numero": item["numero"],
+                "numero_fmt": f"{item['numero']:02d}",
+                "header_esq": f"QUESTÃO {item['numero']:02d} • DISSERTATIVA DE CONHECIMENTO GERAL",
+                "header_dir": "RESPOSTA ARGUMENTATIVA" if is_diss else "MÚLTIPLA ESCOLHA",
+                "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
+                "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
+                "is_objetiva": not is_diss,
+                "is_dissertativa": is_diss,
+                "is_sensacao": False,
+                "tem_imagem": len(list(p.imagens.all())) > 0,
+                "tem_codigo": "```" in raw_txt,
+                "essay_header_esq": f"ESPAÇO PARA RESPOSTA DA QUESTÃO {item['numero']:02d}",
+                "essay_header_dir": f"[DISSERTATIVA Q{item['numero']:02d}]",
+                "linhas_default": 12 if is_diss else 0,
+                "default_zone_2col": "full" if is_diss else "col",
+            })
+
+    # 3. PARTE III: Conhecimentos Específicos por Matéria do Módulo
+    sec_mat = secoes.get("materia_objetivas") or {}
+    if sec_mat.get("perguntas"):
+        _add_bloco({
+            "id": "banner:materia_objetivas",
+            "tipo": "section_banner",
+            "secao": "materia_objetivas",
+            "titulo_esq": "PARTE III — CONHECIMENTOS ESPECÍFICOS POR MATÉRIA DO MÓDULO",
+            "titulo_dir": f"{sec_mat.get('atual', 0)} QUESTÃO(ÕES)",
+            "bg_color": "#111827",
+            "default_zone_2col": "full",
+        })
+        for mat in sec_mat.get("por_materia") or []:
+            if mat.get("perguntas"):
+                assunto_obj = mat["assunto"]
+                _add_bloco({
+                    "id": f"subbanner:materia:{assunto_obj.id}",
+                    "tipo": "subject_subbanner",
+                    "secao": "materia_objetivas",
+                    "assunto_id": assunto_obj.id,
+                    "titulo": f"DISCIPLINA / ASSUNTO: {assunto_obj.nome.upper()} ({mat.get('atual', 0)} questão(ões))",
+                    "default_zone_2col": "col",
+                })
+                for item in mat["perguntas"]:
+                    p = item["pergunta"]
+                    raw_txt = p.get_texto_com_feedback() or ""
+                    _add_bloco({
+                        "id": f"q:{p.id}",
+                        "tipo": "question",
+                        "secao": "materia_objetivas",
+                        "pergunta_id": p.id,
+                        "numero": item["numero"],
+                        "numero_fmt": f"{item['numero']:02d}",
+                        "header_esq": f"QUESTÃO {item['numero']:02d} • {assunto_obj.nome.upper()}",
+                        "header_dir": "MÚLTIPLA ESCOLHA" if item.get("is_objetiva", True) else "DISSERTATIVA",
+                        "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
+                        "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
+                        "is_objetiva": bool(item.get("is_objetiva", True)),
+                        "is_dissertativa": bool(item.get("is_dissertativa", False)),
+                        "is_sensacao": False,
+                        "tem_imagem": len(list(p.imagens.all())) > 0,
+                        "tem_codigo": "```" in raw_txt,
+                        "essay_header_esq": f"ESPAÇO PARA RESPOSTA DA QUESTÃO {item['numero']:02d}",
+                        "essay_header_dir": f"[DISSERTATIVA Q{item['numero']:02d}]",
+                        "linhas_default": 10 if item.get("is_dissertativa") else 0,
+                        "default_zone_2col": "col",
+                    })
+
+    # 4. PARTE IV: Dissertativa Técnica
+    sec_diss_tec = secoes.get("dissertativa_tecnica") or {}
+    if sec_diss_tec.get("perguntas"):
+        _add_bloco({
+            "id": "banner:dissertativa_tecnica",
+            "tipo": "section_banner",
+            "secao": "dissertativa_tecnica",
+            "titulo_esq": "PARTE IV — QUESTÃO DISSERTATIVA TÉCNICA DO MÓDULO",
+            "titulo_dir": f"{sec_diss_tec.get('atual', 0)} QUESTÃO(ÕES)",
+            "bg_color": "#111827",
+            "default_zone_2col": "full",
+        })
+        for item in sec_diss_tec["perguntas"]:
+            p = item["pergunta"]
+            raw_txt = p.get_texto_com_feedback() or ""
+            is_diss = bool(item.get("is_dissertativa", True))
+            _add_bloco({
+                "id": f"q:{p.id}",
+                "tipo": "question",
+                "secao": "dissertativa_tecnica",
+                "pergunta_id": p.id,
+                "numero": item["numero"],
+                "numero_fmt": f"{item['numero']:02d}",
+                "header_esq": f"QUESTÃO {item['numero']:02d} • DISSERTATIVA TÉCNICA ({item['assunto_nome'].upper()})",
+                "header_dir": "RESPOSTA TÉCNICA" if is_diss else "MÚLTIPLA ESCOLHA",
+                "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
+                "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
+                "is_objetiva": not is_diss,
+                "is_dissertativa": is_diss,
+                "is_sensacao": False,
+                "tem_imagem": len(list(p.imagens.all())) > 0,
+                "tem_codigo": "```" in raw_txt,
+                "essay_header_esq": f"ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {item['numero']:02d}",
+                "essay_header_dir": f"[DISSERTATIVA Q{item['numero']:02d}]",
+                "linhas_default": 12 if is_diss else 0,
+                "default_zone_2col": "full" if is_diss else "col",
+            })
+
+    # 5. PARTE V: Sensação do Aluno
+    sec_sens = secoes.get("sensacao_aluno") or {}
+    if sec_sens.get("perguntas"):
+        _add_bloco({
+            "id": "banner:sensacao_aluno",
+            "tipo": "section_banner",
+            "secao": "sensacao_aluno",
+            "titulo_esq": "PARTE V — SENSAÇÃO DO ALUNO SOBRE A PROVA (AUTOAVALIAÇÃO • PESO ZERO)",
+            "titulo_dir": f"{sec_sens.get('atual', 0)} ITEM(NS)",
+            "bg_color": "#374151",
+            "default_zone_2col": "full",
+        })
+        for item in sec_sens["perguntas"]:
+            p = item["pergunta"]
+            raw_txt = p.get_texto_com_feedback() or ""
+            _add_bloco({
+                "id": f"q:{p.id}",
+                "tipo": "question",
+                "secao": "sensacao_aluno",
+                "pergunta_id": p.id,
+                "numero": item["numero"],
+                "numero_fmt": f"{item['numero']:02d}",
+                "header_esq": f"ITEM {item['numero']:02d} • PERCEPÇÃO E AUTOAVALIAÇÃO DO ESTUDANTE",
+                "header_dir": "NÃO PENALIZA A NOTA",
+                "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
+                "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
+                "is_objetiva": True,
+                "is_dissertativa": False,
+                "is_sensacao": True,
+                "tem_imagem": len(list(p.imagens.all())) > 0,
+                "tem_codigo": "```" in raw_txt,
+                "essay_header_esq": "",
+                "essay_header_dir": "",
+                "linhas_default": 0,
+                "default_zone_2col": "col",
+            })
+
+    default_config = {
+        "font_size": "10pt",
+        "margin_mm": 12,
+        "question_gap": 10,
+        "column_rule": True,
+        "card_style": "bordered",
+        "repeat_mini_header": True,
+        "default_alt_cols": 1,
+        "omr_cols": 1,
+    }
+
+    meta = estrutura.get("meta") or {}
+    saved_layout = meta.get("layout_diagramacao") or {}
+
+    config = dict(default_config)
+    if isinstance(saved_layout.get("config"), dict):
+        config.update(saved_layout["config"])
+
+    saved_block_opts = saved_layout.get("block_opts") if isinstance(saved_layout.get("block_opts"), dict) else {}
+    block_opts = {}
+    for b in blocos_ordenados:
+        bid = b["id"]
+        opt_saved = saved_block_opts.get(bid) if isinstance(saved_block_opts.get(bid), dict) else {}
+        block_opts[bid] = {
+            "alt_cols": int(opt_saved.get("alt_cols", config.get("default_alt_cols", 1)) or 1),
+            "img_size": opt_saved.get("img_size", "md") if opt_saved.get("img_size") in ("sm", "md", "lg", "full") else "md",
+            "essay_lines": int(opt_saved.get("essay_lines", b.get("linhas_default", 12)) if b.get("is_dissertativa") else 0),
+        }
+
+    # Reconcilia páginas salvas ou gera paginação inicial inteligente
+    saved_pages = saved_layout.get("pages") if isinstance(saved_layout.get("pages"), list) else []
+    pages_reconciled = []
+    seen_ids = set()
+
+    if saved_pages:
+        for idx_p, pg in enumerate(saved_pages, 1):
+            if not isinstance(pg, dict):
+                continue
+            cols = 2 if int(pg.get("cols", 1) or 1) == 2 else 1
+            raw_items = pg.get("items") if isinstance(pg.get("items"), list) else []
+            valid_items = []
+            for it in raw_items:
+                if not isinstance(it, dict):
+                    continue
+                bid = it.get("id")
+                if bid in blocos_map and bid not in seen_ids:
+                    seen_ids.add(bid)
+                    zone = it.get("zone", "full")
+                    if cols == 1:
+                        zone = "full"
+                    elif zone not in ("full", "col1", "col2"):
+                        zone = "full" if blocos_map[bid].get("default_zone_2col") == "full" else "col1"
+                    valid_items.append({"id": bid, "zone": zone})
+            pages_reconciled.append({
+                "id": pg.get("id") or f"page_{idx_p}",
+                "cols": cols,
+                "items": valid_items,
+            })
+
+        # Se existirem blocos novos na prova que ainda não estavam salvos no layout, insere na página adequada
+        if not pages_reconciled:
+            pages_reconciled.append({"id": "page_1", "cols": 1, "items": []})
+
+        for idx_b, b in enumerate(blocos_ordenados):
+            bid = b["id"]
+            if bid in seen_ids:
+                continue
+            # Tenta achar onde está o bloco anterior
+            inserted = False
+            if idx_b > 0:
+                prev_id = blocos_ordenados[idx_b - 1]["id"]
+                for pg in pages_reconciled:
+                    for pos, it in enumerate(pg["items"]):
+                        if it["id"] == prev_id:
+                            zone_new = "full" if pg["cols"] == 1 else (
+                                "full" if b.get("default_zone_2col") == "full" else it.get("zone", "col1")
+                            )
+                            pg["items"].insert(pos + 1, {"id": bid, "zone": zone_new})
+                            inserted = True
+                            break
+                    if inserted:
+                        break
+            if not inserted:
+                last_pg = pages_reconciled[-1]
+                zone_new = "full" if last_pg["cols"] == 1 else (
+                    "full" if b.get("default_zone_2col") == "full" else "col1"
+                )
+                last_pg["items"].append({"id": bid, "zone": zone_new})
+            seen_ids.add(bid)
+
+        # Remove páginas vazias se houver mais de 1 página
+        if len(pages_reconciled) > 1:
+            pages_reconciled = [pg for pg in pages_reconciled if pg["items"]] or [{"id": "page_1", "cols": 1, "items": []}]
+    else:
+        # Gera paginação padrão inicial (1 coluna balanceada por altura estimada A4)
+        cur_items = []
+        cur_weight = 0.22  # Reserva topo para o cabeçalho institucional da Página 1
+        page_idx = 1
+
+        for b in blocos_ordenados:
+            w = _estimar_peso_altura_bloco(b, em_duas_colunas=False)
+            if cur_items and (cur_weight + w > 0.94):
+                # Evita deixar um banner sozinho no fim da página anterior
+                trailing_banners = []
+                while cur_items and blocos_map[cur_items[-1]["id"]]["tipo"] in ("section_banner", "subject_subbanner"):
+                    trailing_banners.insert(0, cur_items.pop())
+
+                if cur_items:
+                    pages_reconciled.append({
+                        "id": f"page_{page_idx}",
+                        "cols": 1,
+                        "items": cur_items,
+                    })
+                    page_idx += 1
+                    cur_items = list(trailing_banners)
+                    cur_weight = 0.06 + sum(_estimar_peso_altura_bloco(blocos_map[x["id"]]) for x in cur_items)
+                else:
+                    cur_items = list(trailing_banners)
+
+            cur_items.append({"id": b["id"], "zone": "full"})
+            cur_weight += w
+
+        if cur_items or not pages_reconciled:
+            pages_reconciled.append({
+                "id": f"page_{page_idx}",
+                "cols": 1,
+                "items": cur_items,
+            })
+
+    # Constrói a árvore renderizável de cada página com segmentos (full vs two_cols) para o WeasyPrint e Template
+    paginas_render = []
+    for idx_p, pg in enumerate(pages_reconciled, 1):
+        cols = pg["cols"]
+        segments = []
+        for it in pg["items"]:
+            bid = it["id"]
+            if bid not in blocos_map:
+                continue
+            bloco_obj = dict(blocos_map[bid])
+            opts = block_opts.get(bid, {})
+            bloco_obj["opts"] = opts
+            bloco_obj["linhas_range"] = range(1, max(0, int(opts.get("essay_lines", 12))) + 1)
+            zone = "full" if cols == 1 else it.get("zone", "full")
+            bloco_obj["zone"] = zone
+
+            if zone == "full":
+                segments.append({
+                    "type": "full",
+                    "item": bloco_obj,
+                })
+            else:
+                if not segments or segments[-1]["type"] != "two_cols":
+                    segments.append({
+                        "type": "two_cols",
+                        "col1": [],
+                        "col2": [],
+                    })
+                if zone == "col2":
+                    segments[-1]["col2"].append(bloco_obj)
+                else:
+                    segments[-1]["col1"].append(bloco_obj)
+
+        paginas_render.append({
+            "numero": idx_p,
+            "id": pg["id"],
+            "cols": cols,
+            "segments": segments,
+            "total_itens": len(pg["items"]),
+        })
+
+    layout_state = {
+        "config": config,
+        "block_opts": block_opts,
+        "pages": pages_reconciled,
+    }
+
+    return {
+        "config": config,
+        "block_opts": block_opts,
+        "pages_state": pages_reconciled,
+        "paginas_render": paginas_render,
+        "blocos_ordenados": blocos_ordenados,
+        "blocos_map": blocos_map,
+        "layout_state": layout_state,
+    }
+
