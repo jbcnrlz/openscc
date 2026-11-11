@@ -10,20 +10,31 @@ class PerguntasView(LoginRequiredMixin, ListView):
     paginate_by = 10
     
     def get_queryset(self):
-        qs = Pergunta.objects.filter(
-            assunto__user=self.request.user
-        ).select_related('assunto', 'tipoDePergunta').order_by('-id')
+        qs = Pergunta.objects.all().select_related('assunto', 'assunto__user', 'tipoDePergunta').order_by('-id')
+
+        escopo = (self.request.GET.get('escopo') or 'todas').strip()
+        if escopo == 'minhas':
+            qs = qs.filter(assunto__user=self.request.user)
 
         search = (self.request.GET.get('search') or '').strip()
         assunto_id = (self.request.GET.get('assunto') or '').strip()
         tipo_id = (self.request.GET.get('tipo') or '').strip()
 
         if search:
-            qs = qs.filter(
-                Q(pergunta__icontains=search) |
-                Q(gabarito__icontains=search) |
-                Q(assunto__nome__icontains=search)
-            )
+            q_clean = search.lstrip('#').strip()
+            if q_clean.isdigit():
+                qs = qs.filter(
+                    Q(id=int(q_clean)) |
+                    Q(pergunta__icontains=search) |
+                    Q(gabarito__icontains=search) |
+                    Q(assunto__nome__icontains=search)
+                )
+            else:
+                qs = qs.filter(
+                    Q(pergunta__icontains=search) |
+                    Q(gabarito__icontains=search) |
+                    Q(assunto__nome__icontains=search)
+                )
         if assunto_id.isdigit():
             qs = qs.filter(assunto_id=int(assunto_id))
         if tipo_id.isdigit():
@@ -33,11 +44,12 @@ class PerguntasView(LoginRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['titulo'] = 'Minhas Perguntas'
+        context['titulo'] = 'Banco de Perguntas'
         context['total_perguntas'] = self.get_queryset().count()
-        context['assuntos_filtro'] = Assunto.objects.filter(user=self.request.user).order_by('nome')
+        context['assuntos_filtro'] = Assunto.objects.all().order_by('nome')
         context['tipos_filtro'] = TiposDePergunta.objects.all().order_by('descricao')
         context['search_atual'] = (self.request.GET.get('search') or '').strip()
         context['assunto_atual'] = (self.request.GET.get('assunto') or '').strip()
         context['tipo_atual'] = (self.request.GET.get('tipo') or '').strip()
+        context['escopo_atual'] = (self.request.GET.get('escopo') or 'todas').strip()
         return context

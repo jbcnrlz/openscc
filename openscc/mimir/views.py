@@ -3921,7 +3921,7 @@ def criarAvaliacaoUnificada(request):
     - 1 questão dissertativa técnica (configurável)
     - Questões sobre a Sensação do Aluno (configurável)
     """
-    assuntos_professor = Assunto.objects.filter(user=request.user).order_by('nome')
+    assuntos_professor = Assunto.objects.all().select_related('user').order_by('nome')
 
     if request.method == 'POST':
         titulo = (request.POST.get('titulo') or '').strip()
@@ -4119,23 +4119,79 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
             return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
 
         elif acao == 'adicionar_existente':
-            pergunta_id = request.POST.get('pergunta_id')
+            pergunta_ids_raw = request.POST.getlist('pergunta_ids')
+            pergunta_id_unico = request.POST.get('pergunta_id')
+            if pergunta_id_unico and pergunta_id_unico not in pergunta_ids_raw:
+                pergunta_ids_raw.append(pergunta_id_unico)
+
             secao_destino = request.POST.get('secao_destino', 'materia_objetivas')
             assunto_destino_id = request.POST.get('assunto_destino_id')
-            try:
-                pergunta = Pergunta.objects.get(id=pergunta_id)
+            is_ajax = request.POST.get('ajax') == '1' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+            ids_limpos = []
+            for pid in pergunta_ids_raw:
+                try:
+                    ids_limpos.append(int(pid))
+                except (ValueError, TypeError):
+                    pass
+
+            perguntas_encontradas = list(Pergunta.objects.filter(id__in=ids_limpos).select_related('assunto'))
+            if not perguntas_encontradas:
+                if is_ajax:
+                    return JsonResponse({'sucesso': False, 'erro': 'Nenhuma questão válida selecionada.'}, status=400)
+                messages.error(request, 'Questão não encontrada no banco.')
+                return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+            assuntos_modulo_ids = list(meta.get('assuntos_ids') or ([prova.assunto_id] if prova.assunto_id else []))
+            assuntos_modulo_objs = list(Assunto.objects.filter(id__in=assuntos_modulo_ids))
+            mapa_nome_assunto_modulo = {(a.nome or '').strip().lower(): a.id for a in assuntos_modulo_objs}
+
+            q_map = dict(meta.get('question_map', {}))
+            ids_adicionadas = []
+
+            for pergunta in perguntas_encontradas:
                 prova.perguntas.add(pergunta)
-                q_map = dict(meta.get('question_map', {}))
+                ids_adicionadas.append(pergunta.id)
+
+                # Resolve o assunto_id de destino (suporta modo 'auto' para vincular ao assunto correspondente do módulo)
+                target_aid = pergunta.assunto_id
+                if assunto_destino_id and str(assunto_destino_id).isdigit():
+                    target_aid = int(assunto_destino_id)
+                elif secao_destino == 'materia_objetivas':
+                    if pergunta.assunto_id in assuntos_modulo_ids:
+                        target_aid = pergunta.assunto_id
+                    else:
+                        nome_p = (pergunta.assunto.nome if pergunta.assunto_id else '').strip().lower()
+                        if nome_p in mapa_nome_assunto_modulo:
+                            target_aid = mapa_nome_assunto_modulo[nome_p]
+                        elif assuntos_modulo_ids:
+                            target_aid = assuntos_modulo_ids[0]
+
                 q_map[str(pergunta.id)] = {
                     'secao': secao_destino,
-                    'assunto_id': int(assunto_destino_id) if assunto_destino_id else pergunta.assunto_id,
+                    'assunto_id': target_aid,
                 }
-                meta['question_map'] = q_map
-                prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
-                prova.save(update_fields=['descricao'])
-                messages.success(request, f"Questão #{pergunta.id} vinculada à seção '{SECOES_UNIFICADA.get(secao_destino, {}).get('titulo', secao_destino)}'!")
-            except Pergunta.DoesNotExist:
-                messages.error(request, 'Questão não encontrada no banco.')
+
+            meta['question_map'] = q_map
+            prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+            prova.save(update_fields=['descricao'])
+
+            sec_nome = SECOES_UNIFICADA.get(secao_destino, {}).get('titulo', secao_destino)
+            msg_ok = (
+                f"Questão #{ids_adicionadas[0]} vinculada à seção '{sec_nome}'!"
+                if len(ids_adicionadas) == 1
+                else f"{len(ids_adicionadas)} questões vinculadas com sucesso à seção '{sec_nome}'!"
+            )
+
+            if is_ajax:
+                return JsonResponse({
+                    'sucesso': True,
+                    'adicionadas': len(ids_adicionadas),
+                    'ids': ids_adicionadas,
+                    'mensagem': msg_ok,
+                })
+
+            messages.success(request, msg_ok)
             return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
 
         elif acao == 'criar_pergunta_secao':
@@ -4224,16 +4280,19 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
             return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
 
     estrutura = construir_estrutura_unificada(prova)
-    assuntos_professor = Assunto.objects.filter(user=request.user).order_by('nome')
+    assuntos_professor = Assunto.objects.all().select_related('user').order_by('nome')
 
-    # Questões disponíveis no banco para adição manual
-    perguntas_na_prova_ids = prova.perguntas.values_list('id', flat=True)
-    perguntas_banco = (
-        Pergunta.objects.filter(assunto__user=request.user)
+    # Questões disponíveis em todo o banco de questões (sem filtro restritivo de usuário)
+    perguntas_na_prova_ids = list(prova.perguntas.values_list('id', flat=True))
+    qs_disponiveis_banco = (
+        Pergunta.objects.all()
         .exclude(id__in=perguntas_na_prova_ids)
-        .select_related('assunto', 'tipoDePergunta')
-        .order_by('assunto__nome', '-id')[:120]
+        .select_related('assunto', 'assunto__user', 'tipoDePergunta')
+        .order_by('-id')
     )
+    total_disponiveis_banco = qs_disponiveis_banco.count()
+    perguntas_banco = qs_disponiveis_banco[:60]
+    tipos_pergunta_banco = TiposDePergunta.objects.all().order_by('descricao')
 
     # Estatísticas de correções realizadas para esta prova
     provas_alunos = (
@@ -4247,9 +4306,166 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
         'estrutura': estrutura,
         'assuntos_professor': assuntos_professor,
         'perguntas_banco': perguntas_banco,
+        'total_disponiveis_banco': total_disponiveis_banco,
+        'tipos_pergunta_banco': tipos_pergunta_banco,
         'provas_alunos': provas_alunos,
     }
     return render(request, 'mimir/gerenciarAvaliacaoUnificada.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def buscarPerguntasBancoUnificadaAjax(request, prova_id):
+    """
+    Endpoint AJAX para busca, filtragem e paginação completa de TODAS as questões
+    cadastradas no banco de dados para vínculo rápido ou em lote na Avaliação Unificada.
+    """
+    from .avaliacao_unificada import _extrair_letra_gabarito
+
+    prova = get_object_or_404(Prova, id=prova_id)
+    _, meta = extrair_meta_unificada(prova.descricao)
+    assuntos_modulo_ids = list((meta or {}).get('assuntos_ids') or ([prova.assunto_id] if prova.assunto_id else []))
+    nomes_modulo = list(Assunto.objects.filter(id__in=assuntos_modulo_ids).values_list('nome', flat=True))
+
+    perguntas_na_prova_ids = list(prova.perguntas.values_list('id', flat=True))
+
+    qs_base = (
+        Pergunta.objects.all()
+        .exclude(id__in=perguntas_na_prova_ids)
+        .select_related('assunto', 'assunto__user', 'tipoDePergunta')
+        .prefetch_related('imagens')
+    )
+    total_disponivel_geral = qs_base.count()
+
+    qs = qs_base
+    q = (request.GET.get('q') or '').strip()
+    assunto_id = (request.GET.get('assunto_id') or '').strip()
+    formato = (request.GET.get('formato') or 'todas').strip().lower()
+    tipo_id = (request.GET.get('tipo_id') or '').strip()
+    escopo = (request.GET.get('escopo') or 'todas').strip().lower()
+    ordenacao = (request.GET.get('ordenacao') or 'recentes').strip().lower()
+
+    # Filtro de escopo (por padrão traz TODAS as questões do sistema)
+    if escopo == 'minhas':
+        qs = qs.filter(assunto__user=request.user)
+    elif escopo == 'modulo' and assuntos_modulo_ids:
+        q_mod = Q(assunto_id__in=assuntos_modulo_ids)
+        for nm in nomes_modulo:
+            if nm:
+                q_mod |= Q(assunto__nome__iexact=nm)
+        qs = qs.filter(q_mod)
+
+    # Filtro de assunto específico (inclui também assuntos homônimos de outros professores)
+    if assunto_id == 'modulo' and assuntos_modulo_ids:
+        q_mod = Q(assunto_id__in=assuntos_modulo_ids)
+        for nm in nomes_modulo:
+            if nm:
+                q_mod |= Q(assunto__nome__iexact=nm)
+        qs = qs.filter(q_mod)
+    elif assunto_id.isdigit():
+        aid_int = int(assunto_id)
+        assunto_sel = Assunto.objects.filter(id=aid_int).first()
+        if assunto_sel and assunto_sel.nome:
+            qs = qs.filter(Q(assunto_id=aid_int) | Q(assunto__nome__iexact=assunto_sel.nome))
+        else:
+            qs = qs.filter(assunto_id=aid_int)
+
+    # Filtro de Tipo de Pergunta específico
+    if tipo_id.isdigit():
+        qs = qs.filter(tipoDePergunta_id=int(tipo_id))
+
+    # Busca textual livre (Enunciado, Gabarito, Assunto, Tipo ou #ID)
+    if q:
+        q_id_str = q.lstrip('#').strip()
+        if q_id_str.isdigit():
+            qs = qs.filter(
+                Q(id=int(q_id_str))
+                | Q(pergunta__icontains=q)
+                | Q(gabarito__icontains=q)
+                | Q(assunto__nome__icontains=q)
+            )
+        else:
+            for termo in q.split():
+                qs = qs.filter(
+                    Q(pergunta__icontains=termo)
+                    | Q(gabarito__icontains=termo)
+                    | Q(assunto__nome__icontains=termo)
+                    | Q(tipoDePergunta__descricao__icontains=termo)
+                )
+
+    # Ordenação
+    if ordenacao == 'antigas':
+        qs = qs.order_by('id')
+    elif ordenacao == 'assunto':
+        qs = qs.order_by('assunto__nome', '-id')
+    else:
+        qs = qs.order_by('-id')
+
+    # Filtro por formato (objetiva vs dissertativa)
+    if formato in ('objetiva', 'dissertativa'):
+        espera_obj = (formato == 'objetiva')
+        filtradas = [p for p in qs if is_pergunta_objetiva(p) == espera_obj]
+    else:
+        filtradas = list(qs)
+
+    total_filtrado = len(filtradas)
+    try:
+        page = max(1, int(request.GET.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per_page = min(100, max(10, int(request.GET.get('per_page', 25))))
+    except (ValueError, TypeError):
+        per_page = 25
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    pagina_itens = filtradas[start:end]
+    total_pages = max(1, (total_filtrado + per_page - 1) // per_page)
+
+    itens_json = []
+    for p in pagina_itens:
+        obj_flag = is_pergunta_objetiva(p)
+        gab_raw = p.get_gabarito_com_feedback() or ''
+        letra_gab = _extrair_letra_gabarito(gab_raw) if obj_flag else ''
+        texto_raw = p.get_texto_com_feedback() or ''
+        resumo_limpo = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', texto_raw)).strip()
+        if len(resumo_limpo) > 220:
+            resumo_limpo = resumo_limpo[:220] + '...'
+
+        autor_str = ''
+        if p.assunto_id and p.assunto.user_id:
+            u = p.assunto.user
+            autor_str = u.get_full_name() or u.username
+
+        itens_json.append({
+            'id': p.id,
+            'assunto_id': p.assunto_id,
+            'assunto_nome': p.assunto.nome if p.assunto_id else 'Sem Assunto',
+            'autor_nome': autor_str,
+            'tipo_nome': p.tipoDePergunta.descricao if p.tipoDePergunta_id else ('Objetiva' if obj_flag else 'Dissertativa'),
+            'is_objetiva': obj_flag,
+            'letra_gabarito': letra_gab,
+            'qtd_imagens': len(list(p.imagens.all())),
+            'tem_codigo': '```' in texto_raw,
+            'resumo_texto': resumo_limpo,
+            'html_completo': str(p.texto_com_imagens_e_syntax_highlight),
+            'html_gabarito': str(p.gabarito_com_syntax_highlight),
+            'no_modulo': (p.assunto_id in assuntos_modulo_ids) or ((p.assunto.nome if p.assunto_id else '') in nomes_modulo),
+        })
+
+    return JsonResponse({
+        'sucesso': True,
+        'itens': itens_json,
+        'total_filtrado': total_filtrado,
+        'total_disponivel_geral': total_disponivel_geral,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages,
+        'has_next': end < total_filtrado,
+        'has_prev': page > 1,
+    })
 
 
 @login_required(login_url='/login')

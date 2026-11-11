@@ -531,6 +531,8 @@ def preencher_questoes_do_banco(prova) -> dict:
     ids_ja_na_prova = set(prova.perguntas.values_list("id", flat=True))
     adicionadas = 0
 
+    from django.db.models import Q
+
     # 1. Parte III — Questões Objetivas por Matéria (Assunto) do Módulo
     sec_mat = estrutura["secoes"].get("materia_objetivas", {})
     for sub in sec_mat.get("por_materia", []):
@@ -538,7 +540,9 @@ def preencher_questoes_do_banco(prova) -> dict:
         if faltam <= 0:
             continue
         assunto_obj = sub["assunto"]
-        candidatas = Pergunta.objects.filter(assunto=assunto_obj).exclude(id__in=ids_ja_na_prova)
+        candidatas = Pergunta.objects.filter(
+            Q(assunto=assunto_obj) | Q(assunto__nome__iexact=assunto_obj.nome)
+        ).exclude(id__in=ids_ja_na_prova)
         for cand in candidatas:
             if faltam <= 0:
                 break
