@@ -186,12 +186,12 @@ def is_pergunta_objetiva(pergunta) -> bool:
     Identifica se uma instância de Pergunta é objetiva (Múltipla Escolha / V ou F)
     pelo tipo cadastrado ou pela presença de alternativas A) B) C) no enunciado.
     """
-    desc = (pergunta.tipoDePergunta.descricao or "").lower()
+    desc = (pergunta.tipoDePergunta.descricao or "").lower() if getattr(pergunta, "tipoDePergunta_id", None) else ""
     if any(k in desc for k in ["dissertativa", "discursiva", "aberta", "técnica", "tecnica"]):
         return False
     if any(k in desc for k in ["múltipla", "multipla", "objetiva", "multiple", "verdadeiro", "alternativa"]):
         return True
-    texto = pergunta.pergunta or ""
+    texto = pergunta.get_texto_com_feedback() if hasattr(pergunta, "get_texto_com_feedback") else (pergunta.pergunta or "")
     if re.search(r"(?m)^\s*[A-E][\)\.\-]\s+", texto):
         return True
     return False

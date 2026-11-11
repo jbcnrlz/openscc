@@ -3906,6 +3906,8 @@ from .avaliacao_unificada import (
     calcular_diagnostico_prova_aluno_unificada,
     garantir_tipos_pergunta_unificada,
     garantir_assunto_auxiliar,
+    is_pergunta_objetiva,
+    _extrair_letra_gabarito,
 )
 
 
