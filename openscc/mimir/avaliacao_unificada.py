@@ -20,6 +20,14 @@ DEFAULT_QUOTAS = {
     "sensacao_aluno": 3,
 }
 
+DEFAULT_QUOTAS_SIMPLES = {
+    "cg_objetivas": 0,
+    "cg_dissertativa": 0,
+    "materia_objetivas": 5,  # questões objetivas da matéria
+    "dissertativa_tecnica": 2,  # questões dissertativas da matéria
+    "sensacao_aluno": 0,
+}
+
 SECOES_UNIFICADA = {
     "cg_objetivas": {
         "codigo": "cg_objetivas",
@@ -126,7 +134,8 @@ QUESTOES_SENSACAO_PADRAO = [
 
 def extrair_meta_unificada(descricao_raw: str) -> Tuple[str, Optional[dict]]:
     """
-    Separa a descrição visível da prova e o dicionário JSON de metadados da Avaliação Unificada.
+    Separa a descrição visível da prova e o dicionário JSON de metadados da prova
+    (tanto para Avaliações Unificadas quanto para Provas Regulares/Simples).
     """
     if not descricao_raw:
         return "", None
@@ -140,7 +149,7 @@ def extrair_meta_unificada(descricao_raw: str) -> Tuple[str, Optional[dict]]:
     json_str = resto[:end_idx].strip() if end_idx != -1 else resto.strip()
     try:
         meta = json.loads(json_str)
-        if isinstance(meta, dict) and meta.get("is_unificada"):
+        if isinstance(meta, dict):
             return texto_limpo, meta
     except Exception:
         pass
@@ -149,10 +158,11 @@ def extrair_meta_unificada(descricao_raw: str) -> Tuple[str, Optional[dict]]:
 
 def empacotar_meta_unificada(descricao_limpa: str, meta: dict) -> str:
     """
-    Empacota a descrição visível com o bloco oculto de metadados JSON da Avaliação Unificada.
+    Empacota a descrição visível com o bloco oculto de metadados JSON da prova,
+    preservando `is_unificada` (True para Unificada de Módulo, False para Prova Simples).
     """
     meta = dict(meta or {})
-    meta["is_unificada"] = True
+    meta["is_unificada"] = bool(meta.get("is_unificada", False))
     json_compact = json.dumps(meta, ensure_ascii=False)
     base = (descricao_limpa or "").strip()
     return f"{base}\n\n{META_START_MARKER}{json_compact}{META_END_MARKER}"
@@ -257,7 +267,7 @@ def garantir_assunto_auxiliar(user, nome_assunto: str):
 
 def inferir_secao_pergunta(pergunta, meta: dict) -> Tuple[str, Optional[int]]:
     """
-    Determina a qual seção da Avaliação Unificada pertence uma pergunta,
+    Determina a qual seção da prova pertence uma pergunta,
     usando `question_map` (ou `mapa_questoes`) salvo nos metadados ou inferindo pelo assunto/texto/tipo.
     """
     q_map = (meta or {}).get("question_map") or (meta or {}).get("mapa_questoes") or {}
@@ -277,11 +287,17 @@ def inferir_secao_pergunta(pergunta, meta: dict) -> Tuple[str, Optional[int]]:
     ):
         return "sensacao_aluno", pergunta.assunto_id
 
+    objetiva = is_pergunta_objetiva(pergunta)
+
+    if not bool((meta or {}).get("is_unificada", False)):
+        if not objetiva:
+            return "dissertativa_tecnica", pergunta.assunto_id
+        return "materia_objetivas", pergunta.assunto_id
+
     is_cg = any(
         k in assunto_nome_lower or k in texto_lower[:90]
         for k in ["conhecimento geral", "conhecimentos gerais", "atualidades"]
     )
-    objetiva = is_pergunta_objetiva(pergunta)
 
     if is_cg:
         return ("cg_objetivas" if objetiva else "cg_dissertativa"), pergunta.assunto_id
@@ -294,21 +310,45 @@ def inferir_secao_pergunta(pergunta, meta: dict) -> Tuple[str, Optional[int]]:
 
 def construir_estrutura_unificada(prova) -> dict:
     """
-    Constrói a estrutura completa da Avaliação Unificada para gerenciamento, impressão OMR/Foto e correção.
+    Constrói a estrutura completa da Avaliação (Unificada de Módulo ou Prova Regular/Simples)
+    para gerenciamento, diagramação/impressão OMR/Foto e correção por foto.
     """
     from .models import Assunto
 
     descricao_limpa, meta = extrair_meta_unificada(prova.descricao)
+
+    # Restaura automaticamente provas simples que tinham sido convertidas por engano ao abrir a tela
+    if (
+        isinstance(meta, dict)
+        and meta.get("is_unificada") is True
+        and not meta.get("confirmada_unificada")
+        and prova.assunto_id
+        and meta.get("modulo_nome") == f"Módulo - {prova.assunto.nome}"
+    ):
+        q_map_chk = meta.get("question_map") or {}
+        tem_secao_exclusiva_unificada = any(
+            isinstance(v, dict) and v.get("secao") in ("cg_objetivas", "cg_dissertativa", "sensacao_aluno")
+            for v in q_map_chk.values()
+        )
+        if not tem_secao_exclusiva_unificada:
+            meta["is_unificada"] = False
+            meta["modulo_nome"] = prova.assunto.nome
+            meta["quotas"] = dict(DEFAULT_QUOTAS_SIMPLES)
+            prova.descricao = empacotar_meta_unificada(descricao_limpa, meta)
+            prova.save(update_fields=["descricao"])
+
     if not meta:
         meta = {
-            "is_unificada": True,
-            "modulo_nome": f"Módulo - {prova.assunto.nome}" if prova.assunto_id else "Módulo Integrado",
+            "is_unificada": False,
+            "modulo_nome": prova.assunto.nome if prova.assunto_id else "Avaliação Regular",
             "assuntos_ids": [prova.assunto_id] if prova.assunto_id else [],
-            "quotas": dict(DEFAULT_QUOTAS),
+            "quotas": dict(DEFAULT_QUOTAS_SIMPLES),
             "question_map": {},
         }
 
-    quotas = dict(DEFAULT_QUOTAS)
+    is_unificada_flag = bool(meta.get("is_unificada", False))
+    base_quotas = DEFAULT_QUOTAS if is_unificada_flag else DEFAULT_QUOTAS_SIMPLES
+    quotas = dict(base_quotas)
     quotas.update(meta.get("quotas") or meta.get("config_quantidades") or {})
 
     assuntos_ids = meta.get("assuntos_ids") or ([prova.assunto_id] if prova.assunto_id else [])
@@ -451,8 +491,8 @@ def construir_estrutura_unificada(prova) -> dict:
     progresso_pct = round((min(total_atual, total_meta) / total_meta) * 100) if total_meta > 0 else 100
 
     return {
-        "is_unificada": True,
-        "modulo_nome": meta.get("modulo_nome", "Módulo Integrado"),
+        "is_unificada": is_unificada_flag,
+        "modulo_nome": meta.get("modulo_nome") or (prova.assunto.nome if prova.assunto_id else "Avaliação"),
         "descricao_limpa": descricao_limpa,
         "meta": meta,
         "quotas": quotas,
@@ -1256,14 +1296,20 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
                 "default_zone_2col": "full" if is_diss else "col",
             })
 
-    # 3. PARTE III: Conhecimentos Específicos por Matéria do Módulo
+    # 3. PARTE III: Conhecimentos Específicos por Matéria do Módulo (ou Questões Objetivas da Prova Simples)
+    is_unif_doc = bool(estrutura.get("is_unificada", False))
+    qtd_assuntos_doc = len(estrutura.get("assuntos") or [])
     sec_mat = secoes.get("materia_objetivas") or {}
     if sec_mat.get("perguntas"):
         _add_bloco({
             "id": "banner:materia_objetivas",
             "tipo": "section_banner",
             "secao": "materia_objetivas",
-            "titulo_esq": "PARTE III — CONHECIMENTOS ESPECÍFICOS POR MATÉRIA DO MÓDULO",
+            "titulo_esq": (
+                "PARTE III — CONHECIMENTOS ESPECÍFICOS POR MATÉRIA DO MÓDULO"
+                if is_unif_doc
+                else "QUESTÕES OBJETIVAS (MÚLTIPLA ESCOLHA)"
+            ),
             "titulo_dir": f"{sec_mat.get('atual', 0)} QUESTÃO(ÕES)",
             "bg_color": "#111827",
             "default_zone_2col": "full",
@@ -1271,14 +1317,15 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
         for mat in sec_mat.get("por_materia") or []:
             if mat.get("perguntas"):
                 assunto_obj = mat["assunto"]
-                _add_bloco({
-                    "id": f"subbanner:materia:{assunto_obj.id}",
-                    "tipo": "subject_subbanner",
-                    "secao": "materia_objetivas",
-                    "assunto_id": assunto_obj.id,
-                    "titulo": f"DISCIPLINA / ASSUNTO: {assunto_obj.nome.upper()} ({mat.get('atual', 0)} questão(ões))",
-                    "default_zone_2col": "col",
-                })
+                if is_unif_doc or qtd_assuntos_doc > 1:
+                    _add_bloco({
+                        "id": f"subbanner:materia:{assunto_obj.id}",
+                        "tipo": "subject_subbanner",
+                        "secao": "materia_objetivas",
+                        "assunto_id": assunto_obj.id,
+                        "titulo": f"DISCIPLINA / ASSUNTO: {assunto_obj.nome.upper()} ({mat.get('atual', 0)} questão(ões))",
+                        "default_zone_2col": "col",
+                    })
                 for item in mat["perguntas"]:
                     p = item["pergunta"]
                     raw_txt = p.get_texto_com_feedback() or ""
@@ -1304,14 +1351,18 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
                         "default_zone_2col": "col",
                     })
 
-    # 4. PARTE IV: Dissertativa Técnica
+    # 4. PARTE IV: Dissertativa Técnica (ou Questões Dissertativas da Prova Simples)
     sec_diss_tec = secoes.get("dissertativa_tecnica") or {}
     if sec_diss_tec.get("perguntas"):
         _add_bloco({
             "id": "banner:dissertativa_tecnica",
             "tipo": "section_banner",
             "secao": "dissertativa_tecnica",
-            "titulo_esq": "PARTE IV — QUESTÃO DISSERTATIVA TÉCNICA DO MÓDULO",
+            "titulo_esq": (
+                "PARTE IV — QUESTÃO DISSERTATIVA TÉCNICA DO MÓDULO"
+                if is_unif_doc
+                else "QUESTÕES DISSERTATIVAS"
+            ),
             "titulo_dir": f"{sec_diss_tec.get('atual', 0)} QUESTÃO(ÕES)",
             "bg_color": "#111827",
             "default_zone_2col": "full",
@@ -1327,8 +1378,12 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
                 "pergunta_id": p.id,
                 "numero": item["numero"],
                 "numero_fmt": f"{item['numero']:02d}",
-                "header_esq": f"QUESTÃO {item['numero']:02d} • DISSERTATIVA TÉCNICA ({item['assunto_nome'].upper()})",
-                "header_dir": "RESPOSTA TÉCNICA" if is_diss else "MÚLTIPLA ESCOLHA",
+                "header_esq": (
+                    f"QUESTÃO {item['numero']:02d} • DISSERTATIVA TÉCNICA ({item['assunto_nome'].upper()})"
+                    if is_unif_doc
+                    else f"QUESTÃO {item['numero']:02d} • {item['assunto_nome'].upper()}"
+                ),
+                "header_dir": "RESPOSTA TÉCNICA" if (is_diss and is_unif_doc) else ("QUESTÃO DISSERTATIVA" if is_diss else "MÚLTIPLA ESCOLHA"),
                 "html_corpo": str(p.texto_com_imagens_e_syntax_highlight),
                 "texto_plano": re.sub(r"<[^>]+>", " ", raw_txt),
                 "is_objetiva": not is_diss,
@@ -1336,7 +1391,7 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
                 "is_sensacao": False,
                 "tem_imagem": len(list(p.imagens.all())) > 0,
                 "tem_codigo": "```" in raw_txt,
-                "essay_header_esq": f"ESPAÇO PARA RESPOSTA TÉCNICA DA QUESTÃO {item['numero']:02d}",
+                "essay_header_esq": f"ESPAÇO PARA RESPOSTA DA QUESTÃO {item['numero']:02d}",
                 "essay_header_dir": f"[DISSERTATIVA Q{item['numero']:02d}]",
                 "linhas_default": 12 if is_diss else 0,
                 "default_zone_2col": "full" if is_diss else "col",
