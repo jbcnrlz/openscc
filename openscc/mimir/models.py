@@ -507,7 +507,7 @@ def formatar_texto_com_syntax_highlight(texto: str, imagens_html: str = "") -> s
             colored = _colorir_codigo_html_server(esc)
             indent_html = "&nbsp;" * leading_spaces
             linha_html = (
-                f'<div style="display:flex;align-items:baseline;line-height:1.45;font-family:\'Consolas\',\'Courier New\',monospace;font-size:9pt;">'
+                f'<div style="display:flex;align-items:baseline;line-height:1.45;font-family:\'Consolas\',\'Courier New\',monospace;font-size:9pt;page-break-inside:avoid;break-inside:avoid;">'
                 f'<span style="color:#64748b;user-select:none;display:inline-block;min-width:24px;text-align:right;margin-right:10px;padding-right:6px;border-right:1px solid #cbd5e1;font-size:8pt;flex-shrink:0;">{idx}</span>'
                 f'<span style="white-space:pre-wrap;word-break:break-word;flex:1;">{indent_html}{colored if colored else "&nbsp;"}</span>'
                 f'</div>'
@@ -516,10 +516,11 @@ def formatar_texto_com_syntax_highlight(texto: str, imagens_html: str = "") -> s
 
         codigo_html = "".join(escaped_lines)
         lang_label = lang.upper() if lang else "CÓDIGO FONTE"
+        break_rule = "page-break-inside:avoid;break-inside:avoid;" if len(linhas) <= 14 else "page-break-inside:auto;break-inside:auto;"
         html_bloco = (
             f'<div class="mimir-code-block" data-mimir-code-enhanced="1" '
-            f'style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;border-left:4px solid #2563eb;border-radius:6px;margin:6px 0;overflow:hidden;white-space:normal;page-break-inside:avoid;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
-            f'<div style="background:#e2e8f0;color:#1e293b;padding:3px 10px;font-size:8pt;font-weight:700;font-family:\'Consolas\',\'Courier New\',monospace;border-bottom:1px solid #cbd5e1;letter-spacing:0.3px;">'
+            f'style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;border-left:4px solid #2563eb;border-radius:6px;margin:6px 0;overflow:hidden;white-space:normal;{break_rule}-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
+            f'<div style="background:#e2e8f0;color:#1e293b;padding:3px 10px;font-size:8pt;font-weight:700;font-family:\'Consolas\',\'Courier New\',monospace;border-bottom:1px solid #cbd5e1;letter-spacing:0.3px;page-break-after:avoid;break-after:avoid;">'
             f'&lt;/&gt; {escape(lang_label)}'
             f'</div>'
             f'<div style="margin:0;padding:6px 10px;background:#f8fafc;color:#0f172a;">'
