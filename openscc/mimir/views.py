@@ -4509,11 +4509,79 @@ def imprimirAvaliacaoUnificada(request, prova_id):
     itens_objetivos_col1 = itens_objetivos[:meio_omr]
     itens_objetivos_col2 = itens_objetivos[meio_omr:]
 
+    omr_pages_count = 2 if int(diagramacao['config'].get('omr_pages', 1) or 1) >= 2 else 1
+    omr_essay_lines = max(4, min(30, int(diagramacao['config'].get('omr_essay_lines', 12) or 12)))
+    omr_page_map = diagramacao['config'].get('omr_page_map') if isinstance(diagramacao['config'].get('omr_page_map'), dict) else {}
+
+    def _get_omr_target_page(key_name, default_when_2=2):
+        if omr_pages_count == 1:
+            return 1
+        val = omr_page_map.get(key_name)
+        if val in (1, 2, '1', '2'):
+            return int(val)
+        return default_when_2
+
+    omr_paginas_render = []
+    for pnum in range(1, omr_pages_count + 1):
+        diss_p = [
+            it for it in itens_dissertativos
+            if _get_omr_target_page(f"diss:{it['pergunta'].id}", 2) == pnum
+        ]
+        omr_paginas_render.append({
+            'numero': pnum,
+            'show_objetivas': bool(itens_objetivos and _get_omr_target_page('objetivas', 1) == pnum),
+            'dissertativas': diss_p,
+            'show_sensacao': bool(itens_sensacao and _get_omr_target_page('sensacao', 2) == pnum),
+        })
+
+    # Se a página 2 ficou totalmente vazia no modo 2 páginas, move dissertativas (ou sensação) para ela
+    if omr_pages_count == 2 and not (
+        omr_paginas_render[1]['show_objetivas']
+        or omr_paginas_render[1]['dissertativas']
+        or omr_paginas_render[1]['show_sensacao']
+    ):
+        if itens_dissertativos:
+            omr_paginas_render[0]['dissertativas'] = []
+            omr_paginas_render[1]['dissertativas'] = list(itens_dissertativos)
+        elif itens_sensacao:
+            omr_paginas_render[0]['show_sensacao'] = False
+            omr_paginas_render[1]['show_sensacao'] = True
+
+    omr_data_js = {
+        'objetivas': [
+            {
+                'numero_fmt': f"{it['numero']:02d}",
+                'assunto_nome': it['assunto_nome'],
+                'secao_titulo': it['secao_titulo'],
+            }
+            for it in itens_objetivos
+        ],
+        'dissertativas': [
+            {
+                'key': f"diss:{it['pergunta'].id}",
+                'pergunta_id': it['pergunta'].id,
+                'numero_fmt': f"{it['numero']:02d}",
+                'secao_titulo': it['secao_titulo'].upper(),
+                'assunto_nome': it['assunto_nome'].upper(),
+                'resumo': strip_tags(it['pergunta'].get_texto_com_feedback() or '')[:220],
+            }
+            for it in itens_dissertativos
+        ],
+        'sensacao': [
+            {
+                'numero_fmt': f"{it['numero']:02d}",
+                'resumo': strip_tags(it['pergunta'].get_texto_com_feedback() or '')[:110],
+            }
+            for it in itens_sensacao
+        ],
+    }
+
     diagramacao_payload = {
         'config': diagramacao['config'],
         'block_opts': diagramacao['block_opts'],
         'pages': diagramacao['pages_state'],
         'blocos': diagramacao['blocos_ordenados'],
+        'omr_data': omr_data_js,
     }
 
     context = {
@@ -4528,8 +4596,9 @@ def imprimirAvaliacaoUnificada(request, prova_id):
         'itens_objetivos_col2': itens_objetivos_col2,
         'itens_dissertativos': itens_dissertativos,
         'itens_sensacao': itens_sensacao,
+        'omr_paginas_render': omr_paginas_render,
         'alternativas': ['A', 'B', 'C', 'D', 'E'],
-        'linhas_dissertativa': range(1, 13),
+        'linhas_dissertativa': range(1, omr_essay_lines + 1),
         'data_impressao': timezone.now(),
     }
 
