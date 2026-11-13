@@ -7,10 +7,16 @@
         <div class="card-body p-4">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                 <div>
-                    <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        {% if estrutura.is_unificada %}
                         <span class="badge bg-primary px-3 py-1">
                             <i class="fas fa-layer-group me-1"></i> Avaliação Unificada
                         </span>
+                        {% else %}
+                        <span class="badge bg-secondary px-3 py-1">
+                            <i class="fas fa-file-alt me-1"></i> Prova Regular (Não Unificada)
+                        </span>
+                        {% endif %}
                         <span class="badge bg-dark px-3 py-1">
                             <i class="fas fa-cubes me-1"></i> {{ estrutura.modulo_nome }}
                         </span>
@@ -23,6 +29,23 @@
                             <i class="fas fa-hourglass-half me-1"></i> Em Montagem ({{ estrutura.total_atual }}/{{ estrutura.total_meta }} questões)
                         </span>
                         {% endif %}
+
+                        <!-- Botão rápido para alternar entre Prova Simples (Não Unificada) e Avaliação Unificada -->
+                        <form method="post" class="d-inline ms-1">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="alternar_tipo_prova">
+                            {% if estrutura.is_unificada %}
+                            <input type="hidden" name="novo_tipo" value="simples">
+                            <button type="submit" class="btn btn-xs btn-outline-secondary py-0 px-2 small" title="Converter esta avaliação para Prova Simples (Não Unificada)">
+                                <i class="fas fa-exchange-alt me-1"></i> Marcar como Prova Não Unificada
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="novo_tipo" value="unificada">
+                            <button type="submit" class="btn btn-xs btn-outline-primary py-0 px-2 small" title="Converter esta prova para Avaliação Unificada de Módulo">
+                                <i class="fas fa-exchange-alt me-1"></i> Converter em Unificada
+                            </button>
+                            {% endif %}
+                        </form>
                     </div>
                     <h2 class="fw-bold text-dark mb-1">{{ prova.titulo }}</h2>
                     <p class="text-muted mb-0 small">{{ estrutura.descricao_limpa }}</p>
@@ -50,12 +73,12 @@
                             </li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=folha_resposta" target="_blank">
-                                    <i class="fas fa-qrcode text-success me-2"></i> Folha de Respostas OMR / Foto
+                                    <i class="fas fa-qrcode text-success me-2"></i> Folha de Respostas OMR / Foto (1 ou 2 Páginas)
                                 </a>
                             </li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=gabarito" target="_blank">
-                                    <i class="fas fa-check-double text-info me-2"></i> Gabarito Oficial Unificado
+                                    <i class="fas fa-check-double text-info me-2"></i> Gabarito Oficial
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
@@ -84,8 +107,9 @@
                 </div>
             </div>
 
-            <!-- Barra de Progresso das 5 Partes -->
+            <!-- Barra de Progresso -->
             <div class="row g-3 mt-3 pt-3 border-top">
+                {% if estrutura.is_unificada or estrutura.secoes.cg_objetivas.meta > 0 or estrutura.secoes.cg_objetivas.atual > 0 %}
                 <div class="col-md-2 col-6">
                     <div class="p-2 rounded bg-light border text-center">
                         <div class="small text-muted">1. CG Objetivas</div>
@@ -94,6 +118,8 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
+                {% if estrutura.is_unificada or estrutura.secoes.cg_dissertativa.meta > 0 or estrutura.secoes.cg_dissertativa.atual > 0 %}
                 <div class="col-md-2 col-6">
                     <div class="p-2 rounded bg-light border text-center">
                         <div class="small text-muted">2. CG Dissertativa</div>
@@ -102,30 +128,33 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-6">
+                {% endif %}
+                <div class="{% if estrutura.is_unificada %}col-md-3{% else %}col-md-4{% endif %} col-6">
                     <div class="p-2 rounded bg-light border text-center">
-                        <div class="small text-muted">3. Matérias ({{ estrutura.assuntos|length }} assunto(s))</div>
+                        <div class="small text-muted">{% if estrutura.is_unificada %}3. Matérias{% else %}Questões Objetivas{% endif %} ({{ estrutura.assuntos|length }} assunto(s))</div>
                         <div class="fw-bold {% if estrutura.secoes.materia_objetivas.completa %}text-success{% else %}text-primary{% endif %}">
                             {{ estrutura.secoes.materia_objetivas.atual }} / {{ estrutura.secoes.materia_objetivas.meta }}
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-6">
+                <div class="{% if estrutura.is_unificada %}col-md-2{% else %}col-md-4{% endif %} col-6">
                     <div class="p-2 rounded bg-light border text-center">
-                        <div class="small text-muted">4. Diss. Técnica</div>
+                        <div class="small text-muted">{% if estrutura.is_unificada %}4. Diss. Técnica{% else %}Questões Dissertativas{% endif %}</div>
                         <div class="fw-bold {% if estrutura.secoes.dissertativa_tecnica.completa %}text-success{% else %}text-primary{% endif %}">
                             {{ estrutura.secoes.dissertativa_tecnica.atual }} / {{ estrutura.secoes.dissertativa_tecnica.meta }}
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-12">
+                {% if estrutura.is_unificada or estrutura.secoes.sensacao_aluno.meta > 0 or estrutura.secoes.sensacao_aluno.atual > 0 %}
+                <div class="{% if estrutura.is_unificada %}col-md-3{% else %}col-md-4{% endif %} col-12">
                     <div class="p-2 rounded bg-light border text-center">
-                        <div class="small text-muted">5. Sensação do Aluno</div>
+                        <div class="small text-muted">{% if estrutura.is_unificada %}5. {% endif %}Sensação do Aluno</div>
                         <div class="fw-bold {% if estrutura.secoes.sensacao_aluno.completa %}text-success{% else %}text-secondary{% endif %}">
                             {{ estrutura.secoes.sensacao_aluno.atual }} / {{ estrutura.secoes.sensacao_aluno.meta }}
                         </div>
                     </div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -134,7 +163,7 @@
     <div class="collapse mb-4" id="collapseConfigUnificada">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-cogs me-2"></i>Configurar Matérias (Assuntos) e Quantidades por Tipo</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-cogs me-2"></i>Configurar Tipo da Prova, Matérias (Assuntos) e Quantidades</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-toggle="collapse" data-bs-target="#collapseConfigUnificada"></button>
             </div>
             <div class="card-body p-4">
@@ -142,12 +171,19 @@
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="salvar_config">
                     <div class="row g-3">
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Título da Avaliação</label>
                             <input type="text" name="titulo" class="form-control" value="{{ prova.titulo }}" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Nome do Módulo</label>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Tipo de Avaliação</label>
+                            <select name="is_unificada_flag" class="form-select">
+                                <option value="0" {% if not estrutura.is_unificada %}selected{% endif %}>Prova Simples / Regular (Não Unificada)</option>
+                                <option value="1" {% if estrutura.is_unificada %}selected{% endif %}>Avaliação Unificada (Módulo Integrado)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Módulo / Turma</label>
                             <input type="text" name="modulo_nome" class="form-control" value="{{ estrutura.modulo_nome }}" required>
                         </div>
                         <div class="col-md-3">
@@ -255,6 +291,7 @@
                 </div>
             </div>
 
+            {% if estrutura.is_unificada or estrutura.secoes.cg_objetivas.meta > 0 or estrutura.secoes.cg_objetivas.atual > 0 %}
             <!-- PARTE I: Conhecimentos Gerais (Objetivas) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
@@ -284,7 +321,9 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
+            {% if estrutura.is_unificada or estrutura.secoes.cg_dissertativa.meta > 0 or estrutura.secoes.cg_dissertativa.atual > 0 %}
             <!-- PARTE II: Questão Dissertativa (Conhecimento Geral) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
@@ -314,13 +353,20 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
-            <!-- PARTE III: Questões Objetivas por Matéria do Módulo (Assunto) -->
+            <!-- PARTE III / BLOCO 1: Questões Objetivas por Matéria (Assunto) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
-                        <span class="badge bg-success me-2">Parte III</span>
-                        <strong class="text-dark">Questões Objetivas por Matéria do Módulo ({{ estrutura.quotas.materia_objetivas }} por Assunto)</strong>
+                        <span class="badge bg-success me-2">{% if estrutura.is_unificada %}Parte III{% else %}Objetivas{% endif %}</span>
+                        <strong class="text-dark">
+                            {% if estrutura.is_unificada %}
+                                Questões Objetivas por Matéria do Módulo ({{ estrutura.quotas.materia_objetivas }} por Assunto)
+                            {% else %}
+                                Questões Objetivas da Prova (Múltipla Escolha)
+                            {% endif %}
+                        </strong>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge {% if estrutura.secoes.materia_objetivas.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
@@ -328,7 +374,7 @@
                         </span>
                         <button class="btn btn-sm btn-success" type="button"
                                 onclick="abrirExploradorBanco('materia_objetivas', 'auto', 'modulo', 'objetiva')">
-                            <i class="fas fa-search me-1"></i> Buscar p/ Módulo
+                            <i class="fas fa-search me-1"></i> Buscar no Banco
                         </button>
                     </div>
                 </div>
@@ -364,12 +410,12 @@
                 </div>
             </div>
 
-            <!-- PARTE IV: Questão Dissertativa Técnica -->
+            <!-- PARTE IV / BLOCO 2: Questões Dissertativas -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
-                        <span class="badge bg-warning text-dark me-2">Parte IV</span>
-                        <strong class="text-dark">Questão Dissertativa Técnica</strong>
+                        <span class="badge bg-warning text-dark me-2">{% if estrutura.is_unificada %}Parte IV{% else %}Dissertativas{% endif %}</span>
+                        <strong class="text-dark">{% if estrutura.is_unificada %}Questão Dissertativa Técnica{% else %}Questões Dissertativas da Prova{% endif %}</strong>
                     </div>
                     <div class="d-flex align-items-center flex-wrap gap-2">
                         <span class="badge {% if estrutura.secoes.dissertativa_tecnica.completa %}bg-success{% else %}bg-warning text-dark{% endif %}">
@@ -380,7 +426,7 @@
                             <i class="fas fa-search me-1"></i> Buscar no Banco
                         </button>
                         <button class="btn btn-sm btn-outline-primary" type="button"
-                                onclick="abrirModalNovaQuestao('dissertativa_tecnica', '{{ prova.assunto_id }}', 'Parte IV - Dissertativa Técnica do Módulo', false)">
+                                onclick="abrirModalNovaQuestao('dissertativa_tecnica', '{{ prova.assunto_id }}', 'Questão Dissertativa', false)">
                             <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
@@ -389,16 +435,17 @@
                     {% for item in estrutura.secoes.dissertativa_tecnica.perguntas %}
                         {% include "mimir/partials_item_unificada.html" with item=item prova=prova %}
                     {% empty %}
-                        <p class="text-muted small mb-0 text-center py-3">Nenhuma questão Dissertativa Técnica adicionada ainda.</p>
+                        <p class="text-muted small mb-0 text-center py-3">Nenhuma questão dissertativa adicionada ainda.</p>
                     {% endfor %}
                 </div>
             </div>
 
+            {% if estrutura.is_unificada or estrutura.secoes.sensacao_aluno.meta > 0 or estrutura.secoes.sensacao_aluno.atual > 0 %}
             <!-- PARTE V: Sensação do Aluno -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom">
                     <div>
-                        <span class="badge bg-secondary me-2">Parte V</span>
+                        <span class="badge bg-secondary me-2">{% if estrutura.is_unificada %}Parte V{% else %}Opcional{% endif %}</span>
                         <strong class="text-dark">Questões sobre a Sensação do Aluno (Autoavaliação / Percepção)</strong>
                     </div>
                     <div class="d-flex align-items-center flex-wrap gap-2">
@@ -410,7 +457,7 @@
                             <i class="fas fa-search me-1"></i> Buscar no Banco
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" type="button"
-                                onclick="abrirModalNovaQuestao('sensacao_aluno', '', 'Parte V - Sensação do Aluno', true)">
+                                onclick="abrirModalNovaQuestao('sensacao_aluno', '', 'Sensação do Aluno', true)">
                             <i class="fas fa-plus me-1"></i> Criar Nova
                         </button>
                     </div>
@@ -432,6 +479,7 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
         </div>
 
         <!-- Coluna Direita: Banco de Questões e Correções Recentes -->
