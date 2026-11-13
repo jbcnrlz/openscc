@@ -1138,29 +1138,29 @@ def calcular_diagnostico_prova_aluno_unificada(prova_aluno) -> dict:
 
 def _estimar_peso_altura_bloco(bloco: dict, em_duas_colunas: bool = False) -> float:
     """
-    Estima a fração de altura de uma folha A4 (0.0 a 1.0) que um bloco ocupa,
-    para paginação inicial automática no servidor.
+    Estima a fração de altura útil de uma folha A4 (podendo passar de 1.0 em questões
+    muito grandes que ocupam até 2 páginas) para paginação inicial automática no servidor.
     """
     tipo = bloco.get("tipo")
     if tipo == "section_banner":
-        return 0.055
+        return 0.06
     if tipo == "subject_subbanner":
-        return 0.045
+        return 0.05
 
     texto_limpo = bloco.get("texto_plano") or ""
-    chars_por_linha = 48 if em_duas_colunas else 95
+    chars_por_linha = 46 if em_duas_colunas else 90
     linhas_texto = max(2, (len(texto_limpo) // chars_por_linha) + texto_limpo.count("\n"))
-    peso = 0.05 + (linhas_texto * 0.018)
+    peso = 0.06 + (linhas_texto * 0.020)
 
     if bloco.get("tem_codigo"):
-        peso += 0.10
+        peso += 0.14
     if bloco.get("tem_imagem"):
-        peso += 0.16
+        peso += 0.18
     if bloco.get("is_dissertativa"):
         qtd_linhas = int(bloco.get("linhas_default") or 12)
-        peso += 0.04 + (qtd_linhas * 0.022)
+        peso += 0.05 + (qtd_linhas * 0.024)
 
-    return min(0.85, peso)
+    return round(min(2.2, peso), 3)
 
 
 def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> dict:
@@ -1388,6 +1388,9 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
         "repeat_mini_header": True,
         "default_alt_cols": 1,
         "omr_cols": 1,
+        "omr_pages": 1,
+        "omr_essay_lines": 12,
+        "omr_page_map": {},
     }
 
     meta = estrutura.get("meta") or {}
@@ -1396,16 +1399,22 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
     config = dict(default_config)
     if isinstance(saved_layout.get("config"), dict):
         config.update(saved_layout["config"])
+    if not isinstance(config.get("omr_page_map"), dict):
+        config["omr_page_map"] = {}
 
     saved_block_opts = saved_layout.get("block_opts") if isinstance(saved_layout.get("block_opts"), dict) else {}
     block_opts = {}
     for b in blocos_ordenados:
         bid = b["id"]
         opt_saved = saved_block_opts.get(bid) if isinstance(saved_block_opts.get(bid), dict) else {}
+        peso_est = _estimar_peso_altura_bloco(b, em_duas_colunas=False)
+        b["peso_estimado"] = peso_est
+        default_allow_break = bool(peso_est >= 0.55 or b.get("is_dissertativa") or b.get("tem_codigo"))
         block_opts[bid] = {
             "alt_cols": int(opt_saved.get("alt_cols", config.get("default_alt_cols", 1)) or 1),
             "img_size": opt_saved.get("img_size", "md") if opt_saved.get("img_size") in ("sm", "md", "lg", "full") else "md",
             "essay_lines": int(opt_saved.get("essay_lines", b.get("linhas_default", 12)) if b.get("is_dissertativa") else 0),
+            "allow_page_break": bool(opt_saved.get("allow_page_break", default_allow_break)),
         }
 
     # Reconcilia páginas salvas ou gera paginação inicial inteligente
@@ -1418,6 +1427,7 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
             if not isinstance(pg, dict):
                 continue
             cols = 2 if int(pg.get("cols", 1) or 1) == 2 else 1
+            span_pages = 2 if int(pg.get("span_pages", 1) or 1) >= 2 else 1
             raw_items = pg.get("items") if isinstance(pg.get("items"), list) else []
             valid_items = []
             for it in raw_items:
@@ -1435,18 +1445,18 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
             pages_reconciled.append({
                 "id": pg.get("id") or f"page_{idx_p}",
                 "cols": cols,
+                "span_pages": span_pages,
                 "items": valid_items,
             })
 
         # Se existirem blocos novos na prova que ainda não estavam salvos no layout, insere na página adequada
         if not pages_reconciled:
-            pages_reconciled.append({"id": "page_1", "cols": 1, "items": []})
+            pages_reconciled.append({"id": "page_1", "cols": 1, "span_pages": 1, "items": []})
 
         for idx_b, b in enumerate(blocos_ordenados):
             bid = b["id"]
             if bid in seen_ids:
                 continue
-            # Tenta achar onde está o bloco anterior
             inserted = False
             if idx_b > 0:
                 prev_id = blocos_ordenados[idx_b - 1]["id"]
@@ -1469,32 +1479,32 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
                 last_pg["items"].append({"id": bid, "zone": zone_new})
             seen_ids.add(bid)
 
-        # Remove páginas vazias se houver mais de 1 página
-        if len(pages_reconciled) > 1:
-            pages_reconciled = [pg for pg in pages_reconciled if pg["items"]] or [{"id": "page_1", "cols": 1, "items": []}]
+        # Remove páginas vazias para nunca gerar folha em branco na impressão
+        pages_reconciled = [pg for pg in pages_reconciled if pg["items"]] or [{"id": "page_1", "cols": 1, "span_pages": 1, "items": []}]
     else:
-        # Gera paginação padrão inicial (1 coluna balanceada por altura estimada A4)
+        # Gera paginação padrão inicial (1 coluna balanceada com margem de segurança contra folhas em branco)
         cur_items = []
-        cur_weight = 0.22  # Reserva topo para o cabeçalho institucional da Página 1
+        cur_weight = 0.32  # Reserva topo para o cabeçalho institucional + instruções da Página 1
         page_idx = 1
 
         for b in blocos_ordenados:
-            w = _estimar_peso_altura_bloco(b, em_duas_colunas=False)
-            if cur_items and (cur_weight + w > 0.94):
-                # Evita deixar um banner sozinho no fim da página anterior
+            w = b.get("peso_estimado") or _estimar_peso_altura_bloco(b, em_duas_colunas=False)
+            if cur_items and (cur_weight + w > 0.78):
                 trailing_banners = []
                 while cur_items and blocos_map[cur_items[-1]["id"]]["tipo"] in ("section_banner", "subject_subbanner"):
                     trailing_banners.insert(0, cur_items.pop())
 
                 if cur_items:
+                    est_span = 2 if cur_weight > 1.05 else 1
                     pages_reconciled.append({
                         "id": f"page_{page_idx}",
                         "cols": 1,
+                        "span_pages": est_span,
                         "items": cur_items,
                     })
                     page_idx += 1
                     cur_items = list(trailing_banners)
-                    cur_weight = 0.06 + sum(_estimar_peso_altura_bloco(blocos_map[x["id"]]) for x in cur_items)
+                    cur_weight = 0.08 + sum(_estimar_peso_altura_bloco(blocos_map[x["id"]]) for x in cur_items)
                 else:
                     cur_items = list(trailing_banners)
 
@@ -1502,9 +1512,11 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
             cur_weight += w
 
         if cur_items or not pages_reconciled:
+            est_span = 2 if cur_weight > 1.05 else 1
             pages_reconciled.append({
                 "id": f"page_{page_idx}",
                 "cols": 1,
+                "span_pages": est_span,
                 "items": cur_items,
             })
 
@@ -1512,6 +1524,7 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
     paginas_render = []
     for idx_p, pg in enumerate(pages_reconciled, 1):
         cols = pg["cols"]
+        span_pages = 2 if int(pg.get("span_pages", 1) or 1) >= 2 else 1
         segments = []
         for it in pg["items"]:
             bid = it["id"]
@@ -1545,6 +1558,7 @@ def construir_diagramacao_unificada(prova, estrutura: Optional[dict] = None) -> 
             "numero": idx_p,
             "id": pg["id"],
             "cols": cols,
+            "span_pages": span_pages,
             "segments": segments,
             "total_itens": len(pg["items"]),
         })
