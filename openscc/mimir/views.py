@@ -926,14 +926,18 @@ def criarProva(request):
     if not request.user.isProfessor():
         messages.error(request, "Apenas professores podem criar provas.")
         return redirect('mimir:home')
-    
+
+    # Se não for requisição AJAX rápida, utiliza o construtor padronizado no modo Prova Simples (Não Unificada)
+    if request.method == 'GET' and request.headers.get('x-requested-with') != 'XMLHttpRequest' and not request.GET.get('modo_classico'):
+        return redirect(f"{reverse('mimir:criarAvaliacaoUnificada')}?modo=simples")
+
     if request.method == 'POST':
         form = ProvaForm(request.POST)
         if form.is_valid():
             prova = form.save(commit=False)
             prova.user = request.user
             prova.save()
-            
+
             # Se for uma requisição AJAX para criação rápida
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -941,15 +945,15 @@ def criarProva(request):
                     'prova_id': prova.id,
                     'prova_titulo': prova.titulo
                 })
-            
+
             messages.success(request, f"Prova '{prova.titulo}' criada com sucesso!")
-            return redirect('mimir:editarProva', prova_id=prova.id)
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
     else:
         form = ProvaForm()
-    
+
     # Filtra assuntos do usuário atual
     form.fields['assunto'].queryset = Assunto.objects.filter(user=request.user)
-    
+
     context = {
         'form': form,
         'tiposPergunta': TiposDePergunta.objects.all()
@@ -961,8 +965,8 @@ def criarProva(request):
 @grupo_requerido('Professor')
 def editarProva(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
-    
-    if prova.is_unificada and not request.GET.get('modo_classico'):
+
+    if not request.GET.get('modo_classico'):
         return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
     
     # Verificar se o usuário tem permissão para editar
@@ -1142,7 +1146,7 @@ def gerarPdfProva(request, context, tipo):
 @grupo_requerido('Professor')
 def opcoesImpressao(request, prova_id):
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
-    return render(request, 'mimir/opcoesImpressao.html', {'prova': prova})
+    return redirect(f"{reverse('mimir:imprimirAvaliacaoUnificada', args=[prova.id])}?tipo=prova")
 
 
 @login_required
@@ -3894,6 +3898,7 @@ def restaurarVersaoParte(request, historico_id):
 
 from .avaliacao_unificada import (
     DEFAULT_QUOTAS,
+    DEFAULT_QUOTAS_SIMPLES,
     SECOES_UNIFICADA,
     QUESTOES_SENSACAO_PADRAO,
     extrair_meta_unificada,
@@ -3917,18 +3922,18 @@ from .avaliacao_unificada import (
 @grupo_requerido('Professor')
 def criarAvaliacaoUnificada(request):
     """
-    Cria uma Avaliação Unificada de Módulo:
-    - 3 questões de Conhecimentos Gerais objetivas (configurável)
-    - 1 questão dissertativa de Conhecimento Geral (configurável)
-    - 3 questões objetivas por Matéria (Assunto) do módulo do aluno (configurável)
-    - 1 questão dissertativa técnica (configurável)
-    - Questões sobre a Sensação do Aluno (configurável)
+    Cria tanto uma Avaliação Unificada de Módulo (is_unificada=True) quanto uma
+    Prova Simples / Regular de Disciplina (is_unificada=False) usando o mesmo fluxo visual.
     """
     assuntos_professor = Assunto.objects.all().select_related('user').order_by('nome')
+    modo_inicial = (request.GET.get('modo') or request.POST.get('tipo_avaliacao') or 'unificada').strip().lower()
+    is_modo_simples = (modo_inicial == 'simples')
 
     if request.method == 'POST':
+        tipo_avaliacao = (request.POST.get('tipo_avaliacao') or 'unificada').strip().lower()
+        is_unificada_nova = (tipo_avaliacao != 'simples')
         titulo = (request.POST.get('titulo') or '').strip()
-        modulo_nome = (request.POST.get('modulo_nome') or '').strip() or 'Módulo Integrado'
+        modulo_nome = (request.POST.get('modulo_nome') or '').strip()
         descricao_humana = (request.POST.get('descricao') or '').strip()
         assuntos_ids_raw = request.POST.getlist('assuntos_ids')
         novos_assuntos_raw = (request.POST.get('novos_assuntos') or '').strip()
@@ -3951,44 +3956,62 @@ def criarAvaliacaoUnificada(request):
                 novo_assunto, _ = Assunto.objects.get_or_create(
                     user=request.user,
                     nome=nome_assunto,
-                    defaults={'layoutGuiaTutor': f'Disciplina/Matéria do módulo: {nome_assunto}'}
+                    defaults={'layoutGuiaTutor': f'Disciplina/Matéria: {nome_assunto}'}
                 )
                 if novo_assunto.id not in assuntos_ids:
                     assuntos_ids.append(novo_assunto.id)
 
         if not titulo:
-            messages.error(request, 'Informe o título da Avaliação Unificada.')
+            messages.error(request, 'Informe o título da prova.')
         elif not assuntos_ids:
-            messages.error(request, 'Selecione ou cadastre pelo menos 1 matéria (Assunto) do módulo do aluno.')
+            messages.error(request, 'Selecione ou cadastre pelo menos 1 matéria (Assunto).')
         else:
+            base_q = DEFAULT_QUOTAS if is_unificada_nova else DEFAULT_QUOTAS_SIMPLES
+
             def _int_quota(field, default):
                 try:
                     return max(0, int(request.POST.get(field, default)))
                 except (ValueError, TypeError):
                     return default
 
-            quotas = {
-                'cg_objetivas': _int_quota('cg_objetivas', DEFAULT_QUOTAS['cg_objetivas']),
-                'cg_dissertativa': _int_quota('cg_dissertativa', DEFAULT_QUOTAS['cg_dissertativa']),
-                'materia_objetivas': _int_quota('materia_objetivas', DEFAULT_QUOTAS['materia_objetivas']),
-                'dissertativa_tecnica': _int_quota('dissertativa_tecnica', DEFAULT_QUOTAS['dissertativa_tecnica']),
-                'sensacao_aluno': _int_quota('sensacao_aluno', DEFAULT_QUOTAS['sensacao_aluno']),
-            }
+            if is_unificada_nova:
+                quotas = {
+                    'cg_objetivas': _int_quota('cg_objetivas', base_q['cg_objetivas']),
+                    'cg_dissertativa': _int_quota('cg_dissertativa', base_q['cg_dissertativa']),
+                    'materia_objetivas': _int_quota('materia_objetivas', base_q['materia_objetivas']),
+                    'dissertativa_tecnica': _int_quota('dissertativa_tecnica', base_q['dissertativa_tecnica']),
+                    'sensacao_aluno': _int_quota('sensacao_aluno', base_q['sensacao_aluno']),
+                }
+            else:
+                quotas = {
+                    'cg_objetivas': _int_quota('cg_objetivas', 0),
+                    'cg_dissertativa': _int_quota('cg_dissertativa', 0),
+                    'materia_objetivas': _int_quota('materia_objetivas', base_q['materia_objetivas']),
+                    'dissertativa_tecnica': _int_quota('dissertativa_tecnica', base_q['dissertativa_tecnica']),
+                    'sensacao_aluno': _int_quota('sensacao_aluno', 0),
+                }
 
             assunto_principal = Assunto.objects.filter(id=assuntos_ids[0]).first()
             if not assunto_principal:
                 assunto_principal = Assunto.objects.filter(user=request.user).first()
 
+            if not modulo_nome:
+                modulo_nome = 'Módulo Integrado' if is_unificada_nova else (assunto_principal.nome if assunto_principal else 'Avaliação Regular')
+
             if not descricao_humana:
-                descricao_humana = (
-                    f"Avaliação Unificada do {modulo_nome}. "
-                    f"Composta por Conhecimentos Gerais (Objetivas e Dissertativa), "
-                    f"Conhecimentos Específicos por Matéria do Módulo, Questão Dissertativa Técnica "
-                    f"e Pesquisa de Sensação do Aluno."
-                )
+                if is_unificada_nova:
+                    descricao_humana = (
+                        f"Avaliação Unificada do {modulo_nome}. "
+                        f"Composta por Conhecimentos Gerais (Objetivas e Dissertativa), "
+                        f"Conhecimentos Específicos por Matéria do Módulo, Questão Dissertativa Técnica "
+                        f"e Pesquisa de Sensação do Aluno."
+                    )
+                else:
+                    descricao_humana = f"Avaliação de {modulo_nome}. Leia atentamente cada questão antes de responder."
 
             meta = {
-                'is_unificada': True,
+                'is_unificada': is_unificada_nova,
+                'confirmada_unificada': is_unificada_nova,
                 'modulo_nome': modulo_nome,
                 'assuntos_ids': assuntos_ids,
                 'quotas': quotas,
@@ -4002,14 +4025,14 @@ def criarAvaliacaoUnificada(request):
                 assunto=assunto_principal,
             )
 
-            # Opções automáticas marcadas na criação
             incluir_sensacao = request.POST.get('incluir_sensacao_padrao') == 'on'
             preencher_banco = request.POST.get('preencher_do_banco') == 'on'
             gerar_ia = request.POST.get('gerar_faltantes_ia') == 'on'
 
-            msg_partes = [f"Avaliação Unificada '{prova.titulo}' criada com sucesso!"]
+            label_tipo = 'Avaliação Unificada' if is_unificada_nova else 'Prova'
+            msg_partes = [f"{label_tipo} '{prova.titulo}' criada com sucesso!"]
 
-            if incluir_sensacao and quotas['sensacao_aluno'] > 0:
+            if is_unificada_nova and incluir_sensacao and quotas['sensacao_aluno'] > 0:
                 qtd_sens = inserir_questoes_sensacao_padrao(prova, request.user)
                 if qtd_sens:
                     msg_partes.append(f"{qtd_sens} questão(ões) de sensação do aluno incluída(s).")
@@ -4029,7 +4052,10 @@ def criarAvaliacaoUnificada(request):
 
     context = {
         'assuntos': assuntos_professor,
-        'quotas_default': DEFAULT_QUOTAS,
+        'quotas_default': DEFAULT_QUOTAS_SIMPLES if is_modo_simples else DEFAULT_QUOTAS,
+        'quotas_unificada': DEFAULT_QUOTAS,
+        'quotas_simples': DEFAULT_QUOTAS_SIMPLES,
+        'modo_inicial': 'simples' if is_modo_simples else 'unificada',
         'questoes_sensacao_padrao': QUESTOES_SENSACAO_PADRAO,
     }
     return render(request, 'mimir/criarAvaliacaoUnificada.html', context)
@@ -4040,19 +4066,22 @@ def criarAvaliacaoUnificada(request):
 @grupo_requerido('Professor')
 def gerenciarAvaliacaoUnificada(request, prova_id):
     """
-    Painel completo para montar, parametrizar cotas, vincular matérias (Assuntos),
-    adicionar/gerar questões por seção e acionar impressão ou correção por foto.
+    Painel completo para montar tanto Provas Unificadas de Módulo quanto Provas Regulares/Simples,
+    parametrizar cotas, vincular matérias (Assuntos), buscar no banco, gerar questões e acionar
+    diagramação/impressão ou correção por foto.
     """
     prova = get_object_or_404(Prova, id=prova_id, user=request.user)
+    # construir_estrutura_unificada já corrige provas simples convertidas por engano
+    _ = construir_estrutura_unificada(prova)
     descricao_humana, meta = extrair_meta_unificada(prova.descricao)
 
-    # Se uma prova comum for aberta aqui, inicializa os metadados unificados nela
+    # Se uma prova comum (sem metadados) for aberta aqui, mantém ela como Prova Simples (is_unificada: False)!
     if not meta:
         meta = {
-            'is_unificada': True,
-            'modulo_nome': f"Módulo - {prova.assunto.nome}",
-            'assuntos_ids': [prova.assunto_id],
-            'quotas': dict(DEFAULT_QUOTAS),
+            'is_unificada': False,
+            'modulo_nome': prova.assunto.nome if prova.assunto_id else 'Avaliação Regular',
+            'assuntos_ids': [prova.assunto_id] if prova.assunto_id else [],
+            'quotas': dict(DEFAULT_QUOTAS_SIMPLES),
             'question_map': {},
         }
         prova.descricao = empacotar_meta_unificada(descricao_humana or prova.titulo, meta)
@@ -4061,11 +4090,40 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
     if request.method == 'POST':
         acao = request.POST.get('acao', '')
 
-        if acao == 'salvar_config':
+        if acao == 'alternar_tipo_prova':
+            novo_status_unif = not bool(meta.get('is_unificada', False))
+            meta['is_unificada'] = novo_status_unif
+            meta['confirmada_unificada'] = novo_status_unif
+            quotas_atuais = dict(meta.get('quotas') or {})
+            if not novo_status_unif:
+                # Ao converter para Prova Simples (Não Unificada), zera cotas exclusivas de módulo se não houver questões nelas
+                quotas_atuais['cg_objetivas'] = 0
+                quotas_atuais['cg_dissertativa'] = 0
+                quotas_atuais['sensacao_aluno'] = 0
+                if prova.assunto_id and meta.get('modulo_nome', '').startswith('Módulo - '):
+                    meta['modulo_nome'] = prova.assunto.nome
+            else:
+                if quotas_atuais.get('cg_objetivas', 0) == 0 and quotas_atuais.get('sensacao_aluno', 0) == 0:
+                    quotas_atuais.update(DEFAULT_QUOTAS)
+            meta['quotas'] = quotas_atuais
+            prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+            prova.save(update_fields=['descricao'])
+            tipo_msg = 'Avaliação Unificada (Módulo)' if novo_status_unif else 'Prova Simples (Não Unificada)'
+            messages.success(request, f"A prova '{prova.titulo}' agora está configurada como {tipo_msg}.")
+            next_url = request.POST.get('next')
+            if next_url:
+                return redirect(next_url)
+            return redirect('mimir:gerenciarAvaliacaoUnificada', prova_id=prova.id)
+
+        elif acao == 'salvar_config':
             novo_titulo = (request.POST.get('titulo') or prova.titulo).strip()
             modulo_nome = (request.POST.get('modulo_nome') or meta.get('modulo_nome') or 'Módulo').strip()
             nova_desc = (request.POST.get('descricao') or descricao_humana).strip()
             assuntos_ids_raw = request.POST.getlist('assuntos_ids')
+            tipo_form = request.POST.get('tipo_avaliacao')
+            if tipo_form in ('unificada', 'simples'):
+                meta['is_unificada'] = (tipo_form == 'unificada')
+                meta['confirmada_unificada'] = (tipo_form == 'unificada')
 
             assuntos_ids = []
             for aid in assuntos_ids_raw:
@@ -4077,6 +4135,8 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
             if not assuntos_ids:
                 assuntos_ids = meta.get('assuntos_ids') or [prova.assunto_id]
 
+            base_q_cfg = DEFAULT_QUOTAS if meta.get('is_unificada') else DEFAULT_QUOTAS_SIMPLES
+
             def _int_q(field, default):
                 try:
                     return max(0, int(request.POST.get(field, default)))
@@ -4084,11 +4144,11 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
                     return default
 
             quotas = {
-                'cg_objetivas': _int_q('cg_objetivas', DEFAULT_QUOTAS['cg_objetivas']),
-                'cg_dissertativa': _int_q('cg_dissertativa', DEFAULT_QUOTAS['cg_dissertativa']),
-                'materia_objetivas': _int_q('materia_objetivas', DEFAULT_QUOTAS['materia_objetivas']),
-                'dissertativa_tecnica': _int_q('dissertativa_tecnica', DEFAULT_QUOTAS['dissertativa_tecnica']),
-                'sensacao_aluno': _int_q('sensacao_aluno', DEFAULT_QUOTAS['sensacao_aluno']),
+                'cg_objetivas': _int_q('cg_objetivas', base_q_cfg['cg_objetivas']),
+                'cg_dissertativa': _int_q('cg_dissertativa', base_q_cfg['cg_dissertativa']),
+                'materia_objetivas': _int_q('materia_objetivas', base_q_cfg['materia_objetivas']),
+                'dissertativa_tecnica': _int_q('dissertativa_tecnica', base_q_cfg['dissertativa_tecnica']),
+                'sensacao_aluno': _int_q('sensacao_aluno', base_q_cfg['sensacao_aluno']),
             }
 
             meta['modulo_nome'] = modulo_nome
@@ -4627,10 +4687,10 @@ def salvarDiagramacaoUnificadaAjax(request, prova_id):
     descricao_humana, meta = extrair_meta_unificada(prova.descricao)
     if not meta:
         meta = {
-            'is_unificada': True,
-            'modulo_nome': f"Módulo - {prova.assunto.nome}" if prova.assunto_id else 'Módulo Integrado',
+            'is_unificada': False,
+            'modulo_nome': prova.assunto.nome if prova.assunto_id else 'Disciplina Regular',
             'assuntos_ids': [prova.assunto_id] if prova.assunto_id else [],
-            'quotas': dict(DEFAULT_QUOTAS),
+            'quotas': dict(DEFAULT_QUOTAS_SIMPLES),
             'question_map': {},
         }
 
@@ -4782,9 +4842,10 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
                 prova_aluno.data_conclusao = timezone.now()
             prova_aluno.save()
 
+            label_tipo_prova = "Avaliação Unificada" if estrutura.get('is_unificada') else "Prova"
             messages.success(
                 request,
-                f"Correção da Avaliação Unificada de {aluno_selecionado.get_full_name() or aluno_selecionado.username} "
+                f"Correção da {label_tipo_prova} de {aluno_selecionado.get_full_name() or aluno_selecionado.username} "
                 f"salva com sucesso! Nota Acadêmica Final: {diag['nota_academica_final']:.2f} / 10,00."
             )
             return redirect(f"{request.path}?aluno_id={aluno_selecionado.id}")
