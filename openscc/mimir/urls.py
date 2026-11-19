@@ -156,6 +156,9 @@ urlpatterns = [
      path('avaliacao-unificada/<int:prova_id>/salvar-diagramacao-ajax/', views.salvarDiagramacaoUnificadaAjax, name='salvarDiagramacaoUnificadaAjax'),
      path('avaliacao-unificada/<int:prova_id>/corrigir-foto/', views.corrigirAvaliacaoUnificadaFoto, name='corrigirAvaliacaoUnificadaFoto'),
      path('avaliacao-unificada/<int:prova_id>/processar-foto-ajax/', views.processarFotoUnificadaAjax, name='processarFotoUnificadaAjax'),
+     path('avaliacao-unificada/<int:prova_id>/status-scanner-mobile-ajax/', views.statusSessaoScannerMobileAjax, name='statusSessaoScannerMobileAjax'),
+     path('avaliacao-unificada/<int:prova_id>/scanner-mobile/<str:token>/', views.scannerMobileProvaFoto, name='scannerMobileProvaFoto'),
+     path('avaliacao-unificada/<int:prova_id>/scanner-mobile/<str:token>/processar-ajax/', views.processarFotoScannerMobileAjax, name='processarFotoScannerMobileAjax'),
      # Estúdio de Manipulação e Fatiamento de PDF para Fontes (Capítulos / Intervalos)
      path('fontes/inspecionar-pdf-ajax/', views.inspecionarPdfFonteAjax, name='inspecionarPdfFonteAjax'),
      path('fontes/ler-pagina-pdf-ajax/', views.lerPaginaPdfFonteAjax, name='lerPaginaPdfFonteAjax'),
