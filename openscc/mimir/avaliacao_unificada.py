@@ -859,19 +859,138 @@ def gerar_questoes_faltantes_unificada(prova, user, secao_alvo: str = "todas") -
     return {"criadas": geradas_total}
 
 
+def obter_ip_rede_local() -> str:
+    """
+    Detecta o endereço IP da máquina na rede local (LAN/Wi-Fi) para que o QR Code
+    do Scanner Mobile possa ser aberto pelo celular quando o professor acessa via localhost.
+    """
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.3)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip_cand = info[4][0]
+            if ip_cand and not ip_cand.startswith("127."):
+                return ip_cand
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
+def gerar_token_scanner_mobile(prova_id: int, user_id: int, sessao_id: str) -> str:
+    """
+    Gera um token criptograficamente assinado para permitir que o professor abra a câmera
+    direto no celular via QR Code sem precisar digitar login/senha novamente.
+    """
+    from django.core import signing
+    payload = {
+        "p": int(prova_id),
+        "u": int(user_id),
+        "s": str(sessao_id),
+    }
+    return signing.dumps(payload, salt="mimir.scanner.mobile.v1")
+
+
+def validar_token_scanner_mobile(token: str, max_age: int = 86400) -> dict | None:
+    """
+    Valida o token assinado do Scanner Mobile (válido por 24h por padrão).
+    """
+    from django.core import signing
+    try:
+        data = signing.loads(token, salt="mimir.scanner.mobile.v1", max_age=max_age)
+        if isinstance(data, dict) and "p" in data and "u" in data and "s" in data:
+            return data
+    except Exception:
+        return None
+    return None
+
+
+def gerar_qrcode_base64(texto_url: str) -> str:
+    """
+    Gera um QR Code em PNG Base64 100% local (sem depender de internet externa).
+    """
+    try:
+        import qrcode
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=7,
+            border=2,
+        )
+        qr.add_data(texto_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#0f172a", back_color="#ffffff")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception:
+        return ""
+
+
+def _caminho_sessao_scanner(sessao_id: str) -> str:
+    import os
+    safe_id = re.sub(r"[^a-zA-Z0-9_\-]", "", str(sessao_id or "default"))[:64] or "default"
+    pasta = "/tmp/mimir_scanner_sessions"
+    os.makedirs(pasta, exist_ok=True)
+    return os.path.join(pasta, f"sessao_{safe_id}.json")
+
+
+def salvar_estado_sessao_scanner(sessao_id: str, payload: dict) -> None:
+    """
+    Salva o resultado mais recente enviado pelo Scanner Mobile para que a tela do
+    computador sincronize automaticamente em tempo real.
+    """
+    caminho = _caminho_sessao_scanner(sessao_id)
+    try:
+        with open(caminho, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"Erro ao salvar sessão do scanner mobile: {e}")
+
+
+def ler_estado_sessao_scanner(sessao_id: str) -> dict | None:
+    """
+    Lê o estado sincronizado da sessão do Scanner Mobile.
+    """
+    import os
+    caminho = _caminho_sessao_scanner(sessao_id)
+    if not os.path.exists(caminho):
+        return None
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 def analisar_foto_prova_unificada_ia(prova, arquivos_imagens: list, user=None) -> dict:
     """
-    Realiza a leitura óptica e correção inteligente de foto(s) da Avaliação Unificada:
+    Realiza a leitura óptica e correção inteligente de 1 ou múltiplas páginas fotografadas
+    da Folha de Respostas (Gabarito OMR) e/ou Caderno de Prova:
+      - Corrige rotação EXIF de fotos tiradas pelo celular.
+      - Consolida respostas distribuídas em múltiplas páginas (Página 1, Página 2, Página 3...).
       - Detecta as marcações nas questões objetivas (A, B, C, D, E) e cruza com o gabarito.
-      - Transcreve (OCR manuscrito) as questões dissertativas (Geral e Técnica) e avalia nota (0-10) + feedback.
-      - Lê as respostas de Sensação do Aluno e sintetiza a percepção emocional/pedagógica do estudante.
+      - Transcreve (OCR manuscrito) as questões dissertativas e avalia nota (0-10) + feedback.
+      - Marca `detectado=False` nas questões que não aparecem nas páginas enviadas (permitindo
+        leitura página a página incremental sem sobrescrever páginas anteriores).
     """
+    from PIL import ImageOps
     from langchain_core.messages import HumanMessage
     from langchain_google_genai import ChatGoogleGenerativeAI
     from .models import LLMLog
 
     estrutura = construir_estrutura_unificada(prova)
     questoes = estrutura["questoes_numeradas"]
+    total_paginas_enviadas = len(arquivos_imagens)
 
     especificacao_questoes = []
     for q in questoes:
@@ -888,27 +1007,39 @@ def analisar_foto_prova_unificada_ia(prova, arquivos_imagens: list, user=None) -
             "gabarito_oficial": (p.get_gabarito_com_feedback() or "").strip()[:300],
         })
 
-    prompt_sistema = f"""Você é um sistema especialista de Leitura Óptica (OMR) e Correção Acadêmica Multimodal de Avaliações Unificadas.
-Analise a(s) foto(s) anexada(s) da prova / folha de respostas do aluno referente à avaliação: "{prova.titulo}" ({estrutura['modulo_nome']}).
+    prompt_sistema = f"""Você é um sistema especialista de Leitura Óptica (OMR) e Correção Acadêmica Multimodal de Provas e Gabaritos de Múltiplas Páginas.
+Você está recebendo {total_paginas_enviadas} foto(s)/página(s) referente(s) à avaliação: "{prova.titulo}" ({estrutura['modulo_nome']}).
 
-MAPA DE QUESTÕES DA PROVA:
+IMPORTANTE SOBRE GABARITOS DE MÚLTIPLAS PÁGINAS:
+- O gabarito (Folha de Respostas OMR) ou a prova pode estar dividido em 2 ou mais páginas (por exemplo: Página 1 com o cabeçalho e questões objetivas, e Página 2 com as questões dissertativas, continuação das objetivas ou sensação do aluno).
+- Além disso, o professor pode estar fotografando todas as páginas de uma vez OU apenas uma página específica agora para mesclar com as demais.
+
+MAPA COMPLETO DE QUESTÕES DA PROVA:
 {json.dumps(especificacao_questoes, ensure_ascii=False, indent=2)}
 
 SUA TAREFA:
-1. Identifique o nome do aluno escrito na folha (se visível).
-2. Para cada questão na lista acima (pelo campo "pergunta_id" e "numero"):
-   - Se for "objetiva": identifique qual letra ("A", "B", "C", "D" ou "E") o aluno marcou na folha de respostas ou no caderno de prova.
-   - Se for "dissertativa": transcreva fielmente o texto manuscrito pelo aluno em "resposta_lida", avalie com base no "gabarito_oficial" atribuindo "nota_sugerida" de 0.0 a 10.0 e escreva um "feedback" pedagógico construtivo.
-3. Gere um "resumo_sensacao" sintetizando como o aluno está se sentindo no módulo com base na seção de Sensação do Aluno.
+1. Identifique o nome do aluno escrito no cabeçalho de qualquer uma das páginas (se visível).
+2. Analise TODAS as {total_paginas_enviadas} foto(s)/página(s) anexadas em conjunto.
+3. Para cada questão do mapa acima (pelo campo "pergunta_id" e "numero"):
+   - Verifique se a questão (sua linha de bolhas OMR ou sua caixa de resposta dissertativa) aparece em alguma das fotos enviadas e foi respondida.
+   - Se a questão NÃO estiver visível em nenhuma das fotos enviadas (ex.: está em outra página ainda não fotografada) ou estiver totalmente em branco, defina `"detectado_na_foto": false` e `"resposta_lida": ""`. NUNCA invente ou chute uma letra ou texto para questões que não estão visíveis na foto!
+   - Se a questão estiver visível e respondida (`"detectado_na_foto": true`):
+     * Informe `"pagina_foto": N` (número da foto de 1 a {total_paginas_enviadas} onde a resposta foi lida).
+     * Se for `"objetiva"`: identifique qual letra (`"A"`, `"B"`, `"C"`, `"D"` ou `"E"`) teve a bolha preenchida/marcada pelo aluno.
+     * Se for `"dissertativa"`: transcreva fielmente o texto manuscrito pelo aluno em `"resposta_lida"`, avalie com base no `"gabarito_oficial"` atribuindo `"nota_sugerida"` de 0.0 a 10.0 e escreva um `"feedback"` pedagógico construtivo.
+4. Caso as questões de Sensação do Aluno estejam visíveis, gere um `"resumo_sensacao"` sintetizando a percepção do aluno.
 
 RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
 {{
   "aluno_identificado": "Nome do aluno lido na folha ou vazio",
-  "resumo_sensacao": "Síntese da sensação/percepção do aluno sobre o módulo e a prova",
+  "paginas_identificadas": ["Página 1", "Página 2"],
+  "resumo_sensacao": "Síntese da sensação/percepção do aluno (ou vazio se não aplicável)",
   "itens": [
     {{
       "numero": 1,
       "pergunta_id": 123,
+      "detectado_na_foto": true,
+      "pagina_foto": 1,
       "resposta_lida": "Letra A-E marcada ou transcrição do texto manuscrito",
       "nota_sugerida": 10.0,
       "feedback": "Justificativa ou comentário de correção"
@@ -917,26 +1048,47 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
 }}"""
 
     conteudos = [HumanMessage(content=prompt_sistema)]
+    paginas_preview_b64 = []
+
     for idx, arq in enumerate(arquivos_imagens):
         try:
             arq.seek(0)
             img = Image.open(arq)
+            # Corrige orientação EXIF de fotos tiradas em pé/deitadas no celular
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
             if img.mode not in ("RGB", "L"):
                 img = img.convert("RGB")
-            img.thumbnail((2000, 2000))
+
+            # Miniatura leve para exibição sincronizada PC <-> Celular
+            thumb = img.copy()
+            thumb.thumbnail((520, 720))
+            buf_thumb = io.BytesIO()
+            thumb.save(buf_thumb, format="JPEG", quality=75)
+            paginas_preview_b64.append(
+                f"data:image/jpeg;base64,{base64.b64encode(buf_thumb.getvalue()).decode('utf-8')}"
+            )
+
+            # Imagem de alta nitidez para leitura OMR + OCR manuscrito
+            img.thumbnail((2200, 2200))
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=88)
+            img.save(buf, format="JPEG", quality=90)
             b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
             conteudos.append(
                 HumanMessage(
                     content=[
-                        {"type": "text", "text": f"FOTO {idx + 1} DA PROVA / FOLHA DE RESPOSTA:"},
+                        {
+                            "type": "text",
+                            "text": f"FOTO / PÁGINA {idx + 1} DE {total_paginas_enviadas} DO GABARITO / PROVA:",
+                        },
                         {"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64}"},
                     ]
                 )
             )
         except Exception as e:
-            print(f"Erro ao preparar imagem {idx + 1}: {e}")
+            print(f"Erro ao preparar imagem da página {idx + 1}: {e}")
 
     parsed_ia = None
     modo_utilizado = "Leitura Assistida Local"
@@ -946,7 +1098,6 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
         (cfg_ativo.api_key_override or "").strip() if cfg_ativo else ""
     ) or getattr(settings, "GEMINI_API_KEY", None)
 
-    # Prioriza sempre o modelo ativo no Django Admin em tempo real
     candidatos_modelos = []
     if cfg_ativo and cfg_ativo.model_id:
         candidatos_modelos.append((cfg_ativo.provedor, cfg_ativo.model_id.strip(), cfg_ativo.base_url))
@@ -978,7 +1129,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
                 )
             LLMLog.objects.create(
                 user=user,
-                prompt=f"Correção por Foto Avaliação Unificada #{prova.id} ({len(arquivos_imagens)} foto(s))",
+                prompt=f"Correção por Foto #{prova.id} ({total_paginas_enviadas} página(s))",
                 response=raw_text[:5000],
                 model_used=model_candidate,
                 status="success",
@@ -1002,7 +1153,6 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
             )
             continue
 
-    # Normaliza os itens retornados (ou monta fallback assistido)
     mapa_ia_por_pid = {}
     mapa_ia_por_num = {}
     if parsed_ia:
@@ -1013,38 +1163,68 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
                     if it.get("pergunta_id") is not None:
                         mapa_ia_por_pid[str(it["pergunta_id"])] = it
                     if it.get("numero") is not None:
-                        mapa_ia_por_num[int(it["numero"])] = it
+                        try:
+                            mapa_ia_por_num[int(it["numero"])] = it
+                        except (ValueError, TypeError):
+                            pass
         elif isinstance(itens_raw, dict):
             for k, it in itens_raw.items():
                 if isinstance(it, dict):
                     mapa_ia_por_pid[str(k)] = it
                     if it.get("numero") is not None:
-                        mapa_ia_por_num[int(it["numero"])] = it
+                        try:
+                            mapa_ia_por_num[int(it["numero"])] = it
+                        except (ValueError, TypeError):
+                            pass
 
     itens_finais = []
     soma_ponderada = 0.0
     soma_pesos = 0
+    qtd_detectadas = 0
 
     for q in questoes:
         p = q["pergunta"]
         info_ia = mapa_ia_por_pid.get(str(p.id)) or mapa_ia_por_num.get(q["numero"]) or {}
         letra_gab = q["letra_gabarito"] or "A"
 
+        if parsed_ia is not None:
+            resp_bruta = str(info_ia.get("resposta_lida") or info_ia.get("resposta_detectada") or "").strip()
+            flag_detectado = info_ia.get("detectado_na_foto")
+            if flag_detectado is False or not resp_bruta:
+                # Questão não estava visível nesta(s) página(s) ou foi deixada em branco:
+                # Não sobrescreve o que já foi lido de outras páginas!
+                itens_finais.append({
+                    "numero": q["numero"],
+                    "pergunta_id": p.id,
+                    "secao": q["secao"],
+                    "detectado": False,
+                    "pagina_foto": info_ia.get("pagina_foto"),
+                    "resposta_lida": "",
+                    "correta": None,
+                    "nota_sugerida": None,
+                    "feedback": "",
+                })
+                continue
+
+        qtd_detectadas += 1
+        pagina_foto = info_ia.get("pagina_foto") or 1
+
         if q["is_sensacao"]:
             resp_lida = str(info_ia.get("resposta_lida") or info_ia.get("resposta_detectada") or "B").strip()
             nota_sug = 10.0
             correta = True
-            feedback = info_ia.get("feedback") or f"Percepção do aluno registrada ({resp_lida}) — peso 0 na nota."
+            feedback = info_ia.get("feedback") or f"Percepção do aluno registrada ({resp_lida} • Pág. {pagina_foto}) — peso 0 na nota."
         elif q["is_objetiva"]:
             resp_raw = str(info_ia.get("resposta_lida") or info_ia.get("resposta_detectada") or letra_gab).strip()
-            letra_lida = resp_raw[0].upper() if resp_raw and resp_raw[0].upper() in "ABCDE" else letra_gab
+            m_letra = re.search(r"\b([A-Ea-e])\b", resp_raw)
+            letra_lida = m_letra.group(1).upper() if m_letra else (resp_raw[0].upper() if resp_raw and resp_raw[0].upper() in "ABCDE" else letra_gab)
             resp_lida = letra_lida
             correta = (letra_lida == letra_gab) if letra_gab else True
             nota_sug = 10.0 if correta else 0.0
             feedback = (
-                f"Alternativa correta ({letra_lida})."
+                f"Alternativa correta ({letra_lida}) [Lida na Pág. {pagina_foto}]."
                 if correta
-                else f"Marcou {letra_lida}; gabarito oficial é {letra_gab}."
+                else f"Marcou {letra_lida}; gabarito oficial é {letra_gab} [Lida na Pág. {pagina_foto}]."
             )
             soma_ponderada += nota_sug * q["peso_sugerido"]
             soma_pesos += q["peso_sugerido"]
@@ -1060,7 +1240,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
                 nota_sug = 8.5
             nota_sug = max(0.0, min(10.0, nota_sug))
             correta = None
-            feedback = info_ia.get("feedback") or "Avaliação da questão dissertativa baseada nos critérios do gabarito."
+            feedback = (info_ia.get("feedback") or "Avaliação da questão dissertativa baseada nos critérios do gabarito.") + f" [Pág. {pagina_foto}]"
             soma_ponderada += nota_sug * q["peso_sugerido"]
             soma_pesos += q["peso_sugerido"]
 
@@ -1068,6 +1248,8 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
             "numero": q["numero"],
             "pergunta_id": p.id,
             "secao": q["secao"],
+            "detectado": True,
+            "pagina_foto": pagina_foto,
             "resposta_lida": resp_lida,
             "correta": correta,
             "nota_sugerida": round(nota_sug, 1),
@@ -1079,8 +1261,12 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO NO SEGUINTE FORMATO:
     return {
         "success": True,
         "modo": modo_utilizado,
+        "total_paginas_processadas": total_paginas_enviadas,
+        "questoes_detectadas": qtd_detectadas,
+        "total_questoes_prova": len(questoes),
+        "paginas_preview": paginas_preview_b64,
         "aluno_identificado": (parsed_ia or {}).get("aluno_identificado") or (parsed_ia or {}).get("aluno_detectado") or "",
-        "resumo_sensacao": (parsed_ia or {}).get("resumo_sensacao") or "Respostas de sensação do aluno lidas na Parte V.",
+        "resumo_sensacao": (parsed_ia or {}).get("resumo_sensacao") or "",
         "nota_academica_sugerida": nota_academica_sugerida,
         "itens": itens_finais,
     }

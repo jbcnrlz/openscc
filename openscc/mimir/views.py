@@ -3914,6 +3914,12 @@ from .avaliacao_unificada import (
     garantir_assunto_auxiliar,
     is_pergunta_objetiva,
     _extrair_letra_gabarito,
+    obter_ip_rede_local,
+    gerar_token_scanner_mobile,
+    validar_token_scanner_mobile,
+    gerar_qrcode_base64,
+    salvar_estado_sessao_scanner,
+    ler_estado_sessao_scanner,
 )
 
 
@@ -4794,9 +4800,9 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
                 defaults={'status': 'corrigida', 'data_conclusao': timezone.now()}
             )
 
-            foto_anexo = request.FILES.get('foto_comprovante')
+            fotos_anexos = request.FILES.getlist('foto_comprovante')
 
-            for item in estrutura['questoes_numeradas']:
+            for idx_item, item in enumerate(estrutura['questoes_numeradas']):
                 q = item['pergunta']
                 qid = q.id
                 resp_texto = (request.POST.get(f'resposta_texto_{qid}') or '').strip()
@@ -4831,8 +4837,8 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
                     prova_aluno=prova_aluno,
                     defaults=defaults_resp,
                 )
-                if foto_anexo and item['numero'] == 1:
-                    resp_obj.arquivo_resposta = foto_anexo
+                if idx_item < len(fotos_anexos):
+                    resp_obj.arquivo_resposta = fotos_anexos[idx_item]
                     resp_obj.save()
 
             diag = calcular_diagnostico_prova_aluno_unificada(prova_aluno)
@@ -4878,16 +4884,42 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
         .order_by('-data_conclusao', '-id')
     )
 
+    # Configuração do Scanner Mobile (Pareamento Celular <-> Computador via QR Code)
+    diagramacao = construir_diagramacao_unificada(prova, estrutura)
+    omr_pages_configuradas = int(diagramacao['config'].get('omr_pages') or 1)
+    sessao_scanner_id = f"p{prova.id}_u{request.user.id}"
+    token_scanner = gerar_token_scanner_mobile(prova.id, request.user.id, sessao_scanner_id)
+    path_scanner_mobile = reverse('mimir:scannerMobileProvaFoto', args=[prova.id, token_scanner])
+
+    host_atual = request.get_host()
+    scheme_atual = 'https' if request.is_secure() else 'http'
+    ip_lan = obter_ip_rede_local()
+    if host_atual.startswith('localhost') or host_atual.startswith('127.0.0.1'):
+        porta = host_atual.split(':', 1)[1] if ':' in host_atual else ''
+        host_sugerido = f"{ip_lan}:{porta}" if porta else ip_lan
+    else:
+        host_sugerido = host_atual
+
+    url_scanner_mobile = f"{scheme_atual}://{host_sugerido}{path_scanner_mobile}"
+    qrcode_scanner_b64 = gerar_qrcode_base64(url_scanner_mobile)
+
     context = {
         'prova': prova,
         'aplicacao': aplicacao,
         'estrutura': estrutura,
+        'omr_pages_configuradas': omr_pages_configuradas,
         'todos_alunos': todos_alunos,
         'aluno_selecionado': aluno_selecionado,
         'prova_aluno': prova_aluno,
         'itens_correcao': itens_correcao,
         'diagnostico_aluno': diagnostico_aluno,
         'historico_correcoes': historico_correcoes,
+        'sessao_scanner_id': sessao_scanner_id,
+        'token_scanner': token_scanner,
+        'path_scanner_mobile': path_scanner_mobile,
+        'host_sugerido_scanner': f"{scheme_atual}://{host_sugerido}",
+        'url_scanner_mobile': url_scanner_mobile,
+        'qrcode_scanner_b64': qrcode_scanner_b64,
     }
     return render(request, 'mimir/corrigirAvaliacaoUnificadaFoto.html', context)
 
@@ -4898,9 +4930,9 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
 @grupo_requerido('Professor')
 def processarFotoUnificadaAjax(request, prova_id):
     """
-    Endpoint AJAX que recebe uma ou mais fotos da Avaliação Unificada (folha de respostas
-    e/ou páginas de respostas dissertativas), executa leitura óptica + transcrição e avaliação
-    via Gemini Vision Multimodal e retorna o JSON estruturado questão a questão.
+    Endpoint AJAX que recebe 1 ou mais fotos/páginas da prova ou folha de respostas
+    (suportando gabaritos de múltiplas páginas), executa leitura óptica + transcrição
+    e avaliação via Gemini Vision Multimodal e retorna o JSON estruturado questão a questão.
     """
     prova = get_object_or_404(Prova, id=prova_id)
     arquivos = request.FILES.getlist('fotos_prova')
@@ -4910,11 +4942,224 @@ def processarFotoUnificadaAjax(request, prova_id):
     if not arquivos:
         return JsonResponse({
             'success': False,
-            'message': 'Nenhuma foto da prova foi enviada. Selecione ou tire uma foto para corrigir.'
+            'message': 'Nenhuma foto da prova foi enviada. Selecione ou tire a foto das páginas do gabarito para corrigir.'
         }, status=400)
 
     resultado = analisar_foto_prova_unificada_ia(prova, arquivos, user=request.user)
     return JsonResponse(resultado)
+
+
+@login_required
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def statusSessaoScannerMobileAjax(request, prova_id):
+    """
+    Consultado em tempo real pela tela do computador para receber automaticamente
+    as páginas fotografadas pelo celular do professor e preencher o espelho de correção.
+    """
+    sessao_id = request.GET.get('sessao_id') or f"p{prova_id}_u{request.user.id}"
+    custom_host = (request.GET.get('custom_host') or '').strip().rstrip('/')
+    if custom_host:
+        token_scanner = gerar_token_scanner_mobile(prova_id, request.user.id, sessao_id)
+        path_scanner = reverse('mimir:scannerMobileProvaFoto', args=[prova_id, token_scanner])
+        if not custom_host.startswith('http://') and not custom_host.startswith('https://'):
+            custom_host = f"http://{custom_host}"
+        nova_url = f"{custom_host}{path_scanner}"
+        return JsonResponse({
+            'success': True,
+            'url_scanner': nova_url,
+            'qrcode_b64': gerar_qrcode_base64(nova_url),
+        })
+
+    estado = ler_estado_sessao_scanner(sessao_id)
+    if not estado or int(estado.get('prova_id', 0)) != int(prova_id):
+        return JsonResponse({'success': True, 'has_data': False})
+
+    return JsonResponse({
+        'success': True,
+        'has_data': True,
+        'scan': estado,
+    })
+
+
+def scannerMobileProvaFoto(request, prova_id, token):
+    """
+    Interface mobile dedicada para o celular do professor fotografar gabaritos de 1 ou mais
+    páginas (Página 1, Página 2, Página 3...) sem precisar digitar login/senha no celular
+    (autenticada pelo token assinado no QR Code).
+    """
+    dados_token = validar_token_scanner_mobile(token)
+    if not dados_token or int(dados_token.get('p', 0)) != int(prova_id):
+        return HttpResponse(
+            "Link do Scanner Mobile expirado ou inválido. Gere um novo QR Code na tela de correção do computador.",
+            status=403,
+        )
+
+    prova = get_object_or_404(Prova, id=prova_id)
+    professor = User.objects.filter(id=dados_token.get('u')).first()
+    estrutura = construir_estrutura_unificada(prova)
+    diagramacao = construir_diagramacao_unificada(prova, estrutura)
+    omr_pages_configuradas = int(diagramacao['config'].get('omr_pages') or 1)
+
+    assuntos_ids = estrutura.get('assuntos_ids', [prova.assunto_id])
+    alunos_modulo = User.objects.filter(
+        vinculos_assuntos__assunto_id__in=assuntos_ids,
+        vinculos_assuntos__ativo=True
+    ).distinct().order_by('first_name', 'username')
+
+    todos_alunos = User.objects.filter(
+        Q(groups__name='Aluno') | Q(id__in=alunos_modulo.values_list('id', flat=True))
+    ).distinct().order_by('first_name', 'username')
+    if not todos_alunos.exists():
+        todos_alunos = User.objects.filter(is_active=True).order_by('first_name', 'username')
+
+    return render(request, 'mimir/scannerMobileProvaFoto.html', {
+        'prova': prova,
+        'professor': professor,
+        'estrutura': estrutura,
+        'omr_pages_configuradas': omr_pages_configuradas,
+        'todos_alunos': todos_alunos,
+        'token': token,
+        'sessao_id': dados_token.get('s'),
+    })
+
+
+@require_POST
+def processarFotoScannerMobileAjax(request, prova_id, token):
+    """
+    Recebe as fotos de 1 ou múltiplas páginas capturadas no celular do professor,
+    executa a leitura OMR + transcrição IA, sincroniza imediatamente com a tela do
+    computador e opcionalmente já salva a correção completa do aluno no banco.
+    """
+    dados_token = validar_token_scanner_mobile(token)
+    if not dados_token or int(dados_token.get('p', 0)) != int(prova_id):
+        return JsonResponse({'success': False, 'message': 'Token do Scanner Mobile inválido ou expirado.'}, status=403)
+
+    prova = get_object_or_404(Prova, id=prova_id)
+    professor = User.objects.filter(id=dados_token.get('u')).first()
+    sessao_id = dados_token.get('s')
+
+    arquivos = request.FILES.getlist('fotos_prova')
+    if not arquivos:
+        return JsonResponse({
+            'success': False,
+            'message': 'Fotografe pelo menos a Página 1 do gabarito antes de enviar.'
+        }, status=400)
+
+    modo_mesclar = request.POST.get('modo_mesclar') == '1'
+    aluno_id = (request.POST.get('aluno_id') or '').strip()
+    novo_aluno_nome = (request.POST.get('novo_aluno_nome') or '').strip()
+    salvar_direto = request.POST.get('salvar_direto') == '1'
+
+    resultado = analisar_foto_prova_unificada_ia(prova, arquivos, user=professor)
+
+    aluno_obj = None
+    if aluno_id:
+        aluno_obj = User.objects.filter(id=aluno_id).first()
+    if not novo_aluno_nome and resultado.get('aluno_identificado'):
+        novo_aluno_nome = resultado['aluno_identificado']
+
+    salvo_no_banco = False
+    nota_salva = None
+    nome_aluno_final = (
+        (aluno_obj.get_full_name() or aluno_obj.username)
+        if aluno_obj
+        else novo_aluno_nome
+    )
+
+    if salvar_direto and (aluno_obj or novo_aluno_nome):
+        estrutura = construir_estrutura_unificada(prova)
+        aplicacao = AplicacaoProva.objects.filter(prova=prova).order_by('-criado_em').first()
+        if not aplicacao:
+            agora = timezone.now()
+            aplicacao = AplicacaoProva.objects.create(
+                prova=prova,
+                data_disponivel=agora,
+                data_limite=agora + datetime.timedelta(days=365),
+                tempo_limite=datetime.timedelta(hours=4),
+                disponivel=True,
+            )
+
+        if not aluno_obj and novo_aluno_nome:
+            username_base = slugify(novo_aluno_nome).replace('-', '.')[:25] or f"aluno.{timezone.now().strftime('%H%M%S')}"
+            username_final = username_base
+            idx = 1
+            while User.objects.filter(username=username_final).exists():
+                idx += 1
+                username_final = f"{username_base}{idx}"
+            partes_nome = novo_aluno_nome.split(' ', 1)
+            aluno_obj = User.objects.create(
+                username=username_final,
+                first_name=partes_nome[0],
+                last_name=partes_nome[1] if len(partes_nome) > 1 else '',
+            )
+            grupo_aluno, _ = Group.objects.get_or_create(name='Aluno')
+            aluno_obj.groups.add(grupo_aluno)
+            nome_aluno_final = aluno_obj.get_full_name() or aluno_obj.username
+
+        if aluno_obj:
+            prova_aluno, _ = ProvaAluno.objects.get_or_create(
+                aplicacao_prova=aplicacao,
+                aluno=aluno_obj,
+                defaults={'status': 'corrigida', 'data_conclusao': timezone.now()}
+            )
+            mapa_itens_lidos = {int(it['pergunta_id']): it for it in resultado.get('itens', []) if it.get('detectado', True)}
+
+            for idx_q, item in enumerate(estrutura['questoes_numeradas']):
+                q = item['pergunta']
+                lido = mapa_itens_lidos.get(q.id)
+                if not lido and modo_mesclar:
+                    continue
+                resp_txt = (lido.get('resposta_lida') or '') if lido else ''
+                nota_val = lido.get('nota_sugerida') if lido else 0.0
+                peso_val = 0 if item['secao'] == 'sensacao_aluno' else item['peso_sugerido']
+                feedback_txt = (lido.get('feedback') or '') if lido else ''
+
+                resp_db, _ = RespostaAluno.objects.update_or_create(
+                    aluno=aluno_obj,
+                    pergunta=q,
+                    prova_aluno=prova_aluno,
+                    defaults={
+                        'resposta_texto': resp_txt,
+                        'nota': nota_val,
+                        'peso': peso_val,
+                        'feedback_professor': feedback_txt,
+                    }
+                )
+                if idx_q < len(arquivos):
+                    arquivos[idx_q].seek(0)
+                    resp_db.arquivo_resposta = arquivos[idx_q]
+                    resp_db.save()
+
+            diag = calcular_diagnostico_prova_aluno_unificada(prova_aluno)
+            prova_aluno.nota_final = diag['nota_academica_final']
+            prova_aluno.status = 'corrigida'
+            if not prova_aluno.data_conclusao:
+                prova_aluno.data_conclusao = timezone.now()
+            prova_aluno.save()
+            salvo_no_banco = True
+            nota_salva = diag['nota_academica_final']
+
+    # Sincroniza o estado com o computador do professor em tempo real
+    payload_sync = {
+        'scan_timestamp': int(timezone.now().timestamp() * 1000),
+        'prova_id': prova.id,
+        'modo_mesclar': modo_mesclar,
+        'aluno_id': aluno_obj.id if aluno_obj else (int(aluno_id) if aluno_id.isdigit() else None),
+        'aluno_nome': nome_aluno_final,
+        'salvo_no_banco': salvo_no_banco,
+        'nota_salva': nota_salva,
+        'resultado': resultado,
+    }
+    salvar_estado_sessao_scanner(sessao_id, payload_sync)
+
+    return JsonResponse({
+        **resultado,
+        'salvo_no_banco': salvo_no_banco,
+        'nota_salva': nota_salva,
+        'aluno_nome_final': nome_aluno_final,
+        'scan_timestamp': payload_sync['scan_timestamp'],
+    })
 
 
 # ==============================================================================
