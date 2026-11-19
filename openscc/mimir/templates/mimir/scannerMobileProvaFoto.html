@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scanner Mobile • {{ prova.titulo }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding-bottom: 90px;
+        }
+        .scanner-header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 1px solid #334155;
+            padding: 14px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .scanner-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .btn-camera-giant {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 18px 16px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            width: 100%;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-camera-giant:active {
+            transform: scale(0.98);
+        }
+        .page-thumb-card {
+            background: #0f172a;
+            border: 2px solid #38bdf8;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        .page-thumb-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            background: rgba(15, 23, 42, 0.9);
+            color: #38bdf8;
+            font-weight: 800;
+            font-size: 0.78rem;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid #38bdf8;
+        }
+        .page-thumb-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 8px;
+            background: #0f172a;
+            border-top: 1px solid #334155;
+        }
+        .form-select-dark, .form-control-dark {
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            color: #f8fafc;
+        }
+        .form-select-dark:focus, .form-control-dark:focus {
+            background-color: #0f172a;
+            color: #fff;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.25);
+        }
+    </style>
+</head>
+<body>
+
+<div class="scanner-header d-flex justify-content-between align-items-center">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success"><i class="fas fa-mobile-alt me-1"></i>Scanner Mimir</span>
+            <span class="badge bg-info text-dark">Gabarito Multi-Página</span>
+        </div>
+        <h6 class="fw-bold mb-0 mt-1 text-white text-truncate" style="max-width: 260px;">{{ prova.titulo }}</h6>
+    </div>
+    <div class="text-end">
+        <span class="badge bg-dark border border-secondary">Prova #{{ prova.id }}</span>
+        <div class="small text-info" style="font-size: 0.72rem;">Sincronizado c/ PC</div>
+    </div>
+</div>
+
+<div class="container py-3" style="max-width: 540px;">
+    {% csrf_token %}
+
+    <!-- 1. Identificação do Aluno (Opcional — IA também lê o cabeçalho da folha) -->
+    <div class="scanner-card">
+        <label class="form-label small fw-bold text-info mb-1">
+            <i class="fas fa-user-graduate me-1"></i>1. Aluno(a) desta Prova
+        </label>
+        <select id="mobSelectAluno" class="form-select form-select-dark mb-2">
+            <option value="">-- Detectar nome automaticamente na foto ou escolher --</option>
+            {% for al in todos_alunos %}
+            <option value="{{ al.id }}">{{ al.get_full_name|default:al.username }} ({{ al.username }})</option>
+            {% endfor %}
+        </select>
+        <input type="text" id="mobInputNovoAluno" class="form-control form-control-sm form-control-dark"
+               placeholder="Ou digite o nome do aluno (opcional)...">
+    </div>
+
+    <!-- 2. Captura de Múltiplas Páginas do Gabarito / Prova -->
+    <div class="scanner-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small fw-bold text-warning">
+                <i class="fas fa-layer-group me-1"></i>2. Páginas do Gabarito / Prova
+            </span>
+            <span class="badge bg-primary" id="mobBadgeContadorPaginas">
+                0 página(s) na fila
+            </span>
+        </div>
+
+        <p class="small text-light opacity-75 mb-3">
+            {% if omr_pages_configuradas > 1 %}
+                Este gabarito possui <strong>{{ omr_pages_configuradas }} páginas configuradas</strong>. Fotografe a <strong>Página 1</strong>, depois toque em <strong>+ Fotografar Página 2</strong> (e demais páginas) antes de enviar.
+            {% else %}
+                Fotografe a <strong>Página 1</strong> do gabarito. Se o gabarito ou as questões dissertativas tiverem <strong>2 ou mais páginas</strong>, basta continuar adicionando páginas abaixo!
+            {% endif %}
+        </p>
+
+        <!-- Inputs nativos ocultos: um para câmera traseira direta e outro para galeria multi-arquivos -->
+        <input type="file" id="mobInputCameraPage" accept="image/*" capture="environment" class="d-none"
+               onchange="adicionarArquivosNaFilaMobile(this)">
+        <input type="file" id="mobInputGaleriaMulti" accept="image/*" multiple class="d-none"
+               onchange="adicionarArquivosNaFilaMobile(this)">
+
+        <button type="button" id="btnCapturarCameraMobile" class="btn-camera-giant mb-2"
+                onclick="document.getElementById('mobInputCameraPage').click()">
+            <i class="fas fa-camera fa-lg"></i>
+            <span id="lblBotaoCameraMobile">Fotografar Página 1 do Gabarito</span>
+        </button>
+
+        <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-info w-100 fw-semibold"
+                    onclick="document.getElementById('mobInputGaleriaMulti').click()">
+                <i class="fas fa-images me-1"></i> Escolher 1 ou Mais Páginas da Galeria
+            </button>
+            <button type="button" id="btnLimparFilaMobile" class="btn btn-sm btn-outline-danger d-none"
+                    onclick="limparFilaPaginasMobile()">
+                <i class="fas fa-trash-alt"></i> Limpar
+            </button>
+        </div>
+
+        <!-- Grade de Páginas Capturadas (Página 1, Página 2, ...) -->
+        <div id="mobGridPaginas" class="row g-2 mb-3 d-none"></div>
+
+        <!-- Modo de envio -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="mobChkMesclar">
+            <label class="form-check-label small text-light" for="mobChkMesclar">
+                Modo incremental (mesclar apenas as questões desta página com o que já está na tela do PC)
+            </label>
+        </div>
+
+        <!-- Botões de Envio e Correção -->
+        <div class="d-grid gap-2">
+            <button type="button" id="btnEnviarParaPC" class="btn btn-primary fw-bold py-2"
+                    onclick="enviarPaginasMobile(false)" disabled>
+                <i class="fas fa-laptop-medical me-1"></i> Ler Todas as Páginas e Enviar p/ Computador
+            </button>
+            <button type="button" id="btnSalvarDiretoMobile" class="btn btn-warning text-dark fw-bold py-2"
+                    onclick="enviarPaginasMobile(true)" disabled>
+                <i class="fas fa-check-double me-1"></i> Ler Páginas + Já Salvar Nota do Aluno
+            </button>
+        </div>
+
+        <div id="mobStatusBox" class="mt-3 d-none"></div>
+    </div>
+
+    <!-- 3. Resumo da Última Leitura no Celular -->
+    <div id="mobCardResultado" class="scanner-card d-none">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold text-success mb-0">
+                <i class="fas fa-check-circle me-1"></i>Resultado da Leitura
+            </h6>
+            <span class="badge bg-success fs-6" id="mobBadgeNota">0.00 / 10</span>
+        </div>
+        <div id="mobResumoTexto" class="small text-light mb-3"></div>
+        <button type="button" class="btn btn-outline-light btn-sm w-100 fw-bold" onclick="prepararProximoAlunoMobile()">
+            <i class="fas fa-user-plus me-1"></i> Limpar Páginas e Fotografar Próximo Aluno
+        </button>
+    </div>
+</div>
+
+<script>
+let filaPaginasMobile = [];
+
+function adicionarArquivosNaFilaMobile(input) {
+    if (!input.files || input.files.length === 0) return;
+    Array.from(input.files).forEach(file => {
+        const previewUrl = URL.createObjectURL(file);
+        filaPaginasMobile.push({
+            file: file,
+            previewUrl: previewUrl,
+            nome: file.name
+        });
+    });
+    input.value = '';
+    renderizarFilaPaginasMobile();
+}
+
+function removerPaginaFilaMobile(idx) {
+    filaPaginasMobile.splice(idx, 1);
+    renderizarFilaPaginasMobile();
+}
+
+function moverPaginaFilaMobile(idx, direcao) {
+    const novoIdx = idx + direcao;
+    if (novoIdx < 0 || novoIdx >= filaPaginasMobile.length) return;
+    const temp = filaPaginasMobile[idx];
+    filaPaginasMobile[idx] = filaPaginasMobile[novoIdx];
+    filaPaginasMobile[novoIdx] = temp;
+    renderizarFilaPaginasMobile();
+}
+
+function limparFilaPaginasMobile() {
+    filaPaginasMobile = [];
+    renderizarFilaPaginasMobile();
+}
+
+function renderizarFilaPaginasMobile() {
+    const grid = document.getElementById('mobGridPaginas');
+    const badge = document.getElementById('mobBadgeContadorPaginas');
+    const lblCamera = document.getElementById('lblBotaoCameraMobile');
+    const btnLimpar = document.getElementById('btnLimparFilaMobile');
+    const btnEnviarPC = document.getElementById('btnEnviarParaPC');
+    const btnSalvar = document.getElementById('btnSalvarDiretoMobile');
+
+    const total = filaPaginasMobile.length;
+    badge.textContent = `${total} página(s) na fila`;
+    lblCamera.textContent = total === 0
+        ? 'Fotografar Página 1 do Gabarito'
+        : `+ Fotografar Página ${total + 1} do Gabarito`;
+
+    btnEnviarPC.disabled = (total === 0);
+    btnSalvar.disabled = (total === 0);
+
+    if (total === 0) {
+        grid.classList.add('d-none');
+        btnLimpar.classList.add('d-none');
+        grid.innerHTML = '';
+        return;
+    }
+
+    grid.classList.remove('d-none');
+    btnLimpar.classList.remove('d-none');
+    grid.innerHTML = '';
+
+    filaPaginasMobile.forEach((pg, idx) => {
+        const col = document.createElement('div');
+        col.className = 'col-6';
+        col.innerHTML = `
+            <div class="page-thumb-card">
+                <span class="page-thumb-badge">PÁGINA ${idx + 1}</span>
+                <img src="${pg.previewUrl}" style="width:100%; height:135px; object-fit:cover; display:block;">
+                <div class="page-thumb-actions">
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="moverPaginaFilaMobile(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>◀</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="moverPaginaFilaMobile(${idx}, 1)" ${idx === total - 1 ? 'disabled' : ''}>▶</button>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removerPaginaFilaMobile(${idx})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        grid.appendChild(col);
+    });
+}
+
+async function enviarPaginasMobile(salvarDireto) {
+    if (filaPaginasMobile.length === 0) return;
+
+    const statusBox = document.getElementById('mobStatusBox');
+    const btnPC = document.getElementById('btnEnviarParaPC');
+    const btnSalvar = document.getElementById('btnSalvarDiretoMobile');
+
+    const formData = new FormData();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrf);
+    formData.append('aluno_id', document.getElementById('mobSelectAluno').value || '');
+    formData.append('novo_aluno_nome', document.getElementById('mobInputNovoAluno').value || '');
+    formData.append('modo_mesclar', document.getElementById('mobChkMesclar').checked ? '1' : '0');
+    formData.append('salvar_direto', salvarDireto ? '1' : '0');
+
+    filaPaginasMobile.forEach((pg, idx) => {
+        formData.append('fotos_prova', pg.file, `pagina_${idx + 1}_${pg.nome || 'gabarito.jpg'}`);
+    });
+
+    btnPC.disabled = true;
+    btnSalvar.disabled = true;
+    statusBox.className = 'mt-3 alert alert-info small py-2 mb-0';
+    statusBox.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i> Enviando ${filaPaginasMobile.length} página(s) e realizando leitura óptica OMR + transcrição IA...`;
+
+    try {
+        const resp = await fetch("{% url 'mimir:processarFotoScannerMobileAjax' prova.id token %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            statusBox.className = 'mt-3 alert alert-danger small py-2 mb-0';
+            statusBox.innerHTML = `<i class="fas fa-times-circle me-1"></i> ${data.message || 'Erro ao processar páginas.'}`;
+            return;
+        }
+
+        if (data.aluno_identificado && !document.getElementById('mobInputNovoAluno').value) {
+            document.getElementById('mobInputNovoAluno').value = data.aluno_identificado;
+        }
+
+        const notaExibir = data.salvo_no_banco && data.nota_salva !== null
+            ? parseFloat(data.nota_salva).toFixed(2)
+            : parseFloat(data.nota_academica_sugerida || 0).toFixed(2);
+
+        statusBox.className = 'mt-3 alert alert-success small py-2 mb-0';
+        statusBox.innerHTML = `
+            <i class="fas fa-check-circle me-1"></i>
+            <strong>${data.total_paginas_processadas} página(s) lida(s) e sincronizada(s) com o computador!</strong>
+            (${data.questoes_detectadas}/${data.total_questoes_prova} questões identificadas).
+            ${data.salvo_no_banco ? '<br><span class="badge bg-success mt-1">Correção salva no banco!</span>' : ''}
+        `;
+
+        const cardRes = document.getElementById('mobCardResultado');
+        cardRes.classList.remove('d-none');
+        document.getElementById('mobBadgeNota').textContent = `Nota: ${notaExibir} / 10`;
+        document.getElementById('mobResumoTexto').innerHTML = `
+            <div><strong>Aluno(a):</strong> ${data.aluno_nome_final || data.aluno_identificado || 'Não informado (revise no PC)'}</div>
+            <div><strong>Páginas processadas:</strong> ${data.total_paginas_processadas} página(s)</div>
+            <div><strong>Questões lidas:</strong> ${data.questoes_detectadas} de ${data.total_questoes_prova}</div>
+        `;
+    } catch (err) {
+        statusBox.className = 'mt-3 alert alert-danger small py-2 mb-0';
+        statusBox.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i> Falha de conexão: ${err}`;
+    } finally {
+        btnPC.disabled = (filaPaginasMobile.length === 0);
+        btnSalvar.disabled = (filaPaginasMobile.length === 0);
+    }
+}
+
+function prepararProximoAlunoMobile() {
+    limparFilaPaginasMobile();
+    document.getElementById('mobSelectAluno').value = '';
+    document.getElementById('mobInputNovoAluno').value = '';
+    document.getElementById('mobStatusBox').className = 'mt-3 d-none';
+    document.getElementById('mobCardResultado').classList.add('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
