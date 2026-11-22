@@ -147,12 +147,179 @@ class Assunto(models.Model):
         ).distinct()
     
 
-class TiposDePergunta(models.Model):    
+class TiposDePergunta(models.Model):
+    META_START = "<!-- MIMIR_TIPO_META:"
+    META_END = "-->"
+
     descricao = models.CharField(max_length=200, blank=False, null=False)
     textoParaLLM = models.TextField(blank=False, null=True)
 
     def __str__(self):
         return self.descricao
+
+    def extrair_meta_e_instrucoes(self) -> tuple[dict, str]:
+        """
+        Extrai metadados estruturados (formato='objetiva'|'dissertativa', qtd_alternativas, estilo)
+        embutidos em `textoParaLLM` sem exigir alteração destrutiva de schema no banco, mantendo
+        compatibilidade total com tipos antigos.
+        """
+        import json as _json
+        raw = (self.textoParaLLM or "").strip()
+        meta = {}
+        instrucoes = raw
+
+        if raw.startswith(self.META_START):
+            end_idx = raw.find(self.META_END)
+            if end_idx != -1:
+                json_part = raw[len(self.META_START):end_idx].strip()
+                instrucoes = raw[end_idx + len(self.META_END):].strip()
+                try:
+                    parsed = _json.loads(json_part)
+                    if isinstance(parsed, dict):
+                        meta = parsed
+                except Exception:
+                    meta = {}
+
+        # Inferência inteligente caso o tipo tenha sido cadastrado no formato antigo
+        formato = (meta.get("formato") or "").strip().lower()
+        if formato not in ("objetiva", "dissertativa"):
+            texto_busca = f"{self.descricao or ''} {instrucoes}".lower()
+            palavras_dissertativa = ["dissertativa", "discursiva", "aberta", "redação", "redacao"]
+            palavras_objetiva = [
+                "múltipla", "multipla", "objetiva", "alternativa", "escolha",
+                "asserção", "assercao", "afirmativa", "verdadeiro", "falso",
+                "certo ou errado", "enade", "poscomp", "a)", "5 opções", "5 opcoes",
+                "4 alternativas", "5 alternativas",
+            ]
+            if any(p in (self.descricao or "").lower() for p in palavras_objetiva):
+                formato = "objetiva"
+            elif any(p in (self.descricao or "").lower() for p in palavras_dissertativa):
+                formato = "dissertativa"
+            elif any(p in texto_busca for p in palavras_objetiva):
+                formato = "objetiva"
+            else:
+                formato = "dissertativa"
+
+        qtd_alt = meta.get("qtd_alternativas")
+        try:
+            qtd_alt = int(qtd_alt)
+        except (ValueError, TypeError):
+            if formato == "objetiva":
+                desc_low = f"{self.descricao or ''} {instrucoes}".lower()
+                if "verdadeiro" in desc_low or "certo ou errado" in desc_low or "2 alternativas" in desc_low:
+                    qtd_alt = 2
+                elif "4 alternativas" in desc_low or "a a d" in desc_low or "a-d" in desc_low:
+                    qtd_alt = 4
+                else:
+                    qtd_alt = 5
+            else:
+                qtd_alt = 0
+
+        if formato == "objetiva":
+            qtd_alt = max(2, min(8, qtd_alt or 5))
+        else:
+            qtd_alt = 0
+
+        estilo = (meta.get("estilo") or "").strip() or (
+            "multipla_escolha" if formato == "objetiva" else "dissertativa_conceitual"
+        )
+
+        return {
+            "formato": formato,
+            "is_objetiva": formato == "objetiva",
+            "qtd_alternativas": qtd_alt,
+            "estilo": estilo,
+        }, instrucoes
+
+    @classmethod
+    def empacotar_texto_para_llm(
+        cls,
+        instrucoes_limpas: str,
+        formato: str = "objetiva",
+        qtd_alternativas: int = 5,
+        estilo: str = "multipla_escolha",
+    ) -> str:
+        import json as _json
+        fmt = "objetiva" if (formato or "").lower() == "objetiva" else "dissertativa"
+        qtd = max(2, min(8, int(qtd_alternativas or 5))) if fmt == "objetiva" else 0
+        meta = {
+            "formato": fmt,
+            "qtd_alternativas": qtd,
+            "estilo": estilo or ("multipla_escolha" if fmt == "objetiva" else "dissertativa_conceitual"),
+        }
+        corpo = (instrucoes_limpas or "").strip()
+        if not corpo:
+            if fmt == "objetiva":
+                letras = ", ".join("ABCDEFGH"[:qtd])
+                corpo = f"Questão objetiva contendo exatamente {qtd} alternativas ({letras}) e apenas uma alternativa correta."
+            else:
+                corpo = "Questão aberta dissertativa com padrão de resposta estruturado e critérios claros de avaliação."
+        return f"{cls.META_START}{_json.dumps(meta, ensure_ascii=False)}{cls.META_END}\n{corpo}"
+
+    @property
+    def is_objetiva(self) -> bool:
+        meta, _ = self.extrair_meta_e_instrucoes()
+        return bool(meta.get("is_objetiva"))
+
+    @property
+    def formato(self) -> str:
+        meta, _ = self.extrair_meta_e_instrucoes()
+        return meta.get("formato", "objetiva")
+
+    @property
+    def qtd_alternativas(self) -> int:
+        meta, _ = self.extrair_meta_e_instrucoes()
+        return int(meta.get("qtd_alternativas", 5 if self.is_objetiva else 0))
+
+    @property
+    def estilo(self) -> str:
+        meta, _ = self.extrair_meta_e_instrucoes()
+        return meta.get("estilo", "multipla_escolha")
+
+    @property
+    def instrucoes_limpas(self) -> str:
+        _, instrucoes = self.extrair_meta_e_instrucoes()
+        return instrucoes
+
+    @property
+    def resumo_formato(self) -> str:
+        if self.is_objetiva:
+            qtd = self.qtd_alternativas
+            letras = "ABCDEFGH"[:qtd]
+            faixa = f"{letras[0]}–{letras[-1]}" if len(letras) >= 2 else "A–E"
+            return f"Objetiva ({qtd} opções: {faixa})"
+        return "Dissertativa (Aberta)"
+
+    def instrucoes_para_llm_completas(self) -> str:
+        """
+        Monta a diretriz completa enviada ao motor de IA (Gemini / Ollama) garantindo que,
+        se o tipo for objetivo, o modelo SEMPRE gere a lista de alternativas no array `alternativas`.
+        """
+        meta, instrucoes = self.extrair_meta_e_instrucoes()
+        if meta["is_objetiva"]:
+            qtd = meta["qtd_alternativas"]
+            letras = list("ABCDEFGH"[:qtd])
+            exemplo_alts = ", ".join([f'"{l}) Texto da alternativa {l}"' for l in letras])
+            regras_obj = (
+                f'[FORMATO OBRIGATÓRIO PARA O TIPO "{self.descricao}": QUESTÃO OBJETIVA COM {qtd} ALTERNATIVAS]\n'
+                f'- No JSON desta questão, o campo "tipo" DEVE ser exatamente "{self.descricao}".\n'
+                f'- O campo "enunciado" deve conter APENAS o texto-base/comando da questão (e as asserções/afirmativas I, II, III se o estilo pedir), SEM listar as alternativas A, B, C... dentro do enunciado.\n'
+                f'- O campo "alternativas" é OBRIGATÓRIO e DEVE ser um array JSON contendo exatamente {qtd} strings prefixadas de {letras[0]}) até {letras[-1]}): [{exemplo_alts}].\n'
+                f'- O campo "resposta" DEVE iniciar com a letra da alternativa correta seguida do texto e justificativa (ex: "{letras[0]}) Texto correto — Justificativa...").\n'
+            )
+            if instrucoes:
+                regras_obj += f"- Diretrizes pedagógicas específicas deste tipo: {instrucoes}\n"
+            return regras_obj
+        else:
+            regras_diss = (
+                f'[FORMATO OBRIGATÓRIO PARA O TIPO "{self.descricao}": QUESTÃO DISSERTATIVA / ABERTA]\n'
+                f'- No JSON desta questão, o campo "tipo" DEVE ser exatamente "{self.descricao}".\n'
+                f'- O campo "alternativas" DEVE ser uma lista vazia [].\n'
+                f'- O campo "resposta" DEVE conter o padrão de resposta esperado / espelho de correção detalhado.\n'
+            )
+            if instrucoes:
+                regras_diss += f"- Diretrizes pedagógicas específicas deste tipo: {instrucoes}\n"
+            return regras_diss
 
 class PapelTimbrado(models.Model):
     nome = models.CharField(max_length=200, blank=False, null=False)

@@ -1,0 +1,211 @@
+<!-- Modal Rápido para Criar Novo Tipo de Pergunta sem sair da tela atual -->
+<div class="modal fade" id="modalNovoTipoPerguntaRapido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold fs-6">
+                    <i class="fas fa-plus-circle text-info me-2"></i>Cadastrar Novo Tipo de Pergunta
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">
+                        <i class="fas fa-magic text-primary me-1"></i>Carregar Modelo Pedagógico Rápido:
+                    </label>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-primary" onclick="modalTipoPreset('Múltipla Escolha', 'objetiva', 5, 'Elabore uma questão objetiva contextualizada com 5 alternativas (A, B, C, D, E) e apenas uma correta comentada no gabarito.')">
+                            Múltipla Escolha (A–E)
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-primary" onclick="modalTipoPreset('Asserção-Razão (ENADE)', 'objetiva', 5, 'Apresente duas proposições (I e II) ligadas por PORQUE no enunciado e gere as 5 alternativas padronizadas do ENADE (A a E) avaliando a veracidade e relação causal entre I e II.')">
+                            Asserção-Razão (ENADE)
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-primary" onclick="modalTipoPreset('Análise de Afirmativas (I, II, III)', 'objetiva', 5, 'Apresente afirmativas em algarismos romanos (I, II, III, IV) no enunciado e 5 alternativas (A a E) indicando quais afirmativas estão corretas.')">
+                            Afirmativas (I, II, III)
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-success" onclick="modalTipoPreset('Objetiva (4 Alternativas A–D)', 'objetiva', 4, 'Questão objetiva direta contendo 4 alternativas (A, B, C, D) e apenas uma correta.')">
+                            Objetiva 4 Opções (A–D)
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="modalTipoPreset('Verdadeiro ou Falso', 'objetiva', 2, 'Questão de julgamento com 2 alternativas: A) Verdadeiro (Certo) e B) Falso (Errado).')">
+                            Verdadeiro / Falso
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-warning text-dark" onclick="modalTipoPreset('Dissertativa Estudo de Caso', 'dissertativa', 0, 'Questão aberta baseada em situação-problema exigindo análise técnica e padrão de resposta estruturado.')">
+                            Dissertativa / Caso
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label fw-bold small">Nome do Tipo de Pergunta <span class="text-danger">*</span></label>
+                        <input type="text" id="modal_tipo_descricao" class="form-control"
+                               placeholder="Ex: Asserção-Razão (ENADE), Múltipla Escolha Contextualizada...">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold small">Formato da Questão <span class="text-danger">*</span></label>
+                        <select id="modal_tipo_formato" class="form-select" onchange="modalTipoToggleFormato()">
+                            <option value="objetiva" selected>Objetiva (Com Alternativas A, B, C...)</option>
+                            <option value="dissertativa">Dissertativa (Questão Aberta)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6" id="modal_box_qtd_alternativas">
+                        <label class="form-label fw-bold small">Quantidade de Alternativas</label>
+                        <select id="modal_tipo_qtd_alt" class="form-select form-select-sm">
+                            <option value="5" selected>5 alternativas (A, B, C, D, E)</option>
+                            <option value="4">4 alternativas (A, B, C, D)</option>
+                            <option value="3">3 alternativas (A, B, C)</option>
+                            <option value="2">2 alternativas (A, B — V/F)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Instruções para a IA elaborar questões deste tipo <span class="text-danger">*</span></label>
+                        <textarea id="modal_tipo_instrucoes" rows="3" class="form-control form-control-sm"
+                                  placeholder="Descreva como a IA deve montar o enunciado, as alternativas e o gabarito..."></textarea>
+                    </div>
+                </div>
+                <div id="modal_tipo_feedback_msg" class="mt-2 d-none"></div>
+            </div>
+            <div class="modal-footer bg-light d-flex justify-content-between">
+                <a href="{% url 'mimir:gerenciarTiposPergunta' %}" class="btn btn-sm btn-link text-decoration-none">
+                    <i class="fas fa-external-link-alt me-1"></i> Abrir Gerenciador Completo de Tipos
+                </a>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" id="btnSalvarNovoTipoRapido" class="btn btn-sm btn-primary fw-bold px-3" onclick="salvarNovoTipoPerguntaRapidoAjax()">
+                        <i class="fas fa-check me-1"></i> Salvar e Usar Este Tipo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function modalTipoToggleFormato() {
+    const fmt = document.getElementById('modal_tipo_formato').value;
+    const box = document.getElementById('modal_box_qtd_alternativas');
+    if (fmt === 'objetiva') {
+        box.classList.remove('d-none');
+    } else {
+        box.classList.add('d-none');
+    }
+}
+
+function modalTipoPreset(desc, fmt, qtd, instr) {
+    document.getElementById('modal_tipo_descricao').value = desc;
+    document.getElementById('modal_tipo_formato').value = fmt;
+    if (qtd >= 2) document.getElementById('modal_tipo_qtd_alt').value = String(qtd);
+    document.getElementById('modal_tipo_instrucoes').value = instr;
+    modalTipoToggleFormato();
+}
+
+async function salvarNovoTipoPerguntaRapidoAjax() {
+    const desc = (document.getElementById('modal_tipo_descricao').value || '').trim();
+    const fmt = document.getElementById('modal_tipo_formato').value;
+    const qtd = document.getElementById('modal_tipo_qtd_alt').value;
+    const instr = (document.getElementById('modal_tipo_instrucoes').value || '').trim();
+    const msgBox = document.getElementById('modal_tipo_feedback_msg');
+    const btn = document.getElementById('btnSalvarNovoTipoRapido');
+
+    if (!desc) {
+        msgBox.className = 'mt-2 alert alert-warning small py-1';
+        msgBox.textContent = 'Informe o nome do Tipo de Pergunta.';
+        return;
+    }
+
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrf);
+    formData.append('descricao', desc);
+    formData.append('formato', fmt);
+    formData.append('qtd_alternativas', qtd);
+    formData.append('instrucoes_limpas', instr);
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch("{% url 'mimir:salvarTipoPerguntaAjax' %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (!data.success) {
+            msgBox.className = 'mt-2 alert alert-danger small py-1';
+            msgBox.textContent = data.message || 'Erro ao salvar tipo.';
+            return;
+        }
+
+        const t = data.tipo;
+        if (window.TIPOS_META_MAP) {
+            window.TIPOS_META_MAP[String(t.id)] = t;
+        }
+
+        // Se estivermos na tela de Criar ou Editar Pergunta, adiciona/seleciona no dropdown
+        const selTipo = document.querySelector('select[name="tipoDePergunta"]');
+        if (selTipo) {
+            let opt = selTipo.querySelector(`option[value="${t.id}"]`);
+            if (!opt) {
+                opt = document.createElement('option');
+                opt.value = t.id;
+                selTipo.appendChild(opt);
+            }
+            opt.textContent = t.descricao;
+            selTipo.value = String(t.id);
+            selTipo.dispatchEvent(new Event('change'));
+        }
+
+        // Se estivermos na tela de Gerar Perguntas com IA, adiciona o card de quantidade dinamicamente
+        const gridTiposGeracao = document.getElementById('gridCardsTiposGeracao');
+        if (gridTiposGeracao && !document.getElementById(`id_tipo_${t.id}`)) {
+            const col = document.createElement('div');
+            col.className = 'col-md-6';
+            const badgeHtml = t.is_objetiva
+                ? `<span class="badge bg-success-subtle text-success border border-success-subtle flex-shrink-0" style="font-size:0.7rem;"><i class="fas fa-list-ol me-1"></i>${t.resumo_formato}</span>`
+                : `<span class="badge bg-warning-subtle text-dark border border-warning-subtle flex-shrink-0" style="font-size:0.7rem;"><i class="fas fa-align-left me-1"></i>${t.resumo_formato}</span>`;
+            col.innerHTML = `
+                <div class="card border shadow-xs p-3 h-100 card-tipo-geracao" id="card_wrap_tipo_${t.id}">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                        <label for="id_tipo_${t.id}" class="form-label fw-bold text-dark small mb-0">${t.descricao}</label>
+                        ${badgeHtml}
+                    </div>
+                    <small class="text-muted d-block mb-2" style="font-size: 0.76rem; line-height: 1.35;">
+                        ${t.instrucoes_limpas || 'Formato estruturado padrão deste tipo'}
+                    </small>
+                    <div class="d-flex align-items-center justify-content-between mt-auto pt-1">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo(${t.id}, 1)">1</button>
+                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo(${t.id}, 3)">3</button>
+                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo(${t.id}, 5)">5</button>
+                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo(${t.id}, 10)">10</button>
+                        </div>
+                        <div class="input-group input-group-sm" style="width: 130px;">
+                            <button type="button" class="btn btn-outline-dark fw-bold" onclick="ajustarQuantidadeTipo(${t.id}, -1)">−</button>
+                            <input type="number" name="tipo_${t.id}" id="id_tipo_${t.id}"
+                                   data-tipo-id="${t.id}" data-tipo-nome="${t.descricao}" data-is-obj="${t.is_objetiva ? '1' : '0'}"
+                                   class="form-control quantidade-input font-monospace fw-bold text-center"
+                                   min="0" max="50" value="1">
+                            <button type="button" class="btn btn-outline-primary fw-bold" onclick="ajustarQuantidadeTipo(${t.id}, 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            gridTiposGeracao.appendChild(col);
+            if (typeof atualizarPainelResumoGeracao === 'function') {
+                atualizarPainelResumoGeracao();
+            }
+        }
+
+        const modalEl = document.getElementById('modalNovoTipoPerguntaRapido');
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if (bsModal) bsModal.hide();
+
+        document.getElementById('modal_tipo_descricao').value = '';
+        document.getElementById('modal_tipo_instrucoes').value = '';
+        msgBox.className = 'mt-2 d-none';
+    } catch (err) {
+        msgBox.className = 'mt-2 alert alert-danger small py-1';
+        msgBox.textContent = 'Erro de conexão ao salvar tipo.';
+    } finally {
+        btn.disabled = false;
+    }
+}
+</script>

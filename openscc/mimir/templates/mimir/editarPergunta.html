@@ -88,9 +88,20 @@
                     </div>
                     
                     <div class="col-md-6">
-                        <label for="{{ form.tipoDePergunta.id_for_label }}" class="form-label">
-                            <strong>{{ form.tipoDePergunta.label }}</strong>
-                        </label>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label for="{{ form.tipoDePergunta.id_for_label }}" class="form-label mb-0">
+                                <strong>{{ form.tipoDePergunta.label }}</strong>
+                            </label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2"
+                                        data-bs-toggle="modal" data-bs-target="#modalNovoTipoPerguntaRapido">
+                                    <i class="fas fa-plus me-1"></i>Novo Tipo
+                                </button>
+                                <a href="{% url 'mimir:gerenciarTiposPergunta' %}" class="small text-decoration-none">
+                                    Gerenciar Tipos
+                                </a>
+                            </div>
+                        </div>
                         {{ form.tipoDePergunta }}
                         {% if form.tipoDePergunta.errors %}
                         <div class="text-danger small">{{ form.tipoDePergunta.errors }}</div>
@@ -457,7 +468,12 @@ function toggleUploadResposta() {
     }
 }
 
-function isTextoTipoObjetivo(nomeTipo) {
+window.TIPOS_META_MAP = {{ tipos_meta_json|default:"{}"|safe }};
+
+function isTextoTipoObjetivo(nomeTipo, tipoId = null) {
+    if (tipoId && window.TIPOS_META_MAP && window.TIPOS_META_MAP[String(tipoId)]) {
+        return Boolean(window.TIPOS_META_MAP[String(tipoId)].is_objetiva);
+    }
     const t = (nomeTipo || '').toLowerCase();
     if (t.includes('dissertativa') || t.includes('discursiva') || t.includes('aberta')) {
         return false;
@@ -468,6 +484,9 @@ function isTextoTipoObjetivo(nomeTipo) {
         t.includes('objetiva') ||
         t.includes('alternativa') ||
         t.includes('escolha') ||
+        t.includes('asserção') ||
+        t.includes('assercao') ||
+        t.includes('afirmativa') ||
         t.includes('verdadeiro') ||
         t.includes('sensação') ||
         t.includes('sensacao')
@@ -1006,13 +1025,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const chkUpload = document.getElementById('aceita_upload_checkbox');
     if (chkUpload) chkUpload.addEventListener('change', toggleUploadResposta);
 
-    const textoTipoInicial = selectTipo ? (selectTipo.options[selectTipo.selectedIndex]?.text || '') : '';
+    const optInicial = selectTipo ? selectTipo.options[selectTipo.selectedIndex] : null;
+    const textoTipoInicial = optInicial ? (optInicial.text || '') : '';
     decomporPerguntaExistente(inputDjangoPergunta.value, inputDjangoGabarito.value, textoTipoInicial);
 
     if (selectTipo) {
         selectTipo.addEventListener('change', function() {
-            const tx = this.options[this.selectedIndex]?.text || '';
-            definirModoQuestao(isTextoTipoObjetivo(tx) ? 'objetiva' : 'dissertativa', false);
+            const opt = this.options[this.selectedIndex];
+            const ehObj = isTextoTipoObjetivo(opt?.text || '', opt?.value);
+            definirModoQuestao(ehObj ? 'objetiva' : 'dissertativa', false);
         });
     }
 
@@ -1100,4 +1121,5 @@ document.addEventListener('DOMContentLoaded', function() {
 .alternativa-row { transition: all 0.15s ease-in-out; }
 .alternativa-row:hover { border-color: #198754 !important; }
 </style>
+{% include "mimir/partials_modal_tipo_pergunta.html" %}
 {% endblock %}
