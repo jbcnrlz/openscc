@@ -116,46 +116,45 @@ class GeracaoPerguntasForm(forms.Form):
     fontes_selecionadas = forms.ModelMultipleChoiceField(
         queryset=Fontes.objects.none(),
         widget=forms.CheckboxSelectMultiple,
-        label="Fontes de Conteúdo"
+        label="Fontes de Conteúdo (PDFs)",
+        required=False,
     )
-    
-    # Campo dinâmico para quantidade por tipo
-    def __init__(self, user, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['fontes_selecionadas'].queryset = Fontes.objects.filter(user=user)
-        
-        # Adiciona campos dinâmicos para cada tipo de pergunta
-        tipos = TiposDePergunta.objects.all()
-        for tipo in tipos:
-            self.fields[f'quantidade_{tipo.id}'] = forms.IntegerField(
-                min_value=0,
-                max_value=50,
-                initial=0,
-                label=f"Quantidade - {tipo.nome}",
-                required=False
-            )
-    
+
     assunto = forms.ModelChoiceField(
         queryset=Assunto.objects.none(),
-        label="Assunto para as perguntas"
-    )
-    
-    prompt_personalizado = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 4}),
+        label="Assunto / Disciplina",
         required=False,
-        label="Prompt Personalizado",
-        help_text="Deixe em branco para usar o prompt padrão"
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
-    
+
+    prompt_personalizado = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-control',
+            'placeholder': 'Ex: Foque nos capítulos sobre árvores binárias e complexidade; inclua exemplos práticos de código em Python...'
+        }),
+        required=False,
+        label="Tópico Específico / Diretrizes para a IA",
+        help_text="Opcional: oriente o foco temático, estilo das alternativas ou restrições pedagógicas."
+    )
+
     nivel_dificuldade = forms.ChoiceField(
-        choices=[('facil', 'Fácil'), ('medio', 'Médio'), ('dificil', 'Difícil')],
-        initial='medio'
+        choices=[
+            ('facil', 'Fácil (Compreensão e Lembrança — Bloom)'),
+            ('medio', 'Médio (Aplicação e Análise — Bloom)'),
+            ('dificil', 'Difícil (Avaliação e Estudo de Caso Complexo — Bloom)'),
+        ],
+        initial='medio',
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
-    
+
     def __init__(self, user, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['fontes_selecionadas'].queryset = Fontes.objects.filter(user=user)
-        self.fields['assunto'].queryset = Assunto.objects.filter(user=user)
+        self.fields['fontes_selecionadas'].queryset = Fontes.objects.filter(user=user).order_by('-dataCriacao')
+        assuntos_user = Assunto.objects.filter(user=user).order_by('nome')
+        if not assuntos_user.exists():
+            assuntos_user = Assunto.objects.all().order_by('nome')
+        self.fields['assunto'].queryset = assuntos_user
 
 class GerarProblemaForm(forms.Form):
     tema = forms.ModelChoiceField(
