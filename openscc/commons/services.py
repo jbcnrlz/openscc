@@ -1,4 +1,4 @@
-import base64, io, json, re, pdfplumber, time, ast
+import os, base64, io, json, re, pdfplumber, time, ast
 from typing import List, Optional
 
 from django.conf import settings
@@ -307,25 +307,27 @@ OBSERVAÇÕES FINAIS:
 
 def criar_template_questoes():
     parser = JsonOutputParser(pydantic_object=PerguntasSchema)
-    template = """TODO TEXTO QUE VOCÊ GERAR DEVE SER EM JSON, SIGA AS INSTRUÇÕES ABAIXO.
+    template = """TODO TEXTO QUE VOCÊ GERAR DEVE SER EM JSON VÁLIDO. SIGA RIGOROSAMENTE AS INSTRUÇÕES ABAIXO.
 
-BASEADO NO SEGUINTE EXTRATO DE DOCUMENTO:
+BASEADO NO SEGUINTE EXTRATO DE DOCUMENTO / CONTEÚDO DE REFERÊNCIA:
 {conteudo_pdf}
 
-GERE {total_perguntas} QUESTÕES DE PROVA SOBRE O ASSUNTO:
+GERE EXATAMENTE {total_perguntas} QUESTÕES DE PROVA DISTRIBUÍDAS NOS SEGUINTES TIPOS:
 {tipo_perguntas}
 
+DIRETRIZES E ESPECIFICAÇÕES DE CADA TIPO DE QUESTÃO:
 {info_extras}
 
-# INSTRUÇÕES DE FORMATO:
-- GERE O GABARITO DE TODAS
-- PARA AS DISSERTATIVAS, GERE O PADRÃO DE RESPOSTA ESPERADO        
-- FORMATE TODA A SAÍDA EM JSON COM A CHAVE "perguntas" E O VALOR SENDO UM ARRAY DE OBJETOS COM "tipo", "enunciado", "alternativa" E "resposta"
-- NÃO UTILIZE NENHUMA TAG HTML
-- AO GERAR AS ALTERNATIVAS, UTILIZE LETRAS PARA IDENTIFICAR CADA ALTERNATIVA
-- AS ALTERNATIVAS SEMPRE DEVEM CONTER O SEGUINTE FORMATO: "A) texto\n B) texto\n C) texto\n D) texto\n E) texto"
-- A CHAVE "alternativas" NO JSON SEMPRE DEVE SER UM ARRAY E NUNCA UM OBJETO
-- VOCÊ DEVE GERAR EXATAMENTE O NÚMERO DE QUESTÕES SOLICITADO
+# REGRAS OBRIGATÓRIAS DE ESTRUTURA E FORMATO JSON:
+1. Formate TODA a saída em um único objeto JSON com a chave `"perguntas"`, cujo valor é um array de objetos contendo EXATAMENTE as chaves:
+   - `"tipo"`: Nome exato do tipo de questão solicitado.
+   - `"enunciado"`: Texto do comando/enunciado da questão (para questões objetivas, NÃO coloque as alternativas A, B, C, D, E dentro de `"enunciado"`, coloque-as exclusivamente no array `"alternativas"`).
+   - `"alternativas"`: Array JSON de strings `["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."]`.
+     * ATENÇÃO: Para QUALQUER questão de múltipla escolha, objetiva, asserção-razão, análise de afirmativas ou verdadeiro/falso, a chave `"alternativas"` (no plural!) NUNCA pode ser vazia ou nula — ela DEVE conter todas as alternativas como elementos separados do array!
+     * Apenas para questões puramente dissertativas/abertas `"alternativas"` deve ser `[]`.
+   - `"resposta"`: Gabarito oficial. Para questões objetivas, indique claramente a letra correta seguida do texto da alternativa e uma breve justificativa (ex: `"B) Texto da alternativa B — Justificativa..."`). Para questões dissertativas, forneça o padrão de resposta esperado detalhado.
+2. NÃO utilize tags HTML fora de blocos de código.
+3. Gere EXATAMENTE as {total_perguntas} questões solicitadas.
 {format_instructions}
 
 IMPORTANTE - DE FORMA ALGUMA ADICIONE TEXTO FORA DO JSON.
@@ -450,72 +452,87 @@ def processar_edital_business_logic(edital_id, user=None):
         )
         return False
 
-def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None):
+def getQuestionsFromSource(file_path, qtPerguntas, infoExtras, user=None, assunto_nome=""):
     """
-    Nova Arquitetura Agnóstica (RAG In-Memory).
-    Extrai informações usando Banco Vetorial FAISS para evitar estouro de contexto
-    na criação de questões de prova em documentos extensos.
+    Gera questões de prova a partir de fontes PDF (com RAG FAISS e fallback automático
+    para texto direto caso o serviço de embeddings falhe) ou diretamente a partir do
+    Assunto e Diretrizes do professor caso nenhuma fonte PDF tenha sido selecionada.
     """
     totalPerguntas = sum(qtPerguntas.values())
-    textoPerguntas = "\n".join([f"{k};" for k in qtPerguntas])
-    
+    textoPerguntas = "\n".join([f'- {v} questão(ões) do tipo "{k}"' for k, v in qtPerguntas.items()])
+
     try:
-        # 1. Extrair e juntar texto bruto
-        completoTudo = ''
-        for fp in file_path:
-            conteudo_extraido = extrair_texto_pdf(fp[0])
-            completoTudo += "\n".join(conteudo_extraido) + "\n\n"
-            
-        # 2. Fragmentar em blocos de conhecimento semântico
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
-        docs = text_splitter.create_documents([completoTudo])
-        
-        # 3. Criação do Banco Vetorial e do Buscador (Retriever)
-        embeddings = get_embeddings()
-        vectorstore = FAISS.from_documents(docs, embeddings)
-        
-        # Traz os 6 chunks mais relevantes relacionados ao tema das perguntas
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
-        
-        # 4. Formatação da corrente LCEL
+        # 1. Extrair e juntar texto bruto das fontes PDF selecionadas (se houver)
+        completoTudo = ""
+        nomes_fontes = []
+        for fp in (file_path or []):
+            caminho = fp[0] if isinstance(fp, (list, tuple)) else fp
+            nome_f = fp[1] if isinstance(fp, (list, tuple)) and len(fp) > 1 else str(caminho)
+            if caminho and os.path.exists(str(caminho)):
+                conteudo_extraido = extrair_texto_pdf(caminho)
+                texto_arq = "\n".join(conteudo_extraido).strip()
+                if texto_arq:
+                    nomes_fontes.append(nome_f)
+                    completoTudo += f"=== FONTE: {nome_f} ===\n{texto_arq}\n\n"
+
+        # 2. Obter o trecho de conteúdo mais relevante (RAG FAISS com fallback direto resiliente)
+        conteudo_referencia = ""
+        if completoTudo.strip():
+            # Se o texto total cabe confortavelmente na janela de contexto (< 28.000 chars),
+            # passa direto sem risco de perder partes importantes ou falhar no embedding
+            if len(completoTudo) <= 28000:
+                conteudo_referencia = completoTudo
+            else:
+                try:
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1800, chunk_overlap=200)
+                    docs = text_splitter.create_documents([completoTudo])
+                    embeddings = get_embeddings()
+                    vectorstore = FAISS.from_documents(docs, embeddings)
+                    retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
+                    query_busca = f"Assunto: {assunto_nome}. {infoExtras or ''} {', '.join(qtPerguntas.keys())}".strip()
+                    docs_retrieved = retriever.invoke(query_busca)
+                    conteudo_referencia = "\n\n".join([d.page_content for d in docs_retrieved])
+                except Exception as emb_err:
+                    print(f"Aviso: Fallback de embeddings acionado ({emb_err}). Usando extrato direto do PDF.")
+                    conteudo_referencia = completoTudo[:28000]
+        else:
+            conteudo_referencia = (
+                f"Nenhuma fonte PDF anexada. Elabore as questões com rigor acadêmico sobre a disciplina/assunto: "
+                f"'{assunto_nome or 'Tema solicitado nas diretrizes'}', seguindo fielmente as diretrizes abaixo."
+            )
+
+        # 3. Execução do LLM com parser resiliente (evita falha se o LLM envolver JSON em ```json)
         prompt_template, parser = criar_template_questoes()
         llm = get_llm()
-        
-        def format_docs(docs_retrieved):
-            return "\n\n".join([d.page_content for d in docs_retrieved])
+        chain = prompt_template | llm
 
-        rag_chain = (
-            {
-                "conteudo_pdf": lambda x: format_docs(retriever.invoke(x["query"])),
-                "total_perguntas": lambda x: x["total_perguntas"],
-                "tipo_perguntas": lambda x: x["tipo_perguntas"],
-                "info_extras": lambda x: x["info_extras"],
-                "format_instructions": lambda x: x["format_instructions"]
-            }
-            | prompt_template
-            | llm
-            | parser
-        )
-        
-        # Monta a query para o Retriever puxar apenas a área do PDF relevante para as questões
-        query_busca = f"Conteúdo sobre: {', '.join(qtPerguntas.keys())}"
-        
         inputs = {
-            "query": query_busca,
+            "conteudo_pdf": conteudo_referencia,
             "total_perguntas": totalPerguntas,
-            "tipo_perguntas": textoPerguntas,
+            "tipo_perguntas": (
+                f"Assunto/Disciplina: {assunto_nome}\n{textoPerguntas}"
+                if assunto_nome
+                else textoPerguntas
+            ),
             "info_extras": infoExtras,
-            "format_instructions": parser.get_format_instructions()
+            "format_instructions": parser.get_format_instructions(),
         }
-        
-        response = invoke_chain(rag_chain, inputs, endpoint='getQuestionsFromSource', user=user)
-        print(response)
-        return json.dumps(response, ensure_ascii=False, indent=2)
-        
+
+        raw_response = invoke_chain(chain, inputs, endpoint="getQuestionsFromSource", user=user)
+        texto_resposta = extrair_texto_puro(raw_response.content if hasattr(raw_response, "content") else raw_response)
+        texto_limpo = re.sub(r"^```(?:json)?\s*|\s*```$", "", texto_resposta.strip())
+        parsed_data = extrair_json_da_resposta(texto_limpo)
+
+        # Caso o LLM tenha retornado uma lista direta de questões em vez de {"perguntas": [...]}
+        if isinstance(parsed_data, list):
+            parsed_data = {"perguntas": parsed_data}
+
+        return json.dumps(parsed_data, ensure_ascii=False, indent=2)
+
     except Exception as e:
         return json.dumps({
             "perguntas": [],
-            "erro": f"Erro ao gerar questões via RAG: {str(e)}"
+            "erro": f"Erro ao gerar questões com a IA: {str(e)}"
         }, ensure_ascii=False)
 
 
@@ -719,50 +736,553 @@ def extrair_texto_pdf(caminho_arquivo):
     except Exception as e:
         return [f"Erro na extração do PDF: {str(e)}"]
 
+def _limpar_prefixo_alternativa(texto: str) -> str:
+    return re.sub(r'^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\))\s*', '', (texto or '').strip()).strip()
+
+
+def _extrair_alternativas_de_texto_multiline(texto: str) -> tuple[str, list[str]]:
+    """
+    Se o LLM colocou as alternativas A) ... B) ... dentro do enunciado ou como uma única
+    string com quebras de linha, separa o enunciado limpo e a lista de alternativas.
+    """
+    if not texto:
+        return "", []
+    linhas = str(texto).splitlines()
+    linhas_enunciado = []
+    alts = []
+    inside_fence = False
+
+    for linha in linhas:
+        m = None if inside_fence else re.match(r'^\s*(?:\(([A-Ha-h])\)|([A-Ha-h])[\)\.\-:])\s*(.+)$', linha)
+        if m:
+            corpo = (m.group(3) or '').strip()
+            alts.append(corpo)
+        elif not alts:
+            linhas_enunciado.append(linha)
+        elif linha.strip() or inside_fence:
+            alts[-1] = (alts[-1] + "\n" + linha).strip()
+        fences = len(re.findall(r'```', linha))
+        if fences % 2 == 1:
+            inside_fence = not inside_fence
+
+    if len(alts) >= 2:
+        letras = "ABCDEFGH"
+        alts_formatadas = [f"{letras[idx]}) {_limpar_prefixo_alternativa(a)}" for idx, a in enumerate(alts[:8]) if _limpar_prefixo_alternativa(a)]
+        return "\n".join(linhas_enunciado).strip(), alts_formatadas
+    return str(texto).strip(), []
+
+
+def normalizar_alternativas_questao(raw_alts, enunciado_raw: str = "") -> tuple[str, list[str], list[str]]:
+    """
+    Normaliza alternativas vindas da IA em qualquer formato:
+      - Lista de strings: ["A) ...", "B) ..."] ou ["...", "..."]
+      - Dicionário: {"A": "...", "B": "..."}
+      - String única multiline ou inline: "A) ...\nB) ..."
+      - Embutidas ao final do próprio enunciado
+    Retorna: (enunciado_limpo, alternativas_com_prefixo, alternativas_sem_prefixo)
+    """
+    letras = "ABCDEFGH"
+    lista_bruta = []
+
+    if isinstance(raw_alts, dict):
+        for k in sorted(raw_alts.keys()):
+            val = str(raw_alts[k] or '').strip()
+            if val:
+                lista_bruta.append(val)
+    elif isinstance(raw_alts, str) and raw_alts.strip():
+        txt = raw_alts.strip()
+        # Tenta separar por padrão A) B) C) na mesma linha ou em várias linhas
+        partes = re.split(r'(?:^|\n|\s{2,})(?=\(?[A-Ha-h][\)\.\-:]\s+)', txt)
+        if len(partes) >= 2:
+            lista_bruta = [p.strip() for p in partes if p.strip()]
+        else:
+            lista_bruta = [l.strip() for l in txt.splitlines() if l.strip()]
+    elif isinstance(raw_alts, (list, tuple)):
+        for item in raw_alts:
+            if isinstance(item, dict):
+                txt_item = str(item.get("texto") or item.get("alternativa") or item.get("opcao") or "").strip()
+                if txt_item:
+                    lista_bruta.append(txt_item)
+            elif item is not None and str(item).strip():
+                txt_item = str(item).strip()
+                # Se a IA colocou todas as alternativas dentro de um único elemento da lista
+                if len(raw_alts) == 1 and "\n" in txt_item:
+                    _, extraidas = _extrair_alternativas_de_texto_multiline(txt_item)
+                    if len(extraidas) >= 2:
+                        lista_bruta.extend(extraidas)
+                        continue
+                lista_bruta.append(txt_item)
+
+    enunciado_limpo, alts_do_enunciado = _extrair_alternativas_de_texto_multiline(enunciado_raw)
+    if not lista_bruta and len(alts_do_enunciado) >= 2:
+        lista_bruta = alts_do_enunciado
+    elif lista_bruta and len(alts_do_enunciado) >= 2:
+        # Remove as alternativas duplicadas do enunciado
+        enunciado_raw = enunciado_limpo
+
+    alts_com_prefixo = []
+    alts_sem_prefixo = []
+    for item in lista_bruta:
+        limpo = _limpar_prefixo_alternativa(item)
+        if not limpo:
+            continue
+        idx = len(alts_com_prefixo)
+        if idx >= len(letras):
+            break
+        letra = letras[idx]
+        alts_com_prefixo.append(f"{letra}) {limpo}")
+        alts_sem_prefixo.append(limpo)
+
+    enunciado_final = enunciado_limpo if (len(alts_do_enunciado) >= 2 or alts_com_prefixo) else (enunciado_raw or "").strip()
+    return enunciado_final, alts_com_prefixo, alts_sem_prefixo
+
+
 def processarRespostaIA(resposta_ia):
+    """
+    Processa e normaliza o JSON retornado pelo LLM na geração de questões, garantindo que
+    qualquer questão objetiva/múltipla escolha tenha suas alternativas extraídas e estruturadas.
+    """
     try:
-        resposta_limpa = re.sub(r'^```json\n|\n```$', '', resposta_ia.strip())
-        return json.loads(resposta_limpa)
+        if isinstance(resposta_ia, dict):
+            dados = resposta_ia
+        else:
+            resposta_limpa = re.sub(r'^```(?:json)?\s*|\s*```$', '', (resposta_ia or '').strip())
+            dados = extrair_json_da_resposta(resposta_limpa)
+
+        if not isinstance(dados, dict):
+            return {"perguntas": []}
+
+        perguntas_raw = dados.get("perguntas")
+        if not isinstance(perguntas_raw, list):
+            return dados
+
+        from mimir.models import TiposDePergunta
+        tipos_db = list(TiposDePergunta.objects.all())
+
+        perguntas_normalizadas = []
+        for idx_q, q in enumerate(perguntas_raw, 1):
+            if not isinstance(q, dict):
+                continue
+
+            tipo_str = str(q.get("tipo") or q.get("tipo_pergunta") or "").strip()
+            enunciado_raw = str(q.get("enunciado") or q.get("pergunta") or "").strip()
+            resposta_raw = str(q.get("resposta") or q.get("gabarito") or "").strip()
+
+            # Captura alternativas independentemente da chave usada pela IA (alternativas, alternativa, opcoes, options)
+            raw_alts = (
+                q.get("alternativas")
+                if q.get("alternativas") is not None
+                else (
+                    q.get("alternativa")
+                    if q.get("alternativa") is not None
+                    else (q.get("opcoes") or q.get("options") or [])
+                )
+            )
+
+            enunciado_limpo, alts_com_prefixo, alts_sem_prefixo = normalizar_alternativas_questao(raw_alts, enunciado_raw)
+
+            # Vincula ao TiposDePergunta correspondente no banco
+            tipo_obj = None
+            for t in tipos_db:
+                if t.descricao.strip().lower() == tipo_str.lower():
+                    tipo_obj = t
+                    break
+            if not tipo_obj and tipo_str:
+                for t in tipos_db:
+                    if tipo_str.lower() in t.descricao.lower() or t.descricao.lower() in tipo_str.lower():
+                        tipo_obj = t
+                        break
+
+            eh_objetiva = bool(alts_com_prefixo) or (tipo_obj.is_objetiva if tipo_obj else any(
+                p in tipo_str.lower() for p in ["múltipla", "multipla", "objetiva", "alternativa", "escolha", "asserção", "assercao", "afirmativa", "verdadeiro"]
+            ))
+
+            # Se o tipo é objetivo mas a IA não enviou alternativas separadas, garante 5 espaços editáveis
+            if eh_objetiva and len(alts_com_prefixo) < 2:
+                qtd_padrao = tipo_obj.qtd_alternativas if tipo_obj else 5
+                letras = "ABCDEFGH"[:max(2, qtd_padrao)]
+                alts_com_prefixo = []
+                alts_sem_prefixo = []
+                for idx_l, l in enumerate(letras):
+                    txt_op = (
+                        _limpar_prefixo_alternativa(resposta_raw)
+                        if (idx_l == 0 and resposta_raw)
+                        else f"Opção {l} (edite o texto desta alternativa)"
+                    )
+                    alts_com_prefixo.append(f"{l}) {txt_op}")
+                    alts_sem_prefixo.append(txt_op)
+
+            # Identifica a letra correta (A-E) para pré-marcar no editor de revisão
+            letra_correta = "A"
+            if eh_objetiva and resposta_raw:
+                m_gab = re.match(r'^\s*(?:letra|alternativa|opção|resposta|gabarito)?\s*[:\-]?\s*\(?([A-Ha-h])(?:\b|[\)\.\-:])', resposta_raw, re.IGNORECASE)
+                if m_gab:
+                    letra_cand = m_gab.group(1).upper()
+                    if letra_cand in "ABCDEFGH"[:max(2, len(alts_com_prefixo))]:
+                        letra_correta = letra_cand
+                else:
+                    # Tenta casar pelo texto da alternativa
+                    resp_norm = _limpar_prefixo_alternativa(resposta_raw).lower()
+                    for i_alt, txt_alt in enumerate(alts_sem_prefixo):
+                        if txt_alt.lower() == resp_norm or (len(txt_alt) > 10 and txt_alt.lower() in resp_norm):
+                            letra_correta = "ABCDEFGH"[i_alt]
+                            break
+
+            perguntas_normalizadas.append({
+                "tipo": tipo_obj.descricao if tipo_obj else (tipo_str or "Múltipla Escolha"),
+                "tipo_id": tipo_obj.id if tipo_obj else "",
+                "is_objetiva": eh_objetiva,
+                "enunciado": enunciado_limpo,
+                "alternativas": alts_com_prefixo,
+                "alternativas_sem_prefixo": alts_sem_prefixo,
+                "letra_correta": letra_correta,
+                "resposta": resposta_raw,
+            })
+
+        dados["perguntas"] = perguntas_normalizadas
+        return dados
     except Exception as e:
         print(f"Erro ao processar resposta da IA: {str(e)}")
+        return {"perguntas": [], "erro": str(e)}
+
+
+def _reparar_json_string_llm(raw_json: str) -> str:
+    r"""
+    Repara problemas clássicos de JSON gerados por LLMs (Gemini / Ollama):
+      1. Quebras de linha literais (\n, \r) e tabulações (\t) não escapadas dentro de strings JSON.
+      2. Barras invertidas (\) inválidas em JSON (ex.: LaTeX \frac, regex \d, caminhos).
+      3. Aspas duplas internas não escapadas dentro de valores de texto/código.
+      4. Vírgulas sobrando antes de } ou ].
+    """
+    s = (raw_json or "").strip()
+    if not s:
+        return s
+
+    out = []
+    in_string = False
+    n = len(s)
+    i = 0
+
+    while i < n:
+        ch = s[i]
+        if not in_string:
+            if ch == '"':
+                in_string = True
+                out.append(ch)
+            else:
+                out.append(ch)
+            i += 1
+            continue
+
+        # Dentro de uma string JSON ("...")
+        if ch == '\\':
+            if i + 1 < n:
+                nxt = s[i + 1]
+                if nxt in ('"', '\\', '/', 'b', 'f', 'n', 'r', 't'):
+                    out.append('\\')
+                    out.append(nxt)
+                    i += 2
+                    continue
+                elif nxt == 'u' and i + 5 < n and all(c in '0123456789abcdefABCDEF' for c in s[i + 2:i + 6]):
+                    out.append(s[i:i + 6])
+                    i += 6
+                    continue
+            # Barra invertida solta (ex: \d, \s, \frac) -> escapa como \\
+            out.append('\\\\')
+            i += 1
+            continue
+
+        if ch == '\n':
+            out.append('\\n')
+            i += 1
+            continue
+        if ch == '\r':
+            i += 1
+            continue
+        if ch == '\t':
+            out.append('\\t')
+            i += 1
+            continue
+        if ord(ch) < 32:
+            out.append(' ')
+            i += 1
+            continue
+
+        if ch == '"':
+            # Verifica se esta aspa realmente fecha a string JSON (seguida de :, ,, }, ] após espaços)
+            j = i + 1
+            while j < n and s[j] in (' ', '\t', '\r', '\n'):
+                j += 1
+            if j >= n or s[j] in (':', ',', '}', ']'):
+                in_string = False
+                out.append('"')
+            else:
+                # Aspa dupla no meio do texto/código sem escape -> escapa como \"
+                out.append('\\"')
+            i += 1
+            continue
+
+        out.append(ch)
+        i += 1
+
+    reparado = "".join(out)
+    reparado = re.sub(r',\s*([\}\]])', r'\1', reparado)
+    return reparado
+
+
+def _normalizar_estrutura_raiz_perguntas(obj) -> dict | None:
+    """
+    Aceita qualquer variação de estrutura JSON retornada pelo LLM:
+      - {"perguntas": [...]}
+      - {"questoes": [...]} / {"questions": [...]} / {"itens": [...]}
+      - [{"enunciado": ...}, ...] (lista direta)
+      - {"tipo": ..., "enunciado": ..., "resposta": ...} (objeto de questão única)
+      - {"1": {"enunciado": ...}, "2": {"enunciado": ...}} (dicionário indexado)
+    """
+    if isinstance(obj, list):
+        validos = [x for x in obj if isinstance(x, dict) and (x.get("enunciado") or x.get("pergunta") or x.get("question") or x.get("texto"))]
+        if validos:
+            return {"perguntas": validos}
+        return None
+
+    if not isinstance(obj, dict):
+        return None
+
+    for chave_lista in ("perguntas", "questoes", "questões", "questions", "itens", "items", "dados", "data"):
+        val = obj.get(chave_lista)
+        if isinstance(val, list) and len(val) > 0:
+            return {"perguntas": val}
+        if isinstance(val, dict):
+            sub_vals = [v for v in val.values() if isinstance(v, dict)]
+            if sub_vals:
+                return {"perguntas": sub_vals}
+
+    # Caso o LLM tenha retornado um único objeto de questão direto na raiz
+    if obj.get("enunciado") or obj.get("pergunta") or obj.get("question") or obj.get("texto"):
+        return {"perguntas": [obj]}
+
+    # Caso o LLM tenha retornado {"questao_1": {...}, "questao_2": {...}}
+    valores_dict = [
+        v for v in obj.values()
+        if isinstance(v, dict) and (v.get("enunciado") or v.get("pergunta") or v.get("question") or v.get("texto"))
+    ]
+    if valores_dict:
+        return {"perguntas": valores_dict}
+
+    return None
+
+
+def _extrair_objetos_json_balanceados(texto: str) -> list[str]:
+    """
+    Varre o texto e extrai blocos JSON `{...}` balanceados (ignorando chaves dentro de strings),
+    permitindo recuperar questões individuais mesmo quando o JSON geral está truncado ou corrompido.
+    """
+    blocos = []
+    n = len(texto)
+    i = 0
+    while i < n:
+        if texto[i] == '{':
+            depth = 0
+            in_str = False
+            escape = False
+            start = i
+            j = i
+            while j < n:
+                c = texto[j]
+                if in_str:
+                    if escape:
+                        escape = False
+                    elif c == '\\':
+                        escape = True
+                    elif c == '"':
+                        in_str = False
+                else:
+                    if c == '"':
+                        in_str = True
+                    elif c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                        if depth == 0:
+                            blocos.append(texto[start:j + 1])
+                            break
+                j += 1
+            i = start + 1
+        else:
+            i += 1
+    return blocos
+
+
+def _extrair_perguntas_de_texto_markdown(texto: str) -> list[dict]:
+    """
+    Fallback final: caso o LLM (ex.: modelo local) tenha respondido em texto livre / Markdown
+    em vez de JSON, extrai as questões, alternativas A-E e gabaritos do texto.
+    """
+    linhas = [l.rstrip() for l in (texto or "").splitlines()]
+    if not linhas:
         return []
 
+    # Divide por cabeçalhos como "Questão 1", "1.", "### Pergunta 1"
+    blocos_q = re.split(
+        r'(?m)^(?:\s*#{1,4}\s*|\s*\*{1,2})?(?:Quest[ãa]o|Pergunta)\s+\d+[:\.\-\)\*]*\s*|^(?=\s*\d+[\.\)]\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ\[])',
+        texto,
+        flags=re.IGNORECASE,
+    )
+    blocos_q = [b.strip() for b in blocos_q if b and len(b.strip()) > 25]
+    if not blocos_q and len(texto.strip()) > 30:
+        blocos_q = [texto.strip()]
+
+    perguntas = []
+    for bloco in blocos_q:
+        # Procura linha de Gabarito / Resposta no final do bloco
+        m_gab = re.search(
+            r'(?mi)^\s*[\*\-_]*(?:Gabarito|Resposta(?:\s+correta|\s+esperada)?|Padr[ãa]o\s+de\s+resposta)[\*\-_]*\s*[:\-]\s*([\s\S]+)$',
+            bloco,
+        )
+        if m_gab:
+            resposta = m_gab.group(1).strip()
+            corpo_pergunta = bloco[:m_gab.start()].strip()
+        else:
+            resposta = "A"
+            corpo_pergunta = bloco.strip()
+
+        enunc_limpo, alts_extraidas = _extrair_alternativas_de_texto_multiline(corpo_pergunta)
+        if enunc_limpo:
+            perguntas.append({
+                "tipo": "Múltipla Escolha" if len(alts_extraidas) >= 2 else "Dissertativa",
+                "enunciado": enunc_limpo,
+                "alternativas": alts_extraidas,
+                "resposta": resposta,
+            })
+
+    return perguntas
+
+
 def extrair_json_da_resposta(texto):
+    """
+    Extrai e repara JSON retornado pelo LLM (objeto {"perguntas": [...]}, lista [...] ou
+    variações de chaves), tratando blocos markdown ```json, quebras de linha literais em
+    strings, aspas internas em código, barras invertidas e fallback Markdown.
+    """
+    norm_direto = _normalizar_estrutura_raiz_perguntas(texto)
+    if norm_direto:
+        return norm_direto
+
+    bruto = (str(texto or "")).strip()
+    if not bruto:
+        return {"perguntas": [], "erro": "A IA retornou uma resposta vazia."}
+
+    # 1. Tenta o parser nativo do LangChain primeiro
     try:
-        return json.loads(texto)
-    except json.JSONDecodeError:
-        match = re.search(r'\{[\s\S]*\}', texto)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                json_str = match.group()
-                json_str = re.sub(r',\s*}', '}', json_str)
-                json_str = re.sub(r',\s*]', ']', json_str)
+        parsed_lc = JsonOutputParser().parse(bruto)
+        norm_lc = _normalizar_estrutura_raiz_perguntas(parsed_lc)
+        if norm_lc:
+            return norm_lc
+    except Exception:
+        pass
+
+    # 2. Remove cercas markdown ```json ... ``` externas
+    limpo = re.sub(r'^\s*```(?:json)?\s*', '', bruto, flags=re.IGNORECASE)
+    limpo = re.sub(r'\s*```\s*$', '', limpo)
+
+    candidatos = [limpo]
+
+    idx_obj_ini = limpo.find('{')
+    idx_obj_fim = limpo.rfind('}')
+    idx_arr_ini = limpo.find('[')
+    idx_arr_fim = limpo.rfind(']')
+
+    if idx_obj_ini != -1 and idx_obj_fim > idx_obj_ini:
+        if idx_arr_ini != -1 and idx_arr_ini < idx_obj_ini and idx_arr_fim > idx_obj_fim:
+            candidatos.append(limpo[idx_arr_ini:idx_arr_fim + 1])
+        candidatos.append(limpo[idx_obj_ini:idx_obj_fim + 1])
+    elif idx_arr_ini != -1 and idx_arr_fim > idx_arr_ini:
+        candidatos.append(limpo[idx_arr_ini:idx_arr_fim + 1])
+
+    for cand in candidatos:
+        for tentativa in (cand, _reparar_json_string_llm(cand)):
+            for loader in (json.loads, ast.literal_eval):
                 try:
-                    return json.loads(json_str)
-                except:
+                    res = loader(tentativa)
+                    norm = _normalizar_estrutura_raiz_perguntas(res)
+                    if norm:
+                        return norm
+                except Exception:
                     pass
-        return {"perguntas": [], "erro": "Não foi possível processar o JSON"}
+
+    # 3. Extração de objetos JSON `{...}` individuais balanceados (caso o JSON externo tenha quebrado)
+    objetos_recuperados = []
+    for bloco_q in _extrair_objetos_json_balanceados(limpo):
+        if len(bloco_q) < 20 or ('"enunciado"' not in bloco_q and '"pergunta"' not in bloco_q and '"question"' not in bloco_q):
+            continue
+        for t_q in (bloco_q, _reparar_json_string_llm(bloco_q)):
+            try:
+                obj_q = json.loads(t_q)
+                if isinstance(obj_q, dict) and (obj_q.get("enunciado") or obj_q.get("pergunta") or obj_q.get("question")):
+                    # Evita adicionar o objeto raiz caso ele também tenha sido capturado sem lista válida
+                    if not isinstance(obj_q.get("perguntas"), list):
+                        objetos_recuperados.append(obj_q)
+                    break
+            except Exception:
+                continue
+
+    if objetos_recuperados:
+        return {"perguntas": objetos_recuperados}
+
+    # 4. Fallback de texto livre / Markdown (nunca falha se o LLM escreveu as questões fora de JSON)
+    perguntas_md = _extrair_perguntas_de_texto_markdown(limpo)
+    if perguntas_md:
+        return {"perguntas": perguntas_md}
+
+    return {"perguntas": [], "erro": "Não foi possível processar o formato retornado pelo modelo."}
+
 
 def construirTextoPerguntaCompleto(enunciado, tipo_pergunta, pergunta_id, post_data):
-    tipo_pergunta = tipo_pergunta.lower() if tipo_pergunta else ''
-    if 'múltipla' in tipo_pergunta.lower() or 'multipla' in tipo_pergunta.lower():
-        alternativas = []
-        prefixo = f'pergunta_{pergunta_id}'
-        i = 1
-        while True:
+    """
+    Constrói o texto completo da pergunta (`enunciado` + `A) ... B) ... C) ...`) ao salvar
+    perguntas geradas por IA ou formulários em lote.
+    Funciona para QUALQUER tipo de pergunta que possua alternativas preenchidas no POST
+    (não apenas tipos cujo nome contenha a palavra 'múltipla').
+    """
+    enunciado_base = (enunciado or "").strip()
+    prefixo = f'pergunta_{pergunta_id}'
+    modo_post = (post_data.get(f'{prefixo}_modo_questao') or '').strip().lower()
+
+    # Coleta alternativas enviadas como lista `pergunta_{id}_alternativa_item[]` ou indexadas `pergunta_{id}_alternativa_{i}`
+    alternativas_brutas = []
+    if hasattr(post_data, 'getlist'):
+        lista_items = post_data.getlist(f'{prefixo}_alternativa_item[]')
+        if lista_items:
+            alternativas_brutas = [x.strip() for x in lista_items if (x or '').strip()]
+
+    if not alternativas_brutas:
+        for i in range(1, 12):
             alternativa_key = f'{prefixo}_alternativa_{i}'
-            alternativa = post_data.get(alternativa_key, '').strip()
-            if not alternativa: break
-            alternativas.append(alternativa)
-            i += 1
-        if alternativas:
-            texto_pergunta = enunciado + "\n\n"
-            for j, alternativa in enumerate(alternativas, 1):
-                texto_pergunta += f"{alternativa}\n"
-            return texto_pergunta.strip()
-    return enunciado
+            val = (post_data.get(alternativa_key) or '').strip()
+            if val:
+                alternativas_brutas.append(val)
+
+    # Se o usuário explicitamente marcou como dissertativa no card de revisão, retorna apenas o enunciado
+    if modo_post == 'dissertativa':
+        return enunciado_base
+
+    if alternativas_brutas:
+        # Remove eventuais alternativas duplicadas que já estivessem no final do enunciado
+        enunciado_limpo, _ = _extrair_alternativas_de_texto_multiline(enunciado_base)
+        if enunciado_limpo:
+            enunciado_base = enunciado_limpo
+
+        letras = "ABCDEFGH"
+        linhas_alts = []
+        for idx, alt in enumerate(alternativas_brutas[:len(letras)]):
+            txt_limpo = _limpar_prefixo_alternativa(alt)
+            if txt_limpo:
+                linhas_alts.append(f"{letras[idx]}) {txt_limpo}")
+
+        if linhas_alts:
+            return f"{enunciado_base}\n\n" + "\n".join(linhas_alts)
+
+    return enunciado_base
 
 def processar_pdf_em_lotes(file_path, fileName, max_pages_per_batch=20):
     textos_por_lote = []

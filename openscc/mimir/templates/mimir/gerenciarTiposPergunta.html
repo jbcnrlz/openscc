@@ -1,0 +1,373 @@
+{% extends "mimirBase.html" %}
+
+{% block mainContent %}
+<div class="container py-4 mb-5">
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom gap-3">
+        <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-3 py-1 mb-2 fw-semibold">
+                <i class="fas fa-sliders-h me-1"></i> Motor Pedagógico & Estrutura de Questões
+            </span>
+            <h2 class="fw-bold text-dark mb-1">Gerenciar Tipos de Perguntas</h2>
+            <p class="text-muted small mb-0">
+                Cadastre novos formatos de questões (Múltipla Escolha, Asserção-Razão ENADE, Afirmativas I-II-III, V/F ou Dissertativas) e defina como o construtor manual e a IA devem estruturar as alternativas e o gabarito.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-outline-success btn-sm fw-bold">
+                <i class="fas fa-plus me-1"></i> Criar Questão Manual
+            </a>
+            <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary btn-sm fw-bold shadow-sm">
+                <i class="fas fa-robot me-1"></i> Gerar Questões com IA
+            </a>
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Banco de Questões
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Coluna Esquerda: Formulário Construtor de Tipo de Pergunta -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 1.25rem;">
+                <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold fs-6" id="tituloFormTipo">
+                        <i class="fas fa-plus-circle text-info me-2"></i>Cadastrar Novo Tipo de Pergunta
+                    </h5>
+                    <button type="button" id="btnResetFormTipo" class="btn btn-xs btn-outline-light d-none" onclick="resetarFormularioTipo()">
+                        + Novo Tipo
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Modelos Pedagógicos Prontos (1 Clique) -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">
+                            <i class="fas fa-magic text-primary me-1"></i>Modelos Pedagógicos Prontos (Clique para preencher):
+                        </label>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="aplicarPresetTipo('multipla_5')">
+                                Múltipla Escolha (A–E)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="aplicarPresetTipo('assercao_razao')">
+                                Asserção-Razão (ENADE)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="aplicarPresetTipo('afirmativas')">
+                                Afirmativas (I, II, III)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="aplicarPresetTipo('caso_objetivo')">
+                                Estudo de Caso (Obj.)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-success" onclick="aplicarPresetTipo('multipla_4')">
+                                Objetiva 4 Opções (A–D)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="aplicarPresetTipo('verdadeiro_falso')">
+                                Verdadeiro / Falso
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-warning text-dark" onclick="aplicarPresetTipo('dissertativa_conceitual')">
+                                Dissertativa Conceitual
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-warning text-dark" onclick="aplicarPresetTipo('dissertativa_pratica')">
+                                Dissertativa Prática / Código
+                            </button>
+                        </div>
+                    </div>
+
+                    <form method="post" id="formSalvarTipoPergunta">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="salvar_tipo">
+                        <input type="hidden" name="tipo_id" id="input_tipo_id" value="">
+                        <input type="hidden" name="formato" id="input_formato_tipo" value="objetiva">
+                        <input type="hidden" name="estilo" id="input_estilo_tipo" value="multipla_escolha">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">Nome / Descrição do Tipo de Pergunta <span class="text-danger">*</span></label>
+                            <input type="text" name="descricao" id="input_descricao_tipo" class="form-control" required
+                                   placeholder="Ex: Múltipla Escolha, Asserção-Razão (ENADE), Dissertativa Técnica..."
+                                   oninput="atualizarPreviewPromptTipo()">
+                        </div>
+
+                        <!-- Seletor Visual de Formato: Objetiva vs Dissertativa -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small d-block">Estrutura da Questão e do Gabarito <span class="text-danger">*</span></label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div id="cardFormatoObjetiva" class="p-2 rounded-3 border border-2 border-primary bg-primary bg-opacity-10 text-center"
+                                         style="cursor: pointer;" onclick="selecionarFormatoTipo('objetiva')">
+                                        <div class="fw-bold text-primary small">
+                                            <i class="fas fa-list-ol me-1"></i>Objetiva (Alternativas)
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.72rem;">Gera e salva opções A, B, C... e letra correta</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div id="cardFormatoDissertativa" class="p-2 rounded-3 border bg-white text-center"
+                                         style="cursor: pointer;" onclick="selecionarFormatoTipo('dissertativa')">
+                                        <div class="fw-bold text-dark small">
+                                            <i class="fas fa-align-left me-1"></i>Dissertativa (Aberta)
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.72rem;">Questão aberta com padrão de resposta</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quantidade de Alternativas (Exibido quando Objetiva) -->
+                        <div class="mb-3" id="boxQtdAlternativasTipo">
+                            <label class="form-label fw-bold small">Quantidade Padrão de Alternativas</label>
+                            <select name="qtd_alternativas" id="select_qtd_alternativas_tipo" class="form-select form-select-sm"
+                                    onchange="atualizarPreviewPromptTipo()">
+                                <option value="5" selected>5 alternativas — A, B, C, D, E (Padrão Universitário / ENEM / ENADE)</option>
+                                <option value="4">4 alternativas — A, B, C, D</option>
+                                <option value="3">3 alternativas — A, B, C</option>
+                                <option value="2">2 alternativas — A, B (Verdadeiro/Falso ou Certo/Errado)</option>
+                            </select>
+                            <div class="form-text" style="font-size: 0.75rem;">
+                                Ao gerar com IA ou criar manualmente usando este tipo, o Mimir criará e salvará automaticamente todas as alternativas.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">
+                                Instruções Pedagógicas para a IA (Prompt do Tipo) <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="instrucoes_limpas" id="textarea_instrucoes_tipo" rows="4" class="form-control form-control-sm" required
+                                      placeholder="Descreva como a IA deve elaborar questões deste tipo (ex: estrutura do enunciado, nível de contextualização, formato das proposições I e II, critérios do gabarito...)"
+                                      oninput="atualizarPreviewPromptTipo()"></textarea>
+                        </div>
+
+                        <!-- Preview da Diretriz Completa que será enviada ao LLM -->
+                        <div class="p-2 rounded bg-light border mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-bold text-secondary" style="font-size: 0.74rem;">
+                                    <i class="fas fa-terminal me-1"></i>Contrato Automático Enviado à IA:
+                                </span>
+                                <span class="badge bg-success" id="badgeResumoContratoIA" style="font-size: 0.68rem;">Salva Alternativas A–E</span>
+                            </div>
+                            <div id="previewContratoIA" class="text-muted font-monospace" style="font-size: 0.72rem; white-space: pre-line; max-height: 110px; overflow-y: auto;"></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm" id="btnSubmitFormTipo">
+                            <i class="fas fa-save me-1"></i> Salvar Tipo de Pergunta
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: Lista de Tipos Cadastrados -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-dark fs-6">
+                        <i class="fas fa-layer-group text-primary me-2"></i>Tipos de Perguntas Cadastrados ({{ tipos_pergunta|length }})
+                    </h5>
+                    <span class="badge bg-light text-dark border">Clique em Editar para ajustar qualquer tipo</span>
+                </div>
+                <div class="card-body p-3">
+                    <div class="d-flex flex-column gap-3">
+                        {% for tipo in tipos_pergunta %}
+                        <div class="border rounded-3 p-3 bg-white shadow-xs">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                <div>
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <h6 class="fw-bold text-dark mb-0">{{ tipo.descricao }}</h6>
+                                        {% if tipo.is_objetiva %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">
+                                            <i class="fas fa-list-ol me-1"></i>{{ tipo.resumo_formato }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-warning bg-opacity-10 text-dark border border-warning-subtle">
+                                            <i class="fas fa-align-left me-1"></i>{{ tipo.resumo_formato }}
+                                        </span>
+                                        {% endif %}
+                                        <span class="badge bg-light text-secondary border">
+                                            {{ tipo.total_questoes }} questão(ões) no banco
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2"
+                                            onclick="carregarTipoParaEdicao({{ tipo.id }})">
+                                        <i class="fas fa-edit me-1"></i> Editar
+                                    </button>
+                                    <form method="post" action="{% url 'mimir:excluirTipoPergunta' tipo.id %}" class="d-inline"
+                                          onsubmit="return confirm('Tem certeza que deseja excluir o tipo \'{{ tipo.descricao|escapejs }}\'?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2"
+                                                {% if tipos_pergunta|length <= 1 %}disabled{% endif %}>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="small text-secondary bg-light p-2 rounded border" style="white-space: pre-line;">{{ tipo.instrucoes_limpas|default:"Sem instruções adicionais." }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const TIPOS_META_MAP = {{ tipos_meta_json|safe }};
+
+const PRESETS_TIPOS = {
+    multipla_5: {
+        descricao: 'Múltipla Escolha',
+        formato: 'objetiva',
+        qtd_alternativas: 5,
+        estilo: 'multipla_escolha',
+        instrucoes: 'Elabore uma questão objetiva contextualizada contendo um texto-base claro, um comando preciso e 5 alternativas (A, B, C, D, E) plausíveis, sendo apenas uma inequivocamente correta. No gabarito, indique a letra correta e justifique tecnicamente.'
+    },
+    assercao_razao: {
+        descricao: 'Asserção-Razão (Padrão ENADE)',
+        formato: 'objetiva',
+        qtd_alternativas: 5,
+        estilo: 'assercao_razao',
+        instrucoes: 'Elabore uma questão no modelo ENADE de Asserção-Razão contendo duas proposições (I e II) no enunciado separadas pela palavra "PORQUE". Gere exatamente as 5 alternativas padronizadas: A) As asserções I e II são proposições verdadeiras, e a II é uma justificativa correta da I; B) As asserções I e II são proposições verdadeiras, mas a II não é uma justificativa correta da I; C) A asserção I é uma proposição verdadeira, e a II é uma proposição falsa; D) A asserção I é uma proposição falsa, e a II é uma proposição verdadeira; E) As asserções I e II são proposições falsas.'
+    },
+    afirmativas: {
+        descricao: 'Análise de Afirmativas (I, II, III)',
+        formato: 'objetiva',
+        qtd_alternativas: 5,
+        estilo: 'afirmativas',
+        instrucoes: 'Apresente no enunciado uma contextualização seguida de 3 ou 4 afirmativas numeradas em algarismos romanos (I, II, III, IV) e finalize o enunciado com "É correto o que se afirma em:". Nas 5 alternativas (A a E), apresente as combinações (ex: A) I e II, apenas; B) II e III, apenas; C) I, III e IV, apenas...).'
+    },
+    caso_objetivo: {
+        descricao: 'Estudo de Caso / Situação-Problema (Objetiva)',
+        formato: 'objetiva',
+        qtd_alternativas: 5,
+        estilo: 'estudo_caso_obj',
+        instrucoes: 'Apresente um cenário prático, caso clínico ou problema técnico realista no enunciado, exigindo tomada de decisão ou diagnóstico por parte do estudante, seguido de 5 alternativas (A a E) com condutas ou diagnósticos possíveis.'
+    },
+    multipla_4: {
+        descricao: 'Múltipla Escolha (4 Alternativas A–D)',
+        formato: 'objetiva',
+        qtd_alternativas: 4,
+        estilo: 'multipla_escolha',
+        instrucoes: 'Questão objetiva direta contendo 4 alternativas (A, B, C, D) e apenas uma alternativa correta comentada no gabarito.'
+    },
+    verdadeiro_falso: {
+        descricao: 'Verdadeiro ou Falso (Objetiva)',
+        formato: 'objetiva',
+        qtd_alternativas: 2,
+        estilo: 'verdadeiro_falso',
+        instrucoes: 'Apresente uma proposição conceitual ou técnica para julgamento em 2 alternativas: A) Verdadeiro (Certo) e B) Falso (Errado), justificando detalhadamente no gabarito.'
+    },
+    dissertativa_conceitual: {
+        descricao: 'Dissertativa',
+        formato: 'dissertativa',
+        qtd_alternativas: 0,
+        estilo: 'dissertativa_conceitual',
+        instrucoes: 'Questão aberta dissertativa que avalie capacidade analítica, articulação conceitual e argumentação crítica. Forneça no gabarito um padrão de resposta estruturado com os tópicos essenciais esperados do aluno.'
+    },
+    dissertativa_pratica: {
+        descricao: 'Dissertativa Prática / Resolução Técnica',
+        formato: 'dissertativa',
+        qtd_alternativas: 0,
+        estilo: 'dissertativa_pratica',
+        instrucoes: 'Questão aberta prática exigindo implementação de algoritmo/código, modelagem ou resolução passo a passo de um problema técnico. Inclua no gabarito a solução de referência e a rubrica de pontuação.'
+    }
+};
+
+function selecionarFormatoTipo(formato) {
+    document.getElementById('input_formato_tipo').value = formato;
+    const cardObj = document.getElementById('cardFormatoObjetiva');
+    const cardDiss = document.getElementById('cardFormatoDissertativa');
+    const boxQtd = document.getElementById('boxQtdAlternativasTipo');
+
+    if (formato === 'objetiva') {
+        cardObj.className = 'p-2 rounded-3 border border-2 border-primary bg-primary bg-opacity-10 text-center';
+        cardDiss.className = 'p-2 rounded-3 border bg-white text-center';
+        boxQtd.classList.remove('d-none');
+    } else {
+        cardDiss.className = 'p-2 rounded-3 border border-2 border-warning bg-warning bg-opacity-10 text-center';
+        cardObj.className = 'p-2 rounded-3 border bg-white text-center';
+        boxQtd.classList.add('d-none');
+    }
+    atualizarPreviewPromptTipo();
+}
+
+function aplicarPresetTipo(chave) {
+    const p = PRESETS_TIPOS[chave];
+    if (!p) return;
+    document.getElementById('input_descricao_tipo').value = p.descricao;
+    document.getElementById('input_estilo_tipo').value = p.estilo;
+    if (p.qtd_alternativas >= 2) {
+        document.getElementById('select_qtd_alternativas_tipo').value = String(p.qtd_alternativas);
+    }
+    document.getElementById('textarea_instrucoes_tipo').value = p.instrucoes;
+    selecionarFormatoTipo(p.formato);
+}
+
+function carregarTipoParaEdicao(tipoId) {
+    const meta = TIPOS_META_MAP[String(tipoId)];
+    if (!meta) return;
+    document.getElementById('input_tipo_id').value = meta.id;
+    document.getElementById('input_descricao_tipo').value = meta.descricao;
+    document.getElementById('input_estilo_tipo').value = meta.estilo || 'multipla_escolha';
+    if (meta.qtd_alternativas >= 2) {
+        document.getElementById('select_qtd_alternativas_tipo').value = String(meta.qtd_alternativas);
+    }
+    document.getElementById('textarea_instrucoes_tipo').value = meta.instrucoes_limpas || '';
+    selecionarFormatoTipo(meta.formato || 'objetiva');
+
+    document.getElementById('tituloFormTipo').innerHTML = `<i class="fas fa-edit text-warning me-2"></i>Editando: ${meta.descricao}`;
+    document.getElementById('btnSubmitFormTipo').innerHTML = `<i class="fas fa-check me-1"></i> Atualizar Tipo de Pergunta`;
+    document.getElementById('btnResetFormTipo').classList.remove('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetarFormularioTipo() {
+    document.getElementById('input_tipo_id').value = '';
+    document.getElementById('input_descricao_tipo').value = '';
+    document.getElementById('textarea_instrucoes_tipo').value = '';
+    document.getElementById('select_qtd_alternativas_tipo').value = '5';
+    selecionarFormatoTipo('objetiva');
+    document.getElementById('tituloFormTipo').innerHTML = `<i class="fas fa-plus-circle text-info me-2"></i>Cadastrar Novo Tipo de Pergunta`;
+    document.getElementById('btnSubmitFormTipo').innerHTML = `<i class="fas fa-save me-1"></i> Salvar Tipo de Pergunta`;
+    document.getElementById('btnResetFormTipo').classList.add('d-none');
+}
+
+function atualizarPreviewPromptTipo() {
+    const desc = (document.getElementById('input_descricao_tipo').value || 'Novo Tipo').trim();
+    const fmt = document.getElementById('input_formato_tipo').value;
+    const qtd = parseInt(document.getElementById('select_qtd_alternativas_tipo').value || '5', 10);
+    const instr = (document.getElementById('textarea_instrucoes_tipo').value || '').trim();
+    const badge = document.getElementById('badgeResumoContratoIA');
+    const preview = document.getElementById('previewContratoIA');
+
+    if (fmt === 'objetiva') {
+        const letras = 'ABCDEFGH'.slice(0, qtd).split('');
+        badge.className = 'badge bg-success';
+        badge.textContent = `Objetiva • Salva ${qtd} Alternativas (${letras[0]}–${letras[letras.length - 1]})`;
+        preview.textContent =
+            `[TIPO "${desc}" -> QUESTÃO OBJETIVA COM ${qtd} ALTERNATIVAS]\n` +
+            `• "alternativas": ["${letras.join(') ...", "')}) ..."]\n` +
+            `• "resposta": "${letras[0]}) Texto correto + justificativa"\n` +
+            (instr ? `• Diretriz: ${instr}` : '');
+    } else {
+        badge.className = 'badge bg-warning text-dark';
+        badge.textContent = 'Dissertativa • Questão Aberta';
+        preview.textContent =
+            `[TIPO "${desc}" -> QUESTÃO DISSERTATIVA ABERTA]\n` +
+            `• "alternativas": []\n` +
+            `• "resposta": "Espelho / Padrão de resposta esperado"\n` +
+            (instr ? `• Diretriz: ${instr}` : '');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', atualizarPreviewPromptTipo);
+</script>
+{% endblock %}

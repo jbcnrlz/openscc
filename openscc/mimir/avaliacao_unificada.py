@@ -193,16 +193,19 @@ def _extrair_letra_gabarito(gabarito_texto: str) -> str:
 
 def is_pergunta_objetiva(pergunta) -> bool:
     """
-    Identifica se uma instância de Pergunta é objetiva (Múltipla Escolha / V ou F)
-    pelo tipo cadastrado ou pela presença de alternativas A) B) C) no enunciado.
+    Identifica se uma instância de Pergunta é objetiva (Múltipla Escolha / V ou F / Asserção-Razão)
+    pelo tipo cadastrado (`tipoDePergunta.is_objetiva`) ou pela presença de alternativas A) B) C) no enunciado.
     """
+    texto = pergunta.get_texto_com_feedback() if hasattr(pergunta, "get_texto_com_feedback") else (pergunta.pergunta or "")
+    if re.search(r"(?m)^\s*\(?[A-Ha-h][\)\.\-]\s+", texto):
+        return True
+    if getattr(pergunta, "tipoDePergunta_id", None) and getattr(pergunta, "tipoDePergunta", None):
+        if hasattr(pergunta.tipoDePergunta, "is_objetiva"):
+            return bool(pergunta.tipoDePergunta.is_objetiva)
     desc = (pergunta.tipoDePergunta.descricao or "").lower() if getattr(pergunta, "tipoDePergunta_id", None) else ""
     if any(k in desc for k in ["dissertativa", "discursiva", "aberta", "técnica", "tecnica"]):
         return False
-    if any(k in desc for k in ["múltipla", "multipla", "objetiva", "multiple", "verdadeiro", "alternativa"]):
-        return True
-    texto = pergunta.get_texto_com_feedback() if hasattr(pergunta, "get_texto_com_feedback") else (pergunta.pergunta or "")
-    if re.search(r"(?m)^\s*[A-E][\)\.\-]\s+", texto):
+    if any(k in desc for k in ["múltipla", "multipla", "objetiva", "multiple", "verdadeiro", "alternativa", "asserção", "assercao", "afirmativa", "escolha"]):
         return True
     return False
 

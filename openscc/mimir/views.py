@@ -164,22 +164,37 @@ def home(request):
 @require_POST
 @login_required(login_url='/login')
 def saveQuestion(request):
+    garantir_tipos_pergunta_unificada()
     data = json.loads(request.body.decode('utf-8'))
-    perguntaData = json.loads(data['pergunta'])    
-    tpeg = TiposDePergunta.objects.get(descricao=perguntaData['tipo'])
+    perguntaData = json.loads(data['pergunta']) if isinstance(data.get('pergunta'), str) else (data.get('pergunta') or {})
+    tipo_nome = (perguntaData.get('tipo') or '').strip()
+    tpeg = (
+        TiposDePergunta.objects.filter(descricao__iexact=tipo_nome).first()
+        or TiposDePergunta.objects.filter(descricao__icontains=tipo_nome).first()
+        or TiposDePergunta.objects.first()
+    )
     ass = Assunto.objects.get(id=int(data['assunto']))
 
-    alternativasText = '' if 'alternativas' not in perguntaData.keys() else '\n'.join(perguntaData['alternativas'])
+    from commons.services import normalizar_alternativas_questao
+    enunciado_raw = (perguntaData.get('enunciado') or '').strip()
+    raw_alts = perguntaData.get('alternativas') or perguntaData.get('alternativa') or []
+    enunciado_limpo, alts_prefixadas, _ = normalizar_alternativas_questao(raw_alts, enunciado_raw)
+
+    texto_final = (
+        f"{enunciado_limpo}\n\n" + "\n".join(alts_prefixadas)
+        if alts_prefixadas
+        else enunciado_limpo
+    )
     peg = Pergunta(
-        assunto=ass, 
-        pergunta=perguntaData['enunciado'] + '\n' + alternativasText,
-        gabarito=perguntaData['resposta'],
-        tipoDePergunta=tpeg
+        assunto=ass,
+        pergunta=texto_final,
+        gabarito=(perguntaData.get('resposta') or 'A').strip(),
+        tipoDePergunta=tpeg,
     )
     peg.save()
     return JsonResponse({
         'status': 'success',
-        'message': 'Pergunta salva com sucesso!',              
+        'message': 'Pergunta salva com sucesso!',
     })
 
 @csrf_exempt
@@ -495,98 +510,153 @@ def listarPerguntas(request):
     perguntas = Pergunta.objects.all()
     return render(request, "mimir/listarPerguntas.html", {"perguntas": perguntas})
 
+def _serializar_tipos_pergunta_meta() -> tuple[list, str]:
+    """
+    Retorna a lista de TiposDePergunta e o JSON com seus metadados estruturados
+    (formato objetiva/dissertativa, quantidade de alternativas, estilo e instruções limpas).
+    """
+    garantir_tipos_pergunta_unificada()
+    tipos = list(TiposDePergunta.objects.all().order_by('id'))
+    mapa = {}
+    for t in tipos:
+        meta, instr = t.extrair_meta_e_instrucoes()
+        mapa[str(t.id)] = {
+            'id': t.id,
+            'descricao': t.descricao,
+            'formato': meta['formato'],
+            'is_objetiva': meta['is_objetiva'],
+            'qtd_alternativas': meta['qtd_alternativas'],
+            'estilo': meta['estilo'],
+            'resumo_formato': t.resumo_formato,
+            'instrucoes_limpas': instr,
+        }
+    return tipos, json.dumps(mapa, ensure_ascii=False)
+
+
 @csrf_exempt
 @login_required(login_url='/login')
 @acesso_mimir_requerido
 @grupo_requerido('Professor')
 def gerarPerguntas(request):
+    tipos_all, tipos_meta_json = _serializar_tipos_pergunta_meta()
     if request.method == 'POST':
-        form = GeracaoPerguntasForm(request.user, request.POST)
+        # Coleta as quantidades informadas para nunca perdê-las se houver erro
+        quantidades = {}
+        quantidades_raw = {}
+        tipos = TiposDePergunta.objects.all().order_by('id')
+        for tipo in tipos:
+            val_str = (request.POST.get(f'tipo_{tipo.id}', '0') or '0').strip()
+            quantidade = int(val_str) if val_str.isdigit() else 0
+            quantidades_raw[tipo.id] = quantidade
+            if quantidade > 0:
+                quantidades[tipo.descricao] = quantidade
+
+        # Permite criar um novo Assunto na hora caso o professor tenha digitado `novo_assunto_nome`
+        post_data = request.POST.copy()
+        novo_assunto_nome = (post_data.get('novo_assunto_nome') or '').strip()
+        if novo_assunto_nome:
+            novo_assunto_obj, _ = Assunto.objects.get_or_create(
+                user=request.user,
+                nome=novo_assunto_nome,
+            )
+            post_data['assunto'] = str(novo_assunto_obj.id)
+
+        form = GeracaoPerguntasForm(request.user, post_data)
+        context_retry = {
+            'form': form,
+            'tipos_pergunta': tipos,
+            'tipos_meta_json': tipos_meta_json,
+            'titulo': 'Gerar Perguntas com IA',
+            'quantidades_raw_json': json.dumps(quantidades_raw),
+        }
+
         if form.is_valid():
-            # Coletar dados do formulário
-            fontes_selecionadas = form.cleaned_data['fontes_selecionadas']
+            fontes_selecionadas = form.cleaned_data.get('fontes_selecionadas') or []
+            assunto = form.cleaned_data.get('assunto')
+            prompt_personalizado = (form.cleaned_data.get('prompt_personalizado') or '').strip()
+            nivel_dificuldade = form.cleaned_data.get('nivel_dificuldade') or 'medio'
+
+            if not assunto:
+                messages.error(request, 'Selecione um Assunto/Disciplina (ou digite o nome de um novo assunto) para classificar as questões.')
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
+
+            if not any(quantidades.values()):
+                messages.error(request, 'Defina a quantidade (maior que zero) em pelo menos um Tipo de Pergunta.')
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
 
             fontesPaths = []
             for ft in fontes_selecionadas:
-                fontesPaths.append([ft.fonte.path, ft.nome])
+                try:
+                    if ft.fonte and os.path.exists(ft.fonte.path):
+                        fontesPaths.append([ft.fonte.path, ft.nome])
+                except Exception:
+                    continue
 
-            assunto = form.cleaned_data['assunto']
-            prompt_personalizado = form.cleaned_data['prompt_personalizado']
-            nivel_dificuldade = form.cleaned_data['nivel_dificuldade']
-            contExtra = prompt_personalizado + '\n- AS QUESTÕES DEVEM SER DE NÍVEL ' + nivel_dificuldade.upper() + ' SEGUNDO A TAXONOMIA DE BLOOM\n'
-            
-            # Coletar quantidades por tipo
-            quantidades = {}
-            quantidades_raw = {} # Guardará os dados preenchidos para repopular em caso de erro 503
-            tipos = TiposDePergunta.objects.all()
-            
+            if not fontesPaths and not prompt_personalizado and not assunto:
+                messages.error(request, 'Selecione ao menos uma Fonte PDF ou informe o Assunto/Tópico para a geração.')
+                return render(request, 'mimir/gerarPerguntas.html', context_retry)
+
+            contExtra = (
+                f'DISCIPLINA / ASSUNTO: {assunto.nome}\n'
+                f'DIRETRIZES DO PROFESSOR: {prompt_personalizado or "Elaborar questões academicamente rigorosas sobre o tema."}\n'
+                f'- AS QUESTÕES DEVEM SER DE NÍVEL {nivel_dificuldade.upper()} SEGUNDO A TAXONOMIA DE BLOOM.\n'
+            )
+
             for tipo in tipos:
-                val_str = request.POST.get(f'tipo_{tipo.id}', '0')
-                quantidade = int(val_str) if val_str.isdigit() else 0
-                quantidades_raw[tipo.id] = quantidade
-                
-                if quantidade and quantidade > 0:
-                    quantidades[tipo.descricao] = quantidade
-                    contExtra += f'- {quantidade} QUESTÕES DO TIPO {tipo.descricao}\n'
-                    if tipo.textoParaLLM is not None:
-                        contExtra += tipo.textoParaLLM + '\n'
+                qtd_t = quantidades_raw.get(tipo.id, 0)
+                if qtd_t > 0:
+                    contExtra += f'\n=== GERAR EXATAMENTE {qtd_t} QUESTÃO(ÕES) DO TIPO "{tipo.descricao}" ===\n'
+                    contExtra += tipo.instrucoes_para_llm_completas() + '\n'
 
-            # Cria o Contexto de Recuperação Segura (State Backup)
-            import json
-            context_retry = {
-                'form': form,
-                'tipos_pergunta': tipos,
-                'titulo': 'Gerar Perguntas com IA',
-                'quantidades_raw_json': json.dumps(quantidades_raw)
-            }
-            
-            if not any(quantidades.values()):
-                messages.error(request, 'Selecione pelo menos uma quantidade de perguntas.')
-                return render(request, 'mimir/gerarPerguntas.html', context_retry)
-            
-            if not fontes_selecionadas:
-                messages.error(request, 'Selecione pelo menos uma fonte.')
-                return render(request, 'mimir/gerarPerguntas.html', context_retry)
-            
             try:
-                resposta_bruta = getQuestionsFromSource(fontesPaths, quantidades, contExtra, request.user)
+                resposta_bruta = getQuestionsFromSource(
+                    fontesPaths,
+                    quantidades,
+                    contExtra,
+                    user=request.user,
+                    assunto_nome=assunto.nome,
+                )
                 iaResposta = processarRespostaIA(resposta_bruta)
-                
-                # 1. Verifica se a API do LangChain retornou o erro empacotado no JSON
-                if isinstance(iaResposta, dict) and 'erro' in iaResposta:
-                    messages.warning(request, f"A IA não conseguiu completar a geração. Motivo: {iaResposta['erro']}. Seus dados estão salvos, tente novamente.")
-                    return render(request, 'mimir/gerarPerguntas.html', context_retry)
-                    
-                # 2. Verifica se a IA teve sobrecarga (503) e retornou vazio sem erro explícito
-                if not iaResposta or (isinstance(iaResposta, dict) and not iaResposta.get('perguntas')):
-                    messages.warning(request, "A API está enfrentando instabilidade (High Demand - Erro 503). Por favor, não mude de tela e clique em Gerar novamente.")
+
+                if isinstance(iaResposta, dict) and 'erro' in iaResposta and not iaResposta.get('perguntas'):
+                    messages.warning(
+                        request,
+                        f"A IA não conseguiu completar a geração: {iaResposta['erro']}. Suas configurações foram mantidas abaixo."
+                    )
                     return render(request, 'mimir/gerarPerguntas.html', context_retry)
 
-                # Se sucesso, avança para a próxima tela
+                if not iaResposta or (isinstance(iaResposta, dict) and not iaResposta.get('perguntas')):
+                    messages.warning(
+                        request,
+                        "O motor de IA retornou uma resposta vazia ou está temporariamente sobrecarregado (Erro 503). Clique em Gerar novamente — seus dados foram preservados."
+                    )
+                    return render(request, 'mimir/gerarPerguntas.html', context_retry)
+
                 context = {
                     'perguntas': iaResposta['perguntas'] if 'perguntas' in iaResposta else [],
-                    'assunto': assunto
+                    'assunto': assunto,
+                    'assuntos_usuario': Assunto.objects.filter(user=request.user).order_by('nome'),
+                    'tipos_pergunta': tipos,
+                    'tipos_meta_json': tipos_meta_json,
                 }
                 return render(request, 'mimir/perguntasGeradas.html', context)
-                
+
             except Exception as e:
-                messages.error(request, f"Falha de comunicação: {str(e)}")
+                messages.error(request, f"Falha de comunicação ao gerar questões: {str(e)}")
                 return render(request, 'mimir/gerarPerguntas.html', context_retry)
-                
+
         else:
-            messages.error(request, 'Por favor, corrija os erros no formulário.')
-            return render(request, 'mimir/gerarPerguntas.html', {
-                'form': form,
-                'tipos_pergunta': TiposDePergunta.objects.all(),
-                'titulo': 'Gerar Perguntas com IA'
-            })
+            erros_txt = "; ".join([f"{k}: {', '.join(v)}" for k, v in form.errors.items()])
+            messages.error(request, f"Verifique os campos do formulário ({erros_txt}).")
+            return render(request, 'mimir/gerarPerguntas.html', context_retry)
     else:
         form = GeracaoPerguntasForm(request.user)
-    
+
     context = {
         'form': form,
-        'tipos_pergunta': TiposDePergunta.objects.all(),
-        'titulo': 'Gerar Perguntas com IA'
+        'tipos_pergunta': tipos_all,
+        'tipos_meta_json': tipos_meta_json,
+        'titulo': 'Gerar Perguntas com IA',
     }
     return render(request, 'mimir/gerarPerguntas.html', context)
 
@@ -596,67 +666,106 @@ def gerarPerguntas(request):
 @grupo_requerido('Professor')
 def salvarPerguntasForm(request):
     if request.method == 'POST':
+        garantir_tipos_pergunta_unificada()
         perguntas_selecionadas_ids = request.POST.getlist('perguntas_selecionadas')
-        
+
         if not perguntas_selecionadas_ids:
             messages.error(request, 'Nenhuma pergunta foi selecionada para salvar.')
-            return redirect(request.META.get('HTTP_REFERER', 'minhas_perguntas'))
-        
+            return redirect(request.META.get('HTTP_REFERER', 'mimir:visualizarPerguntas'))
+
         perguntas_salvas_count = 0
         perguntas_com_erro = []
-        
-        # Processar cada pergunta selecionada
+
         for pergunta_id in perguntas_selecionadas_ids:
             try:
-                # Extrair dados específicos desta pergunta do POST
                 prefixo = f'pergunta_{pergunta_id}'
-                
+
                 enunciado = request.POST.get(f'{prefixo}_enunciado', '').strip()
                 resposta = request.POST.get(f'{prefixo}_resposta', '').strip()
                 assunto_id = request.POST.get(f'{prefixo}_assunto')
-                tipo_pergunta_nome = request.POST.get(f'{prefixo}_tipo_pergunta', '')
-                
-                # Validar campos obrigatórios
-                if not all([enunciado, resposta, assunto_id]):
-                    perguntas_com_erro.append(f"Pergunta {pergunta_id}: Campos obrigatórios faltando")
+                tipo_pergunta_id = (request.POST.get(f'{prefixo}_tipo_id') or '').strip()
+                tipo_pergunta_nome = (request.POST.get(f'{prefixo}_tipo_pergunta') or '').strip()
+                modo_questao = (request.POST.get(f'{prefixo}_modo_questao') or '').strip().lower()
+                letra_correta = (request.POST.get(f'{prefixo}_letra_correta') or '').strip().upper()
+
+                if not all([enunciado, assunto_id]):
+                    perguntas_com_erro.append(f"Pergunta #{pergunta_id}: Enunciado ou Assunto faltando.")
                     continue
-                
-                # Obter objetos relacionados
-                assunto = get_object_or_404(Assunto, id=assunto_id, user=request.user)
-                tipo_pergunta = get_object_or_404(TiposDePergunta, descricao=tipo_pergunta_nome)
-                
-                # Extrair alternativas se for múltipla escolha
-                pergunta_texto_completo = construirTextoPerguntaCompleto(
-                    enunciado, 
-                    tipo_pergunta_nome, 
-                    pergunta_id, 
-                    request.POST
+
+                assunto = (
+                    Assunto.objects.filter(id=assunto_id, user=request.user).first()
+                    or get_object_or_404(Assunto, id=assunto_id)
                 )
-                
-                # Criar a pergunta no banco de dados
-                pergunta = Pergunta.objects.create(
+
+                # Localiza o TiposDePergunta de forma resiliente (por ID, nome exato, nome parcial ou fallback)
+                tipo_pergunta = None
+                if tipo_pergunta_id.isdigit():
+                    tipo_pergunta = TiposDePergunta.objects.filter(id=int(tipo_pergunta_id)).first()
+                if not tipo_pergunta and tipo_pergunta_nome:
+                    tipo_pergunta = (
+                        TiposDePergunta.objects.filter(descricao__iexact=tipo_pergunta_nome).first()
+                        or TiposDePergunta.objects.filter(descricao__icontains=tipo_pergunta_nome).first()
+                    )
+                if not tipo_pergunta:
+                    tipos_padrao = garantir_tipos_pergunta_unificada()
+                    tipo_pergunta = (
+                        tipos_padrao['dissertativa']
+                        if modo_questao == 'dissertativa'
+                        else tipos_padrao['objetiva']
+                    )
+
+                # Monta o texto completo com as alternativas A) B) C) D) E)
+                pergunta_texto_completo = construirTextoPerguntaCompleto(
+                    enunciado,
+                    tipo_pergunta.descricao,
+                    pergunta_id,
+                    request.POST,
+                )
+
+                # Se for questão objetiva e tiver alternativas, garante que o gabarito contenha a letra correta e o texto
+                if modo_questao != 'dissertativa':
+                    from commons.services import _extrair_alternativas_de_texto_multiline, _limpar_prefixo_alternativa
+                    _, alts_extraidas = _extrair_alternativas_de_texto_multiline(pergunta_texto_completo)
+                    if alts_extraidas:
+                        mapa_alts = {}
+                        for a_str in alts_extraidas:
+                            m_l = re.match(r'^\s*([A-Ha-h])\)\s*(.+)$', a_str, re.DOTALL)
+                            if m_l:
+                                mapa_alts[m_l.group(1).upper()] = m_l.group(2).strip()
+                        if letra_correta and letra_correta in mapa_alts:
+                            txt_correta = mapa_alts[letra_correta]
+                            # Se a resposta atual já traz uma justificativa, preserva-a
+                            resp_limpa = _limpar_prefixo_alternativa(resposta)
+                            if resp_limpa and resp_limpa.lower() != txt_correta.lower() and txt_correta.lower() not in resp_limpa.lower():
+                                resposta = f"{letra_correta}) {txt_correta}\nJustificativa: {resp_limpa}"
+                            elif not resposta or not re.match(r'^\s*[A-Ha-h][\)\.\-:]', resposta):
+                                resposta = f"{letra_correta}) {txt_correta}"
+                        elif not resposta:
+                            resposta = f"A) {mapa_alts.get('A', '')}".strip()
+
+                if not resposta:
+                    resposta = "A" if tipo_pergunta.is_objetiva else "Padrão de resposta esperado."
+
+                Pergunta.objects.create(
                     assunto=assunto,
                     pergunta=pergunta_texto_completo,
                     gabarito=resposta,
-                    tipoDePergunta=tipo_pergunta
+                    tipoDePergunta=tipo_pergunta,
                 )
-                
                 perguntas_salvas_count += 1
-                
+
             except Exception as e:
-                perguntas_com_erro.append(f"Pergunta {pergunta_id}: {str(e)}")
+                perguntas_com_erro.append(f"Pergunta #{pergunta_id}: {str(e)}")
                 continue
-        
-        # Feedback para o usuário
+
         if perguntas_salvas_count > 0:
-            messages.success(request, f'✅ {perguntas_salvas_count} pergunta(s) salva(s) com sucesso!')
-        
+            messages.success(request, f'✅ {perguntas_salvas_count} pergunta(s) salva(s) com sucesso no Banco de Questões!')
+
         if perguntas_com_erro:
-            messages.warning(request, f'{len(perguntas_com_erro)} pergunta(s) não puderam ser salvas.')
-            # Log detalhado dos erros (opcional)
-            for erro in perguntas_com_erro[:3]:  # Mostrar apenas os 3 primeiros erros
+            messages.warning(request, f'{len(perguntas_com_erro)} pergunta(s) apresentaram erro ao salvar.')
+            for erro in perguntas_com_erro[:3]:
                 messages.info(request, erro)
-        
+
         return redirect('mimir:visualizarPerguntas')
 
 @login_required
@@ -719,16 +828,17 @@ def solicitarFeedbackPerguntaDireto(request, pergunta_id):
 
 def _normalizar_post_pergunta_objetiva(post_data):
     """
-    Se o formulário enviou `modo_questao == 'objetiva'` com a lista estruturada de
+    Se o formulário enviou `modo_questao == 'objetiva'` (ou se o `tipoDePergunta` selecionado
+    é objetivo e há itens em `alternativa_item[]`) com a lista estruturada de
     alternativas (`alternativa_item[]`) e a letra correta (`alternativa_correta_letra`),
     monta automaticamente os campos `pergunta` (enunciado + A) B) C) D) E)) e `gabarito`
     para manter compatibilidade total com `PerguntaForm`, impressão de provas e OMR.
     """
     mutable = post_data.copy()
     modo = (mutable.get('modo_questao') or '').strip().lower()
-    alternativas_raw = mutable.getlist('alternativa_item[]')
+    alternativas_raw = [x.strip() for x in mutable.getlist('alternativa_item[]') if (x or '').strip()]
 
-    if modo != 'objetiva' or not alternativas_raw:
+    if modo == 'dissertativa' or not alternativas_raw:
         return mutable
 
     letras = 'ABCDEFGH'
@@ -740,7 +850,7 @@ def _normalizar_post_pergunta_objetiva(post_data):
         if not txt:
             continue
         # Remove prefixo duplicado caso o usuário tenha digitado "A) " dentro da caixinha
-        txt = re.sub(r'^\s*[A-Ha-h][\)\.\-:]\s*', '', txt).strip()
+        txt = re.sub(r'^\s*(?:[A-Ha-h][\)\.\-:]|\([A-Ha-h]\))\s*', '', txt).strip()
         if not txt:
             continue
         idx = len(alternativas_limpas)
@@ -752,11 +862,10 @@ def _normalizar_post_pergunta_objetiva(post_data):
 
     enunciado_base = (mutable.get('enunciado_base_obj') or '').strip()
     if not enunciado_base:
-        # Extrai apenas a parte antes das alternativas do campo pergunta/pergunta_texto
         bruto = (mutable.get('pergunta') or mutable.get('pergunta_texto') or '').strip()
         linhas_base = []
         for linha in bruto.splitlines():
-            if re.match(r'^\s*[A-Ha-h][\)\.\-]\s+', linha):
+            if re.match(r'^\s*\(?[A-Ha-h][\)\.\-:]\s+', linha):
                 break
             linhas_base.append(linha)
         enunciado_base = "\n".join(linhas_base).strip()
@@ -766,7 +875,7 @@ def _normalizar_post_pergunta_objetiva(post_data):
         mutable['pergunta'] = texto_completo
         mutable['pergunta_texto'] = texto_completo
 
-    letra_correta = (mutable.get('alternativa_correta_letra') or '').strip().upper()
+    letra_correta = (mutable.get('alternativa_correta_letra') or 'A').strip().upper()
     justificativa = (mutable.get('gabarito_justificativa_obj') or '').strip()
 
     if letra_correta and letra_correta in mapa_letra_texto:
@@ -867,9 +976,12 @@ def editarPergunta(request, pID):
     else:
         form = PerguntaForm(request.user, instance=pergunta)
 
+    tipos_all, tipos_meta_json = _serializar_tipos_pergunta_meta()
     return render(request, 'mimir/editarPergunta.html', {
         'form': form,
         'pergunta': pergunta,
+        'tipos_pergunta': tipos_all,
+        'tipos_meta_json': tipos_meta_json,
         'titulo': f'Editar Pergunta #{pergunta.id}'
     })
 
@@ -2761,10 +2873,170 @@ def criarPergunta(request):
             initial_data['tipoDePergunta'] = request.GET.get('tipo')
         form = PerguntaForm(request.user, initial=initial_data)
 
+    tipos_all, tipos_meta_json = _serializar_tipos_pergunta_meta()
     return render(request, 'mimir/criarPergunta.html', {
         'form': form,
+        'tipos_pergunta': tipos_all,
+        'tipos_meta_json': tipos_meta_json,
         'titulo': 'Criar Nova Pergunta'
     })
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def gerenciarTiposPergunta(request):
+    """
+    Estúdio de Gestão de Tipos de Perguntas (TiposDePergunta).
+    Permite cadastrar, editar e excluir tipos personalizados (Objetivas com N alternativas,
+    Asserção-Razão, Análise de Afirmativas, Verdadeiro/Falso, Dissertativas, etc.) com
+    modelos pedagógicos prontos e instruções estruturadas para a IA.
+    """
+    garantir_tipos_pergunta_unificada()
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or 'salvar_tipo').strip()
+        tipo_id = (request.POST.get('tipo_id') or '').strip()
+        descricao = (request.POST.get('descricao') or '').strip()
+        formato = (request.POST.get('formato') or 'objetiva').strip().lower()
+        qtd_alternativas = request.POST.get('qtd_alternativas') or '5'
+        estilo = (request.POST.get('estilo') or 'multipla_escolha').strip()
+        instrucoes_limpas = (request.POST.get('instrucoes_limpas') or '').strip()
+
+        if acao == 'salvar_tipo':
+            if not descricao:
+                messages.error(request, 'Informe o nome/descrição do Tipo de Pergunta.')
+            else:
+                texto_empacotado = TiposDePergunta.empacotar_texto_para_llm(
+                    instrucoes_limpas=instrucoes_limpas,
+                    formato=formato,
+                    qtd_alternativas=int(qtd_alternativas) if str(qtd_alternativas).isdigit() else 5,
+                    estilo=estilo,
+                )
+                if tipo_id.isdigit():
+                    tipo_obj = get_object_or_404(TiposDePergunta, id=int(tipo_id))
+                    tipo_obj.descricao = descricao
+                    tipo_obj.textoParaLLM = texto_empacotado
+                    tipo_obj.save()
+                    messages.success(request, f'Tipo de pergunta "{tipo_obj.descricao}" atualizado com sucesso!')
+                else:
+                    tipo_obj = TiposDePergunta.objects.create(
+                        descricao=descricao,
+                        textoParaLLM=texto_empacotado,
+                    )
+                    messages.success(request, f'Novo tipo de pergunta "{tipo_obj.descricao}" cadastrado com sucesso!')
+                return redirect('mimir:gerenciarTiposPergunta')
+
+    tipos_qs = TiposDePergunta.objects.annotate(total_questoes=Count('pergunta')).order_by('id')
+    _, tipos_meta_json = _serializar_tipos_pergunta_meta()
+
+    return render(request, 'mimir/gerenciarTiposPergunta.html', {
+        'tipos_pergunta': tipos_qs,
+        'tipos_meta_json': tipos_meta_json,
+        'titulo': 'Gerenciar Tipos de Perguntas',
+    })
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+@require_POST
+def salvarTipoPerguntaAjax(request):
+    """
+    Cria ou atualiza um TiposDePergunta via AJAX (a partir do modal rápido nas telas
+    de Criar/Editar Pergunta e Gerar Perguntas com IA) e retorna os metadados para
+    atualizar o select imediatamente sem recarregar a página.
+    """
+    descricao = (request.POST.get('descricao') or '').strip()
+    formato = (request.POST.get('formato') or 'objetiva').strip().lower()
+    qtd_raw = request.POST.get('qtd_alternativas') or '5'
+    qtd_alt = int(qtd_raw) if str(qtd_raw).isdigit() else 5
+    estilo = (request.POST.get('estilo') or 'multipla_escolha').strip()
+    instrucoes = (request.POST.get('instrucoes_limpas') or '').strip()
+    tipo_id = (request.POST.get('tipo_id') or '').strip()
+
+    if not descricao:
+        return JsonResponse({'success': False, 'message': 'Informe o nome do Tipo de Pergunta.'}, status=400)
+
+    texto_empacotado = TiposDePergunta.empacotar_texto_para_llm(
+        instrucoes_limpas=instrucoes,
+        formato=formato,
+        qtd_alternativas=qtd_alt,
+        estilo=estilo,
+    )
+
+    if tipo_id.isdigit():
+        tipo_obj = get_object_or_404(TiposDePergunta, id=int(tipo_id))
+        tipo_obj.descricao = descricao
+        tipo_obj.textoParaLLM = texto_empacotado
+        tipo_obj.save()
+    else:
+        existente = TiposDePergunta.objects.filter(descricao__iexact=descricao).first()
+        if existente:
+            existente.textoParaLLM = texto_empacotado
+            existente.save()
+            tipo_obj = existente
+        else:
+            tipo_obj = TiposDePergunta.objects.create(
+                descricao=descricao,
+                textoParaLLM=texto_empacotado,
+            )
+
+    meta, instr_limpa = tipo_obj.extrair_meta_e_instrucoes()
+    return JsonResponse({
+        'success': True,
+        'message': f'Tipo "{tipo_obj.descricao}" salvo com sucesso!',
+        'tipo': {
+            'id': tipo_obj.id,
+            'descricao': tipo_obj.descricao,
+            'formato': meta['formato'],
+            'is_objetiva': meta['is_objetiva'],
+            'qtd_alternativas': meta['qtd_alternativas'],
+            'estilo': meta['estilo'],
+            'resumo_formato': tipo_obj.resumo_formato,
+            'instrucoes_limpas': instr_limpa,
+        }
+    })
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+@require_POST
+def excluirTipoPergunta(request, tipo_id):
+    """
+    Exclui um TiposDePergunta. Caso existam perguntas vinculadas, reatribui-as para
+    o tipo padrão compatível (Múltipla Escolha ou Dissertativa) para não perder questões do banco.
+    """
+    tipo_obj = get_object_or_404(TiposDePergunta, id=tipo_id)
+    if TiposDePergunta.objects.count() <= 1:
+        messages.warning(request, 'Não é possível excluir o único tipo de pergunta do sistema.')
+        return redirect('mimir:gerenciarTiposPergunta')
+
+    nome_excluido = tipo_obj.descricao
+    era_objetiva = tipo_obj.is_objetiva
+    qtd_vinculadas = Pergunta.objects.filter(tipoDePergunta=tipo_obj).count()
+
+    if qtd_vinculadas > 0:
+        outros = TiposDePergunta.objects.exclude(id=tipo_obj.id)
+        substituto = None
+        for cand in outros:
+            if cand.is_objetiva == era_objetiva:
+                substituto = cand
+                break
+        if not substituto:
+            substituto = outros.first()
+        Pergunta.objects.filter(tipoDePergunta=tipo_obj).update(tipoDePergunta=substituto)
+        tipo_obj.delete()
+        messages.success(
+            request,
+            f'Tipo "{nome_excluido}" excluído. As {qtd_vinculadas} questão(ões) vinculada(s) foram migradas para "{substituto.descricao}".'
+        )
+    else:
+        tipo_obj.delete()
+        messages.success(request, f'Tipo de pergunta "{nome_excluido}" excluído com sucesso!')
+
+    return redirect('mimir:gerenciarTiposPergunta')
 
 @login_required
 @acesso_mimir_requerido

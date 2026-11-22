@@ -1,211 +1,307 @@
 {% extends 'mimirBase.html' %}
 
 {% block mainContent %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between py-3">
-                    <h4 class="card-title mb-0 fs-5">
-                        <i class="fas fa-robot me-2"></i> {{ titulo }}
-                    </h4>
-                    <span class="badge bg-light text-primary fw-bold px-3 py-2">Mimir Question Engine</span>
-                </div>
-                <div class="card-body p-4">
-                    <form method="post" id="formGeracao">
-                        {% csrf_token %}
-                        
-                        <ul class="nav nav-pills nav-justified mb-4 border-bottom pb-2" id="formTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active fw-bold py-2" id="config-tab" data-bs-toggle="tab" data-bs-target="#tab-config" type="button" role="tab">
-                                    <i class="fas fa-sliders-h me-2"></i>1. Parâmetros da Prova
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link fw-bold py-2" id="quantidades-tab" data-bs-toggle="tab" data-bs-target="#tab-quantidades" type="button" role="tab">
-                                    <i class="fas fa-list-ol me-2"></i>2. Tipos e Quantidades
-                                    <span id="total-badge-tab" class="badge bg-secondary ms-1">0</span>
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link fw-bold py-2" id="fontes-tab" data-bs-toggle="tab" data-bs-target="#tab-fontes" type="button" role="tab">
-                                    <i class="fas fa-book me-2"></i>3. Fontes de Referência
-                                    <span class="badge bg-secondary ms-1" id="count-fontes">0</span>
-                                </button>
-                            </li>
-                        </ul>
+<div class="container-fluid px-4 py-4 mb-5">
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom gap-3">
+        <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-3 py-1 mb-1 fw-semibold">
+                <i class="fas fa-robot me-1"></i> Mimir Question Engine (RAG + IA Estruturada)
+            </span>
+            <h2 class="fw-bold text-dark mb-0">{{ titulo }}</h2>
+            <p class="text-muted small mb-0">
+                Configure a disciplina, escolha a quantidade de questões por tipo (Objetivas A–E, Asserção-Razão, Dissertativas...) e selecione as fontes PDF ou diretrizes temáticas.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'mimir:gerenciarTiposPergunta' %}" class="btn btn-outline-dark btn-sm fw-bold">
+                <i class="fas fa-sliders-h me-1"></i> Gerenciar Tipos de Perguntas
+            </a>
+            <a href="{% url 'mimir:criarPergunta' %}" class="btn btn-outline-success btn-sm fw-bold">
+                <i class="fas fa-plus me-1"></i> Criar Questão Manual
+            </a>
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Banco de Questões
+            </a>
+        </div>
+    </div>
 
-                        <div class="tab-content min-vh-50" id="formTabsContent">
-                            
-                            <div class="tab-pane fade show active" id="tab-config" role="tabpanel">
-                                <div class="bg-light p-4 rounded-3 border mb-4">
-                                    <h5 class="text-dark fw-bold mb-3 small text-uppercase tracking-wider">
-                                        <i class="fas fa-cog text-primary me-2"></i>Escopo Pedagógico
-                                    </h5>
-                                    
-                                    <div class="row g-3 mb-3">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="{{ form.assunto.id_for_label }}" class="form-label fw-bold text-secondary">
-                                                    {{ form.assunto.label }} *
-                                                </label>
-                                                {{ form.assunto }}
-                                                {% if form.assunto.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.assunto.errors }}</div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="{{ form.nivel_dificuldade.id_for_label }}" class="form-label fw-bold text-secondary">
-                                                    Nível de Dificuldade *
-                                                </label>
-                                                {{ form.nivel_dificuldade }}
-                                            </div>
-                                        </div>
-                                    </div>
+    <!-- Mensagens de Erro / Aviso (Antes estavam ocultas e não apareciam na tela!) -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm mb-4" role="alert">
+                <i class="fas fa-info-circle me-1"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" id="formGeracao">
+        {% csrf_token %}
+        <div class="row g-4">
+            <!-- Coluna Principal (Passos 1, 2 e 3 visíveis na mesma tela sem abas travadas) -->
+            <div class="col-lg-8">
+
+                <!-- 1. Escopo Pedagógico: Assunto, Dificuldade e Diretrizes -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0 fw-bold text-dark fs-6">
+                            <i class="fas fa-graduation-cap text-primary me-2"></i>1. Assunto (Disciplina), Nível e Diretrizes
+                        </h5>
+                        <button type="button" class="btn btn-xs btn-outline-primary fw-semibold"
+                                onclick="alternarCriacaoRapidaAssunto()">
+                            <i class="fas fa-plus-circle me-1"></i>+ Criar Novo Assunto
+                        </button>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.assunto.id_for_label }}" class="form-label fw-bold small text-dark mb-1">
+                                    Assunto / Disciplina <span class="text-danger">*</span>
+                                </label>
+                                <div id="boxSelectAssuntoExistente">
+                                    {{ form.assunto }}
                                 </div>
-                                
-                                <div class="bg-light p-4 rounded-3 border">
-                                    <h5 class="text-dark fw-bold mb-3 small text-uppercase tracking-wider">
-                                        <i class="fas fa-pen-fancy text-primary me-2"></i>Diretrizes Customizadas
-                                    </h5>
-                                    <div class="mb-2">
-                                        <label for="{{ form.prompt_personalizado.id_for_label }}" class="form-label fw-bold text-secondary">
-                                            {{ form.prompt_personalizado.label }} (Opcional)
-                                        </label>
-                                        {{ form.prompt_personalizado }}
-                                    </div>
-                                    <div class="form-text text-muted">
-                                        <i class="fas fa-info-circle me-1"></i> Adicione restrições à IA (Ex: "Gere apenas alternativas curtas", "Foque em cenários clínicos ambulatoriais").
-                                    </div>
-                                </div>
-
-                                <div class="text-end mt-4">
-                                    <button type="button" class="btn btn-primary px-4 shadow-sm" onclick="switchTab('quantidades-tab')">
-                                        Avançar para Quantidades <i class="fas fa-arrow-right ms-2"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="tab-pane fade" id="tab-quantidades" role="tabpanel">
-                                <div class="alert alert-light border mb-4 d-flex justify-content-between align-items-center py-3 px-4">
-                                    <div class="text-secondary small mb-0">
-                                        <i class="fas fa-info-circle text-primary me-2"></i> Defina pelo menos uma quantidade maior que zero para os tipos abaixo.
-                                    </div>
-                                    <div>
-                                        <span class="text-muted small me-2">Total Acumulado:</span>
-                                        <span id="total-perguntas" class="badge bg-danger fs-6 px-3 py-2">0</span>
-                                    </div>
-                                </div>
-
-                                <div class="row g-3">
-                                    {% for tipo in tipos_pergunta %}
-                                    <div class="col-md-6 col-lg-4">
-                                        <div class="card border shadow-sm p-3 h-100 bg-white">
-                                            <label for="id_tipo_{{ tipo.id }}" class="form-label fw-bold text-dark small mb-2">
-                                                {{ tipo.descricao }}
-                                            </label>
-                                            <div class="input-group">
-                                                <span class="input-group-text bg-light text-muted"><i class="fas fa-list-numeric"></i></span>
-                                                <input type="number" 
-                                                       name="tipo_{{ tipo.id }}" 
-                                                       id="id_tipo_{{ tipo.id }}"
-                                                       class="form-control quantidade-input font-monospace fw-bold text-center" 
-                                                       min="0" max="50" value="0">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {% empty %}
-                                    <div class="col-12">
-                                        <div class="alert alert-warning">
-                                            Nenhum tipo de pergunta cadastrado no sistema.
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-
-                                <div class="d-flex justify-content-between mt-5">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="switchTab('config-tab')">
-                                        <i class="fas fa-arrow-left me-2"></i> Voltar
-                                    </button>
-                                    <button type="button" class="btn btn-primary px-4" onclick="switchTab('fontes-tab')">
-                                        Avançar para Fontes <i class="fas fa-arrow-right ms-2"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="tab-pane fade" id="tab-fontes" role="tabpanel">
-                                <div class="card border mb-3">
-                                    {% if form.fontes_selecionadas.field.queryset.exists or form.fontes_selecionadas %}
-                                        <div class="card-header bg-light py-2">
-                                            <div class="input-group">
-                                                <span class="input-group-text bg-white border-end-0 text-muted">
-                                                    <i class="fas fa-search"></i>
-                                                </span>
-                                                <input type="text" id="searchFontes" class="form-control border-start-0" placeholder="Filtrar fontes pelo nome ou descrição...">
-                                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFontes">Limpar</button>
-                                            </div>
-                                        </div>
-                                        
-                                        {% if form.fontes_selecionadas.errors %}
-                                            <div class="alert alert-danger m-3 mb-0">
-                                                {{ form.fontes_selecionadas.errors }}
-                                            </div>
-                                        {% endif %}
-
-                                        <div class="card-body p-0 list-container" id="containerFontes">
-                                            <div class="p-3 grid-checkboxes">
-                                                {% for fonte in form.fontes_selecionadas %}
-                                                    <label for="{{ fonte.id_for_label }}">
-                                                        {{ fonte.tag }}
-                                                        <span>{{ fonte.choice_label }}</span>
-                                                    </label>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    {% else %}
-                                        <div class="card-body text-center py-5">
-                                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-                                            <h5>Nenhuma fonte cadastrada</h5>
-                                            <p class="text-muted small">Adicione arquivos PDFs no banco de fontes antes de prosseguir.</p>
-                                            <a href="{% url 'mimir:visualizarFontes' %}" class="btn btn-sm btn-primary">
-                                                <i class="fas fa-plus me-1"></i> Cadastrar Nova Fonte
-                                            </a>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <div class="d-flex justify-content-between mt-4">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="switchTab('quantidades-tab')">
-                                        <i class="fas fa-arrow-left me-2"></i> Voltar
-                                    </button>
-                                    <div class="d-flex gap-2">
-                                        <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary px-4">
-                                            Cancelar
-                                        </a>
-                                        <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm" id="submitButton">
-                                            <i class="fas fa-magic me-2"></i> Gerar Perguntas com IA
+                                <div id="boxInputNovoAssunto" class="d-none mt-2">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-primary text-white fw-bold">Novo Assunto</span>
+                                        <input type="text" name="novo_assunto_nome" id="inputNovoAssuntoNome"
+                                               class="form-control"
+                                               placeholder="Digite o nome da nova disciplina/assunto..."
+                                               oninput="atualizarPainelResumoGeracao()">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="alternarCriacaoRapidaAssunto(false)">
+                                            Usar Existente
                                         </button>
                                     </div>
+                                    <small class="text-primary d-block mt-1">
+                                        O Mimir criará este assunto automaticamente ao iniciar a geração.
+                                    </small>
                                 </div>
+                                {% if form.assunto.errors %}
+                                    <div class="text-danger small mt-1">{{ form.assunto.errors }}</div>
+                                {% endif %}
                             </div>
 
+                            <div class="col-md-6">
+                                <label for="{{ form.nivel_dificuldade.id_for_label }}" class="form-label fw-bold small text-dark mb-1">
+                                    Nível de Complexidade (Taxonomia de Bloom) <span class="text-danger">*</span>
+                                </label>
+                                {{ form.nivel_dificuldade }}
+                            </div>
                         </div>
-                    </form>
+
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-1">
+                                <label for="{{ form.prompt_personalizado.id_for_label }}" class="form-label fw-bold small text-dark mb-0">
+                                    Tópico Específico / Diretrizes Customizadas para a IA (Opcional)
+                                </label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="button" class="btn btn-xs btn-light border text-secondary"
+                                            onclick="adicionarChipPrompt('Contextualize cada questão com um estudo de caso ou situação-problema prática.')">
+                                        + Caso Prático
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-light border text-secondary"
+                                            onclick="adicionarChipPrompt('Inclua trechos de código-fonte formatados com ```linguagem para análise do aluno.')">
+                                        + Com Código Fonte
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-light border text-secondary"
+                                            onclick="adicionarChipPrompt('Elabore distratores plausíveis nas alternativas A-E e justifique detalhadamente o gabarito.')">
+                                        + Distratores Rigorosos
+                                    </button>
+                                </div>
+                            </div>
+                            {{ form.prompt_personalizado }}
+                        </div>
+                    </div>
                 </div>
+
+                <!-- 2. Tipos de Questões e Quantidades -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h5 class="mb-0 fw-bold text-dark fs-6">
+                                <i class="fas fa-list-ol text-success me-2"></i>2. Tipos de Questões e Quantidades
+                            </h5>
+                            <small class="text-muted">Use os botões <strong>-</strong> e <strong>+</strong> ou os atalhos abaixo para definir quantas questões gerar de cada tipo.</small>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-xs btn-outline-success fw-bold" onclick="aplicarAtalhoQuantidades('5_obj')">
+                                ⚡ +5 Objetivas
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold" onclick="aplicarAtalhoQuantidades('mista')">
+                                ⚡ 4 Obj + 1 Diss
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="zerarTodasQuantidades()">
+                                Limpar (0)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-primary fw-bold"
+                                    data-bs-toggle="modal" data-bs-target="#modalNovoTipoPerguntaRapido">
+                                <i class="fas fa-plus me-1"></i>Novo Tipo
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3" id="gridCardsTiposGeracao">
+                            {% for tipo in tipos_pergunta %}
+                            <div class="col-md-6">
+                                <div class="card border shadow-xs p-3 h-100 card-tipo-geracao" id="card_wrap_tipo_{{ tipo.id }}">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                        <label for="id_tipo_{{ tipo.id }}" class="form-label fw-bold text-dark small mb-0">
+                                            {{ tipo.descricao }}
+                                        </label>
+                                        {% if tipo.is_objetiva %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle flex-shrink-0" style="font-size: 0.7rem;">
+                                            <i class="fas fa-list-ol me-1"></i>{{ tipo.resumo_formato }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle flex-shrink-0" style="font-size: 0.7rem;">
+                                            <i class="fas fa-align-left me-1"></i>{{ tipo.resumo_formato }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted d-block mb-2" style="font-size: 0.76rem; line-height: 1.35;">
+                                        {{ tipo.instrucoes_limpas|default:"Formato estruturado padrão deste tipo"|truncatechars:95 }}
+                                    </small>
+                                    <div class="d-flex align-items-center justify-content-between mt-auto pt-1">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo({{ tipo.id }}, 1)">1</button>
+                                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo({{ tipo.id }}, 3)">3</button>
+                                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo({{ tipo.id }}, 5)">5</button>
+                                            <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="setQuantidadeTipo({{ tipo.id }}, 10)">10</button>
+                                        </div>
+                                        <div class="input-group input-group-sm" style="width: 130px;">
+                                            <button type="button" class="btn btn-outline-dark fw-bold" onclick="ajustarQuantidadeTipo({{ tipo.id }}, -1)">−</button>
+                                            <input type="number"
+                                                   name="tipo_{{ tipo.id }}"
+                                                   id="id_tipo_{{ tipo.id }}"
+                                                   data-tipo-id="{{ tipo.id }}"
+                                                   data-tipo-nome="{{ tipo.descricao }}"
+                                                   data-is-obj="{{ tipo.is_objetiva|yesno:'1,0' }}"
+                                                   class="form-control quantidade-input font-monospace fw-bold text-center"
+                                                   min="0" max="50" value="0">
+                                            <button type="button" class="btn btn-outline-primary fw-bold" onclick="ajustarQuantidadeTipo({{ tipo.id }}, 1)">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-warning mb-0">
+                                    Nenhum tipo de pergunta cadastrado. Clique em <strong>+ Novo Tipo</strong> acima para criar.
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Fontes de Referência (PDFs) -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h5 class="mb-0 fw-bold text-dark fs-6">
+                                <i class="fas fa-book-open text-info me-2"></i>3. Fontes de Referência em PDF (RAG)
+                            </h5>
+                            <small class="text-muted">
+                                Selecione 1 ou mais PDFs como base, ou deixe desmarcado para gerar diretamente a partir do <strong>Assunto e Tópico</strong> acima.
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-xs btn-outline-primary fw-semibold" onclick="selecionarTodasFontesVisiveis(true)">
+                                <i class="fas fa-check-double me-1"></i>Marcar Todas
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="selecionarTodasFontesVisiveis(false)">
+                                Desmarcar
+                            </button>
+                            <a href="{% url 'mimir:addFontes' %}" class="btn btn-xs btn-outline-success fw-semibold">
+                                <i class="fas fa-upload me-1"></i>+ Novo PDF
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body p-3">
+                        {% if form.fontes_selecionadas.field.queryset.exists %}
+                            <div class="input-group input-group-sm mb-3">
+                                <span class="input-group-text bg-light"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" id="searchFontes" class="form-control" placeholder="Buscar fonte PDF pelo nome...">
+                                <button class="btn btn-outline-secondary" type="button" id="clearFontes">Limpar</button>
+                            </div>
+
+                            <div class="list-container" id="containerFontes" style="max-height: 290px;">
+                                <div class="grid-checkboxes">
+                                    {% for fonte in form.fontes_selecionadas %}
+                                        <label for="{{ fonte.id_for_label }}" class="item-fonte-label">
+                                            {{ fonte.tag }}
+                                            <span>{{ fonte.choice_label }}</span>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-light border text-center py-4 mb-0">
+                                <i class="fas fa-file-pdf fa-2x text-muted mb-2 d-block"></i>
+                                <div class="fw-bold text-dark small">Nenhuma fonte PDF cadastrada ainda</div>
+                                <p class="text-muted small mb-2">
+                                    Você já pode gerar questões normalmente usando apenas o <strong>Assunto e as Diretrizes</strong> acima, ou enviar um PDF se preferir embasamento em documento específico.
+                                </p>
+                                <a href="{% url 'mimir:addFontes' %}" class="btn btn-xs btn-outline-primary">
+                                    <i class="fas fa-plus me-1"></i> Cadastrar Fonte PDF (Opcional)
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
             </div>
 
-            <div class="card mt-4 border-0 bg-light text-secondary">
-                <div class="card-body py-3 d-flex align-items-center">
-                    <i class="fas fa-info-circle fa-lg text-primary me-3"></i>
-                    <small class="mb-0">
-                        As questões geradas serão associadas diretamente ao <strong>Assunto</strong> selecionado e salvas no banco de dados estruturado do Mimir, prontas para serem inclusas em futuras avaliações.
-                    </small>
+            <!-- Coluna Lateral: Resumo em Tempo Real e Botão de Geração Sempre Visível -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm sticky-top" style="top: 1.25rem;">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h5 class="mb-0 fw-bold fs-6">
+                            <i class="fas fa-bolt text-warning me-2"></i>Resumo da Geração
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-3 pb-2 border-bottom">
+                            <div class="small text-muted">Assunto / Disciplina:</div>
+                            <div class="fw-bold text-dark" id="resumoAssuntoNome">-- Selecione um assunto --</div>
+                        </div>
+
+                        <div class="mb-3 pb-2 border-bottom">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small text-muted">Questões Solicitadas:</span>
+                                <span id="total-perguntas" class="badge bg-danger">0 questões</span>
+                            </div>
+                            <ul class="list-group list-group-flush small" id="listaResumoTiposSelecionados">
+                                <li class="list-group-item px-0 py-1 text-muted fst-italic">
+                                    Nenhuma quantidade definida ainda.
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="small text-muted">Base de Conhecimento:</span>
+                                <span class="badge bg-secondary" id="count-fontes">Assunto / Tópico</span>
+                            </div>
+                        </div>
+
+                        <div id="alertaValidacaoInline" class="alert alert-warning small py-2 d-none mb-3"></div>
+
+                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold py-3 shadow-sm" id="submitButton">
+                            <i class="fas fa-magic me-2"></i> Gerar Questões com IA
+                        </button>
+
+                        <div class="text-center mt-2">
+                            <small class="text-muted" style="font-size: 0.74rem;">
+                                Após a geração, você poderá revisar e editar todas as alternativas antes de salvar no banco.
+                            </small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 </div>
 
 <!-- Loader Modal -->
@@ -216,8 +312,10 @@
                 <div class="spinner-border text-primary my-3" style="width: 3.5rem; height: 3.5rem; border-width: 0.35em;" role="status">
                     <span class="visually-hidden">Processando...</span>
                 </div>
-                <h5 class="mt-2 fw-bold text-dark">Processando RAG e Montando Gabaritos</h5>
-                <p class="text-muted small px-3">O Mimir está fatiando as fontes selecionadas para estruturar enunciados inéditos e chaves de correção completas. Por favor, aguarde sem recarregar.</p>
+                <h5 class="mt-2 fw-bold text-dark">Elaborando Questões, Alternativas e Gabaritos</h5>
+                <p class="text-muted small px-3">
+                    O Mimir está estruturando os enunciados, as alternativas de múltipla escolha (A–E) e as chaves de correção. Por favor, aguarde alguns segundos.
+                </p>
                 <div class="progress mx-4 mt-3" style="height: 6px; border-radius: 3px;">
                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 100%"></div>
                 </div>
@@ -227,285 +325,267 @@
 </div>
 
 <script>
-// Troca de Abas Manual via Botão (Resolve o bug do empilhamento)
-function switchTab(tabId) {
-    const triggerEl = document.querySelector(`#${tabId}`);
-    if (triggerEl) {
-        // Simula o clique exato na aba superior para limpar o estado ativo anterior
-        triggerEl.click();
-        
-        // Rola a tela suavemente para o topo do form para evitar que o usuário se perca
-        window.scrollTo({
-            top: document.querySelector('.card-header').offsetTop - 20,
-            behavior: 'smooth'
-        });
+window.TIPOS_META_MAP = {{ tipos_meta_json|default:"{}"|safe }};
+
+function alternarCriacaoRapidaAssunto(forcarEstado = null) {
+    const boxSelect = document.getElementById('boxSelectAssuntoExistente');
+    const boxNovo = document.getElementById('boxInputNovoAssunto');
+    const inpNovo = document.getElementById('inputNovoAssuntoNome');
+    const mostrarNovo = forcarEstado !== null ? forcarEstado : boxNovo.classList.contains('d-none');
+
+    if (mostrarNovo) {
+        boxNovo.classList.remove('d-none');
+        boxSelect.classList.add('opacity-50');
+        inpNovo.focus();
+    } else {
+        boxNovo.classList.add('d-none');
+        boxSelect.classList.remove('opacity-50');
+        inpNovo.value = '';
     }
+    atualizarPainelResumoGeracao();
+}
+
+function adicionarChipPrompt(texto) {
+    const area = document.getElementById('{{ form.prompt_personalizado.id_for_label }}') || document.querySelector('textarea[name="prompt_personalizado"]');
+    if (!area) return;
+    const atual = area.value.trim();
+    area.value = atual ? `${atual}\n- ${texto}` : `- ${texto}`;
+    area.focus();
+}
+
+function ajustarQuantidadeTipo(tipoId, delta) {
+    const inp = document.getElementById(`id_tipo_${tipoId}`);
+    if (!inp) return;
+    const atual = parseInt(inp.value || '0', 10) || 0;
+    inp.value = Math.max(0, Math.min(50, atual + delta));
+    atualizarPainelResumoGeracao();
+}
+
+function setQuantidadeTipo(tipoId, valor) {
+    const inp = document.getElementById(`id_tipo_${tipoId}`);
+    if (!inp) return;
+    inp.value = Math.max(0, Math.min(50, valor));
+    atualizarPainelResumoGeracao();
+}
+
+function zerarTodasQuantidades() {
+    document.querySelectorAll('.quantidade-input').forEach(inp => {
+        inp.value = '0';
+    });
+    atualizarPainelResumoGeracao();
+}
+
+function aplicarAtalhoQuantidades(preset) {
+    zerarTodasQuantidades();
+    const inputs = Array.from(document.querySelectorAll('.quantidade-input'));
+    const primeiroObj = inputs.find(i => i.getAttribute('data-is-obj') === '1') || inputs[0];
+    const primeiroDiss = inputs.find(i => i.getAttribute('data-is-obj') === '0');
+
+    if (preset === '5_obj' && primeiroObj) {
+        primeiroObj.value = '5';
+    } else if (preset === 'mista') {
+        if (primeiroObj) primeiroObj.value = '4';
+        if (primeiroDiss) primeiroDiss.value = '1';
+        else if (primeiroObj) primeiroObj.value = '5';
+    }
+    atualizarPainelResumoGeracao();
+}
+
+function selecionarTodasFontesVisiveis(marcar) {
+    document.querySelectorAll('#containerFontes .item-fonte-label').forEach(lbl => {
+        if (lbl.style.display !== 'none') {
+            const cb = lbl.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = marcar;
+        }
+    });
+    atualizarPainelResumoGeracao();
+}
+
+function atualizarPainelResumoGeracao() {
+    // 1. Assunto
+    const inpNovoAssunto = document.getElementById('inputNovoAssuntoNome');
+    const selAssunto = document.getElementById('{{ form.assunto.id_for_label }}') || document.querySelector('select[name="assunto"]');
+    const resumoAssunto = document.getElementById('resumoAssuntoNome');
+
+    const nomeNovo = (inpNovoAssunto?.value || '').trim();
+    if (nomeNovo) {
+        resumoAssunto.innerHTML = `<span class="badge bg-primary me-1">Novo</span> ${nomeNovo}`;
+    } else if (selAssunto && selAssunto.value) {
+        const txt = selAssunto.options[selAssunto.selectedIndex]?.text || '';
+        resumoAssunto.textContent = txt;
+    } else {
+        resumoAssunto.innerHTML = `<span class="text-danger">-- Selecione ou crie um assunto --</span>`;
+    }
+
+    // 2. Tipos e Quantidades
+    let total = 0;
+    const listaUl = document.getElementById('listaResumoTiposSelecionados');
+    if (listaUl) listaUl.innerHTML = '';
+
+    document.querySelectorAll('.quantidade-input').forEach(inp => {
+        const val = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        const tipoId = inp.getAttribute('data-tipo-id');
+        const cardWrap = tipoId ? document.getElementById(`card_wrap_tipo_${tipoId}`) : inp.closest('.card');
+        if (cardWrap) {
+            if (val > 0) {
+                cardWrap.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+            } else {
+                cardWrap.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10');
+            }
+        }
+        if (val > 0) {
+            total += val;
+            const nomeTipo = inp.getAttribute('data-tipo-nome') || inp.closest('.card')?.querySelector('label')?.textContent?.trim() || 'Questão';
+            if (listaUl) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item px-0 py-1 d-flex justify-content-between align-items-center bg-transparent';
+                li.innerHTML = `<span class="text-dark fw-semibold text-truncate me-2">${nomeTipo}</span><span class="badge bg-primary rounded-pill">${val}</span>`;
+                listaUl.appendChild(li);
+            }
+        }
+    });
+
+    if (total === 0 && listaUl) {
+        listaUl.innerHTML = `<li class="list-group-item px-0 py-1 text-muted fst-italic">Nenhuma quantidade definida ainda.</li>`;
+    }
+
+    const totalBadge = document.getElementById('total-perguntas');
+    if (totalBadge) {
+        totalBadge.textContent = `${total} questão(ões)`;
+        totalBadge.className = total > 0 ? 'badge bg-success fs-6' : 'badge bg-danger';
+    }
+
+    // 3. Fontes PDF
+    const numFontes = document.querySelectorAll('input[name="fontes_selecionadas"]:checked').length;
+    const badgeFontes = document.getElementById('count-fontes');
+    if (badgeFontes) {
+        if (numFontes > 0) {
+            badgeFontes.textContent = `${numFontes} PDF(s) selecionado(s)`;
+            badgeFontes.className = 'badge bg-info text-dark';
+        } else {
+            badgeFontes.textContent = 'Direto por Assunto / Tópico';
+            badgeFontes.className = 'badge bg-secondary';
+        }
+    }
+
+    return total;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    calcularTotal();
+    // Se o usuário ainda não tem nenhum assunto cadastrado no select, já abre o campo "+ Novo Assunto"
+    const selAssunto = document.getElementById('{{ form.assunto.id_for_label }}') || document.querySelector('select[name="assunto"]');
+    if (selAssunto && selAssunto.options.length <= 1 && !selAssunto.value) {
+        alternarCriacaoRapidaAssunto(true);
+    }
 
-    // --- LÓGICA DE RECUPERAÇÃO DE ESTADO (ERRO 503 / HIGH DEMAND) ---
-    // Se a API falhar, o Django recarregará a tela. Este script pega o que havia 
-    // sido preenchido e repopula os números instantaneamente.
+    // Restaura quantidades em caso de retry ou erro 503
     {% if quantidades_raw_json %}
         try {
-            const qtds_restauradas = JSON.parse('{{ quantidades_raw_json|safe }}');
-            for (const [id, val] of Object.entries(qtds_restauradas)) {
+            const qtdsRestauradas = JSON.parse('{{ quantidades_raw_json|escapejs }}');
+            for (const [id, val] of Object.entries(qtdsRestauradas)) {
                 const inputNum = document.getElementById('id_tipo_' + id);
-                if(inputNum) {
-                    inputNum.value = val;
-                }
+                if (inputNum) inputNum.value = val;
             }
-            calcularTotal(); // Atualiza os banners de totais com os dados recuperados
-        } catch(e) { 
-            console.error("Não foi possível restaurar os dados das quantidades:", e); 
-        }
+        } catch (e) {}
     {% endif %}
 
-    // --- LÓGICA DE FILTRO DAS FONTES DE REFERÊNCIA ---
+    // Event delegation para qualquer input de quantidade (inclusive tipos criados via modal AJAX)
+    document.getElementById('formGeracao').addEventListener('input', function(e) {
+        if (e.target.classList.contains('quantidade-input') || e.target.name === 'assunto' || e.target.id === 'inputNovoAssuntoNome') {
+            atualizarPainelResumoGeracao();
+        }
+    });
+    document.getElementById('formGeracao').addEventListener('change', atualizarPainelResumoGeracao);
+
+    // Filtro de busca de fontes PDF
     const searchFontes = document.getElementById('searchFontes');
     const containerFontes = document.getElementById('containerFontes');
-    
     if (searchFontes && containerFontes) {
-        const labelsFontes = containerFontes.querySelectorAll('label');
-        
         searchFontes.addEventListener('input', function(e) {
             const term = e.target.value.toLowerCase().trim();
-            labelsFontes.forEach(label => {
+            containerFontes.querySelectorAll('.item-fonte-label').forEach(label => {
                 const text = label.textContent.toLowerCase();
-                if (text.includes(term)) {
-                    label.style.setProperty('display', 'flex', 'important');
-                } else {
-                    label.style.setProperty('display', 'none', 'important');
-                }
+                label.style.setProperty('display', text.includes(term) ? 'flex' : 'none', 'important');
             });
         });
-        
-        document.getElementById('clearFontes').addEventListener('click', function() {
+        document.getElementById('clearFontes')?.addEventListener('click', function() {
             searchFontes.value = '';
-            labelsFontes.forEach(label => label.style.setProperty('display', 'flex', 'important'));
-            updateCounters();
+            containerFontes.querySelectorAll('.item-fonte-label').forEach(label => {
+                label.style.setProperty('display', 'flex', 'important');
+            });
         });
     }
 
-    // --- ENGENHARIA DOS CONTADORES (BADGES DE SELEÇÃO) ---
-    function updateCounters() {
-        const numFontes = document.querySelectorAll('input[name="fontes_selecionadas"]:checked').length;
-        const badgeFontes = document.getElementById('count-fontes');
-        if (badgeFontes) {
-            badgeFontes.textContent = numFontes;
-            badgeFontes.className = numFontes > 0 ? "badge bg-success ms-1" : "badge bg-secondary ms-1";
-        }
-    }
+    atualizarPainelResumoGeracao();
 
-    // --- CÁLCULO DÍNAMICO TOTAL DE PERGUNTAS ---
-    function calcularTotal() {
-        let total = 0;
-        document.querySelectorAll('.quantidade-input').forEach(input => {
-            total += parseInt(input.value) || 0;
-        });
-        
-        const totalElement = document.getElementById('total-perguntas');
-        const badgeTab = document.getElementById('total-badge-tab');
-        
-        if (totalElement) {
-            totalElement.textContent = total;
-            totalElement.className = total === 0 ? 'badge bg-danger fs-6 px-3 py-2' : 'badge bg-success fs-6 px-3 py-2';
-        }
-        
-        if (badgeTab) {
-            badgeTab.textContent = total;
-            badgeTab.className = total === 0 ? 'badge bg-secondary ms-1' : 'badge bg-success ms-1';
-        }
-        
-        return total;
-    }
-
-    // Escuta alterações nos inputs de quantidades numéricas
-    document.querySelectorAll('.quantidade-input').forEach(input => {
-        input.addEventListener('change', calcularTotal);
-        input.addEventListener('input', calcularTotal);
-    });
-
-    document.getElementById('formGeracao').addEventListener('change', updateCounters);
-    updateCounters(); // Inicialização das fontes
-
-    // --- VALIDACÃO E ENVIO DO FORMULÁRIO ---
+    // Validação amigável antes de enviar
     document.getElementById('formGeracao').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const totalPerguntas = calcularTotal();
-        const assunto = document.getElementById('id_assunto') || document.querySelector('select[name="assunto"]');
-        const fontesSelecionadas = document.querySelectorAll('input[name="fontes_selecionadas"]:checked');
-        
-        if (!assunto || !assunto.value) {
-            switchTab('config-tab');
-            if(assunto) assunto.focus();
-            alert('Atenção: Selecione o Assunto da geração de questões.');
+        const total = atualizarPainelResumoGeracao();
+        const nomeNovo = (document.getElementById('inputNovoAssuntoNome')?.value || '').trim();
+        const temAssunto = Boolean(nomeNovo || (selAssunto && selAssunto.value));
+        const alerta = document.getElementById('alertaValidacaoInline');
+
+        if (!temAssunto) {
+            e.preventDefault();
+            alerta.className = 'alert alert-danger small py-2 mb-3';
+            alerta.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Selecione um <strong>Assunto</strong> ou clique em <strong>+ Criar Novo Assunto</strong>.';
+            selAssunto?.focus();
             return false;
         }
 
-        if (totalPerguntas === 0) {
-            switchTab('quantidades-tab');
-            alert('Por favor, defina pelo menos uma quantidade maior que zero para os tipos de questões.');
+        if (total === 0) {
+            e.preventDefault();
+            alerta.className = 'alert alert-danger small py-2 mb-3';
+            alerta.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Defina pelo menos <strong>1 questão</strong> na seção <strong>2. Tipos de Questões e Quantidades</strong>.';
             return false;
         }
-        
-        if (fontesSelecionadas.length === 0) {
-            switchTab('fontes-tab');
-            alert('Por favor, selecione ao menos uma Fonte de Referência para embasamento.');
-            return false;
-        }
-        
-        // Ativação do Modal de processamento
+
+        alerta.classList.add('d-none');
         const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
         loadingModal.show();
-        
+
         const submitBtn = document.getElementById('submitButton');
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processando Tokens...';
-        
-        setTimeout(() => {
-            this.submit();
-        }, 600);
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Gerando Questões com IA...';
     });
 });
 </script>
 
 <style>
-/* ==========================================================================
-   FORÇAR ESTILIZAÇÃO DO BOOTSTRAP NOS CAMPOS NATIVOS DO DJANGO (ABA 1)
-   ========================================================================== */
-#formGeracao select {
-    display: block;
-    width: 100%;
-    padding: 0.4375rem 2.25rem 0.4375rem 0.75rem;
-    font-size: 0.95rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: #4e5166;
-    background-color: #fff;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 16px 12px;
-    border: 1px solid #ced4da;
-    border-radius: 0.375rem;
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-    appearance: none;
-}
-
-#formGeracao select:focus {
-    border-color: #86b7fe;
-    outline: 0;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-}
-
-#formGeracao textarea {
-    display: block;
-    width: 100%;
-    padding: 0.4375rem 0.75rem;
-    font-size: 0.95rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: #4e5166;
-    background-color: #fff;
-    border: 1px solid #ced4da;
-    border-radius: 0.375rem;
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-    min-height: 100px;
-}
-
-#formGeracao textarea:focus {
-    border-color: #86b7fe;
-    outline: 0;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-}
-
-/* ==========================================================================
-   ESTILOS DE CONTAINERS E LISTAS (ABA 2 e 3)
-   ========================================================================== */
+.btn-xs { padding: 0.2rem 0.55rem; font-size: 0.76rem; border-radius: 0.35rem; }
+.card-tipo-geracao { transition: all 0.15s ease-in-out; }
 .list-container {
-    max-height: 400px;
+    max-height: 320px;
     overflow-y: auto;
     background-color: #f8f9fc;
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
 }
-
-.grid-checkboxes ul, 
-.grid-checkboxes li {
-    list-style: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-}
-
-.grid-checkboxes > div,
-.grid-checkboxes > div > div {
-    width: 100% !important;
-}
-
 .grid-checkboxes label {
     display: flex !important;
-    align-items: flex-start !important; 
+    align-items: center !important;
     width: 100% !important;
-    height: auto !important; 
     background: #ffffff;
-    padding: 14px 16px !important;
-    margin-bottom: 8px !important; 
+    padding: 10px 14px !important;
+    margin-bottom: 6px !important;
     border: 1px solid #e3e6f0 !important;
     border-radius: 8px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     cursor: pointer;
     transition: all 0.15s ease-in-out;
-    
-    white-space: normal !important;
-    word-break: break-word !important;
-    font-weight: normal !important;
-    font-size: 0.95rem;
-    color: #4e5166;
+    font-size: 0.9rem;
 }
-
 .grid-checkboxes input[type="checkbox"] {
-    flex-shrink: 0; 
-    width: 1.2em !important;
-    height: 1.2em !important;
-    margin-top: 3px !important;
-    margin-right: 12px !important; 
-    margin-left: 0 !important;     
+    width: 1.15em !important;
+    height: 1.15em !important;
+    margin-right: 10px !important;
     cursor: pointer;
 }
-
-.grid-checkboxes label:hover {
-    border-color: #bac8f3 !important;
-    background-color: #ffffff !important;
-    box-shadow: 0 3px 8px rgba(78, 115, 223, 0.06) !important;
-}
-
 .grid-checkboxes label:has(input:checked) {
-    border-color: #4e73df !important;
-    background-color: #f4f7fe !important;
-    color: #2e59d9 !important;
-    font-weight: 500 !important;
-}
-
-.nav-pills .nav-link {
-    color: #6e707e;
-    background-color: #f8f9fc;
-    border: 1px solid #e3e6f0;
-    margin: 0 4px;
-}
-
-.nav-pills .nav-link.active {
-    background-color: #4e73df;
-    color: #fff;
-    border-color: #4e73df;
-}
-
-.modal-backdrop {
-    opacity: 0.7 !important;
+    border-color: #2c5aa0 !important;
+    background-color: #eff6ff !important;
+    color: #1e3d72 !important;
+    font-weight: 600 !important;
 }
 </style>
+{% include "mimir/partials_modal_tipo_pergunta.html" %}
 {% endblock %}

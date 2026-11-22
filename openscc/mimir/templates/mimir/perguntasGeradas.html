@@ -1,190 +1,233 @@
 {% extends "mimirBase.html" %}
 
 {% block mainContent %}
-<div class="container-fluid mt-4">
+<div class="container-fluid px-4 py-4 mb-5">
     <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Perguntas geradas</h2>
-    </div>
-    
-    <!-- Informações da Geração -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-4">
-                    <strong>Assunto:</strong> {{ assunto.nome }}
-                </div>
-            </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-3 py-1 mb-1 fw-semibold">
+                <i class="fas fa-robot me-1"></i> Revisão Interativa de Questões Geradas
+            </span>
+            <h2 class="fw-bold text-dark mb-0">Revisar, Editar Alternativas e Salvar Questões</h2>
+            <p class="text-muted small mb-0">
+                Assunto padrão: <strong>{{ assunto.nome }}</strong> • Revise ou edite os enunciados, as alternativas <strong>A–E</strong> e clique na letra correta antes de salvar no Banco de Questões.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-outline-primary btn-sm fw-bold">
+                <i class="fas fa-redo me-1"></i> Nova Geração
+            </a>
+            <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-list me-1"></i> Ir para o Banco de Questões
+            </a>
         </div>
     </div>
-    
+
     <form method="post" id="formSelecaoPerguntas" action="{% url 'mimir:salvarPerguntasForm' %}">
         {% csrf_token %}
-        
-        <!-- Controles de Ação -->
-        <div class="card mb-3">
-            <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="selectAll">
-                            <label class="form-check-label" for="selectAll">
-                                Selecionar todas as perguntas
-                            </label>
-                        </div>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <span id="contador-selecionadas" class="badge bg-primary">0 selecionadas</span>
-                        <button type="submit" name="acao" value="salvar" class="btn btn-success btn-sm">
-                            <i class="bi bi-check-lg"></i> Salvar Selecionadas
-                        </button>
-                    </div>
+
+        <!-- Barra de Controle Superior -->
+        <div class="card border-0 shadow-sm mb-4 sticky-top" style="top: 1rem; z-index: 90;">
+            <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="selectAll" checked>
+                    <label class="form-check-label fw-bold text-dark" for="selectAll">
+                        Selecionar todas as questões geradas
+                    </label>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="contador-selecionadas" class="badge bg-primary fs-6 px-3 py-2">
+                        {{ perguntas|length }} selecionada(s)
+                    </span>
+                    <button type="submit" name="acao" value="salvar" class="btn btn-success fw-bold px-4 shadow-sm">
+                        <i class="fas fa-save me-1"></i> Salvar Questões Selecionadas no Banco
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Lista de Perguntas -->
-        <div class="row">
+
+        <!-- Lista de Cards Interativos de Questões Geradas -->
+        <div class="row g-4">
             {% for pergunta in perguntas %}
-            <div class="col-lg-6 mb-4">
-                <div class="card h-100 pergunta-card {% if pergunta.salva %}border-success{% endif %}">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="badge {% if pergunta.salva %}bg-success{% else %}bg-primary{% endif %}">
-                                {{ pergunta.tipo }}
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100 pergunta-card" id="card_gerada_{{ forloop.counter }}" data-qidx="{{ forloop.counter }}">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="badge bg-dark fs-6">#{{ forloop.counter }}</span>
+                            <span class="badge {% if pergunta.is_objetiva %}bg-success{% else %}bg-warning text-dark{% endif %}" id="badge_modo_{{ forloop.counter }}">
+                                {% if pergunta.is_objetiva %}Objetiva (Com Alternativas){% else %}Dissertativa (Aberta){% endif %}
                             </span>
-                            <span class="badge bg-secondary">#{{ forloop.counter }}</span>                            
                         </div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input pergunta-checkbox" 
-                                   type="checkbox" 
-                                   name="perguntas_selecionadas" 
-                                   value="{{ forloop.counter }}"
-                                   id="pergunta_{{ forloop.counter }}">
-                            <label class="form-check-label" for="pergunta_{{ forloop.counter }}">
-                                Salvar
-                            </label>
-                            <input type="hidden" name="pergunta_{{ forloop.counter }}_enunciado" value="{{ pergunta.enunciado }}">
-                            <input type="hidden" name="pergunta_{{ forloop.counter }}_resposta" value="{{ pergunta.resposta }}">
-                            {% if pergunta.alternativas %}
-                                {% for alternativa in pergunta.alternativas %}
-                                    <input type="hidden" name="pergunta_{{ forloop.parentloop.counter }}_alternativa_{{ forloop.counter }}" value="{{ alternativa }}">
-                                {% endfor %}
-                            {% endif %}
-                            <input type="hidden" name="pergunta_{{ forloop.counter }}_assunto" value="{{ assunto.id }}">
-                            <input type="hidden" name="pergunta_{{ forloop.counter }}_tipo_pergunta" value="{{ pergunta.tipo }}">
+
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn {% if pergunta.is_objetiva %}btn-primary{% else %}btn-outline-primary{% endif %} py-0 px-2"
+                                        id="btn_toggle_obj_{{ forloop.counter }}"
+                                        onclick="alternarModoQuestaoGerada({{ forloop.counter }}, 'objetiva')">
+                                    Alternativas
+                                </button>
+                                <button type="button" class="btn {% if not pergunta.is_objetiva %}btn-primary{% else %}btn-outline-primary{% endif %} py-0 px-2"
+                                        id="btn_toggle_diss_{{ forloop.counter }}"
+                                        onclick="alternarModoQuestaoGerada({{ forloop.counter }}, 'dissertativa')">
+                                    Dissertativa
+                                </button>
+                            </div>
+
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input pergunta-checkbox"
+                                       type="checkbox"
+                                       name="perguntas_selecionadas"
+                                       value="{{ forloop.counter }}"
+                                       id="pergunta_{{ forloop.counter }}"
+                                       checked>
+                                <label class="form-check-label fw-bold text-success" for="pergunta_{{ forloop.counter }}">
+                                    Salvar
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="card-body">
-                        <!-- Preview da Pergunta -->
-                        <div class="pergunta-preview">
-                            <div class="mb-3">
-                                <strong>Enunciado:</strong>
-                                <div class="mt-1 p-2 bg-light rounded">
-                                    {{ pergunta.enunciado|linebreaksbr }}
-                                </div>
+
+                    <div class="card-body p-3">
+                        <input type="hidden" name="pergunta_{{ forloop.counter }}_modo_questao"
+                               id="input_modo_{{ forloop.counter }}"
+                               value="{% if pergunta.is_objetiva %}objetiva{% else %}dissertativa{% endif %}">
+                        <input type="hidden" name="pergunta_{{ forloop.counter }}_letra_correta"
+                               id="input_letra_correta_{{ forloop.counter }}"
+                               value="{{ pergunta.letra_correta|default:'A' }}">
+                        <input type="hidden" name="pergunta_{{ forloop.counter }}_tipo_pergunta"
+                               id="input_tipo_nome_{{ forloop.counter }}"
+                               value="{{ pergunta.tipo }}">
+
+                        <!-- Linha: Assunto e Tipo de Pergunta -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-secondary mb-1">Assunto / Disciplina</label>
+                                <select name="pergunta_{{ forloop.counter }}_assunto" class="form-select form-select-sm">
+                                    {% for a in assuntos_usuario %}
+                                    <option value="{{ a.id }}" {% if a.id == assunto.id %}selected{% endif %}>{{ a.nome }}</option>
+                                    {% empty %}
+                                    <option value="{{ assunto.id }}" selected>{{ assunto.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
-                            
-                            {% if pergunta.alternativas %}
-                            <div class="mb-3">
-                                <strong>Alternativas:</strong>
-                                <div class="mt-1">
-                                    {% for alternativa in pergunta.alternativas %}
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" disabled>
-                                        <label class="form-check-label small">{{ alternativa }}</label>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-secondary mb-1">Tipo de Pergunta</label>
+                                <select name="pergunta_{{ forloop.counter }}_tipo_id" class="form-select form-select-sm"
+                                        onchange="aoMudarTipoSelectGerada({{ forloop.counter }}, this)">
+                                    {% for t in tipos_pergunta %}
+                                    <option value="{{ t.id }}"
+                                            data-nome="{{ t.descricao }}"
+                                            data-is-obj="{{ t.is_objetiva|yesno:'1,0' }}"
+                                            {% if pergunta.tipo_id == t.id or pergunta.tipo == t.descricao %}selected{% endif %}>
+                                        {{ t.descricao }} ({{ t.resumo_formato }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Enunciado Editável -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-dark mb-1">
+                                <i class="fas fa-file-alt text-primary me-1"></i>Enunciado / Comando da Questão:
+                            </label>
+                            <textarea name="pergunta_{{ forloop.counter }}_enunciado"
+                                      rows="4"
+                                      class="form-control form-control-sm"
+                                      required>{{ pergunta.enunciado }}</textarea>
+                        </div>
+
+                        <!-- Bloco Interativo de Alternativas (Salvas automaticamente no banco!) -->
+                        <div id="bloco_alternativas_{{ forloop.counter }}" class="mb-3 p-3 rounded-3 bg-light border {% if not pergunta.is_objetiva %}d-none{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-bold text-success-emphasis">
+                                    <i class="fas fa-list-ol me-1"></i>Alternativas (Clique na letra para definir o gabarito correto):
+                                </span>
+                                <button type="button" class="btn btn-xs btn-outline-success fw-bold py-0 px-2"
+                                        onclick="adicionarAlternativaCardGerada({{ forloop.counter }})">
+                                    + Opção
+                                </button>
+                            </div>
+
+                            <div id="lista_alts_{{ forloop.counter }}" class="d-flex flex-column gap-2">
+                                {% if pergunta.alternativas_sem_prefixo %}
+                                    {% for alt_txt in pergunta.alternativas_sem_prefixo %}
+                                    <div class="d-flex align-items-center gap-2 linha-alt-gerada">
+                                        <button type="button"
+                                                class="btn btn-sm rounded-circle fw-bold btn-letra-alt flex-shrink-0"
+                                                style="width: 34px; height: 34px;"
+                                                onclick="selecionarLetraCorretaCardGerada({{ forloop.parentloop.counter }}, {{ forloop.counter0 }})">
+                                            A
+                                        </button>
+                                        <input type="text"
+                                               name="pergunta_{{ forloop.parentloop.counter }}_alternativa_item[]"
+                                               value="{{ alt_txt }}"
+                                               class="form-control form-control-sm input-alt-gerada"
+                                               placeholder="Texto da alternativa...">
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                                onclick="removerAlternativaCardGerada(this, {{ forloop.parentloop.counter }})">
+                                            <i class="fas fa-times"></i>
+                                        </button>
                                     </div>
                                     {% endfor %}
-                                </div>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="mb-3">
-                                <strong>Resposta:</strong>
-                                <div class="mt-1 p-2 bg-info text-dark rounded">
-                                    {{ pergunta.resposta }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <button type="button" 
-                                    class="btn btn-outline-primary btn-sm" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#modalPergunta{{ forloop.counter }}">
-                                <i class="bi bi-arrows-fullscreen"></i> Expandir
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Modal para visualização expandida -->
-            <div class="modal fade" id="modalPergunta{{ forloop.counter }}" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                Pergunta #{{ forloop.counter }} - {{ pergunta.tipo }}
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <h6>Enunciado:</h6>
-                                <div class="p-3 bg-light rounded">
-                                    {{ pergunta.enunciado|linebreaks }}
-                                </div>
-                            </div>
-                            
-                            {% if pergunta.alternativas %}
-                            <div class="mb-3">
-                                <h6>Alternativas:</h6>
-                                {% for alternativa in pergunta.alternativas %}
-                                <div class="p-2 {% if forloop.counter0|divisibleby:2 %}bg-white{% else %}bg-light{% endif %}">
-                                    {{ alternativa }}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            
-                            <div class="mb-3">
-                                <h6>Resposta Correta:</h6>
-                                <div class="p-3 bg-success text-white rounded">
-                                    {{ pergunta.resposta }}
-                                </div>
+                                {% else %}
+                                    {% for letra_default in "ABCDE" %}
+                                    <div class="d-flex align-items-center gap-2 linha-alt-gerada">
+                                        <button type="button"
+                                                class="btn btn-sm rounded-circle fw-bold btn-letra-alt flex-shrink-0"
+                                                style="width: 34px; height: 34px;"
+                                                onclick="selecionarLetraCorretaCardGerada({{ forloop.parentloop.counter }}, {{ forloop.counter0 }})">
+                                            {{ letra_default }}
+                                        </button>
+                                        <input type="text"
+                                               name="pergunta_{{ forloop.parentloop.counter }}_alternativa_item[]"
+                                               value=""
+                                               class="form-control form-control-sm input-alt-gerada"
+                                               placeholder="Texto da alternativa {{ letra_default }}...">
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                                onclick="removerAlternativaCardGerada(this, {{ forloop.parentloop.counter }})">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% endif %}
                             </div>
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+
+                        <!-- Gabarito / Padrão de Resposta -->
+                        <div>
+                            <label class="form-label small fw-bold text-dark mb-1">
+                                <i class="fas fa-check-circle text-success me-1"></i>Gabarito / Padrão de Resposta e Justificativa:
+                            </label>
+                            <textarea name="pergunta_{{ forloop.counter }}_resposta"
+                                      id="input_resposta_{{ forloop.counter }}"
+                                      rows="2"
+                                      class="form-control form-control-sm bg-success bg-opacity-10 border-success-subtle"
+                                      required>{{ pergunta.resposta }}</textarea>
                         </div>
                     </div>
                 </div>
             </div>
             {% empty %}
             <div class="col-12">
-                <div class="alert alert-warning text-center">
+                <div class="alert alert-warning text-center py-4">
                     <h5>Nenhuma pergunta foi gerada</h5>
-                    <p>Não foi possível gerar perguntas com os parâmetros fornecidos.</p>
-                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-primary">Tentar Novamente</a>
+                    <p class="mb-3">Não foi possível gerar perguntas com os parâmetros fornecidos.</p>
+                    <a href="{% url 'mimir:gerarPerguntasForm' %}" class="btn btn-primary">Tentar Novamente</a>
                 </div>
             </div>
             {% endfor %}
         </div>
-        
-        <!-- Controles inferiores -->
+
         {% if perguntas %}
-        <div class="card mt-4">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-center gap-3">
-                    <button type="submit" name="acao" value="salvar" class="btn btn-success btn-lg">
-                        <i class="bi bi-check-lg"></i> Salvar Perguntas Selecionadas
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body text-center py-3">
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <button type="submit" name="acao" value="salvar" class="btn btn-success btn-lg fw-bold px-5 shadow-sm">
+                        <i class="fas fa-save me-2"></i> Salvar Questões Selecionadas no Banco
                     </button>
-                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-secondary btn-lg">
-                        <i class="bi bi-list"></i> Voltar para Lista
+                    <a href="{% url 'mimir:visualizarPerguntas' %}" class="btn btn-outline-secondary btn-lg">
+                        Cancelar e Voltar
                     </a>
                 </div>
             </div>
@@ -192,61 +235,143 @@
         {% endif %}
     </form>
 </div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Selecionar/Deselecionar todas
-    document.getElementById('selectAll').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.pergunta-checkbox:not(:disabled)');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
-        atualizarContador();
-    });
-    
-    // Atualizar contador de selecionadas
-    function atualizarContador() {
-        const selecionadas = document.querySelectorAll('.pergunta-checkbox:checked:not(:disabled)').length;
-        document.getElementById('contador-selecionadas').textContent = selecionadas + ' selecionadas';
-    }
-    
-    // Atualizar contador quando checkboxes mudarem
-    document.querySelectorAll('.pergunta-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', atualizarContador);
-    });
-    
-    atualizarContador(); // Inicializar contador
-    
-    // Validação antes de enviar
-    document.getElementById('formSelecaoPerguntas').addEventListener('submit', function(e) {
-        const selecionadas = document.querySelectorAll('.pergunta-checkbox:checked:not(:disabled)').length;
-        const acao = document.querySelector('button[type="submit"]:focus')?.value || 'salvar';
-        
-        if (acao === 'salvar' && selecionadas === 0) {
-            e.preventDefault();
-            alert('Selecione pelo menos uma pergunta para salvar.');
-            return false;
+const LETRAS_PADRAO = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+function renumerarAlternativasCard(qIdx) {
+    const container = document.getElementById(`lista_alts_${qIdx}`);
+    if (!container) return;
+    const inputLetra = document.getElementById(`input_letra_correta_${qIdx}`);
+    const letraAtual = (inputLetra?.value || 'A').toUpperCase();
+
+    const linhas = container.querySelectorAll('.linha-alt-gerada');
+    linhas.forEach((linha, idx) => {
+        const letra = LETRAS_PADRAO[idx] || String(idx + 1);
+        const btnLetra = linha.querySelector('.btn-letra-alt');
+        const inp = linha.querySelector('.input-alt-gerada');
+        const ehCorreta = (letra === letraAtual);
+
+        if (btnLetra) {
+            btnLetra.textContent = letra;
+            btnLetra.setAttribute('onclick', `selecionarLetraCorretaCardGerada(${qIdx}, ${idx})`);
+            btnLetra.className = `btn btn-sm rounded-circle fw-bold btn-letra-alt flex-shrink-0 ${ehCorreta ? 'btn-success' : 'btn-outline-secondary'}`;
+        }
+        if (inp) {
+            inp.className = `form-control form-control-sm input-alt-gerada ${ehCorreta ? 'border-success fw-semibold bg-white' : ''}`;
+            inp.placeholder = `Texto da alternativa ${letra}...`;
         }
     });
+}
+
+function selecionarLetraCorretaCardGerada(qIdx, altIdx) {
+    const letra = LETRAS_PADRAO[altIdx] || 'A';
+    const inputLetra = document.getElementById(`input_letra_correta_${qIdx}`);
+    if (inputLetra) inputLetra.value = letra;
+    renumerarAlternativasCard(qIdx);
+
+    const container = document.getElementById(`lista_alts_${qIdx}`);
+    const inps = container ? container.querySelectorAll('.input-alt-gerada') : [];
+    const textoEscolhido = (inps[altIdx]?.value || '').trim();
+    const inputResp = document.getElementById(`input_resposta_${qIdx}`);
+    if (inputResp && textoEscolhido) {
+        const atual = (inputResp.value || '').trim();
+        const matchJust = atual.match(/(?:—|-|Justificativa:)\s*(.+)$/i);
+        inputResp.value = matchJust
+            ? `${letra}) ${textoEscolhido} — ${matchJust[1].trim()}`
+            : `${letra}) ${textoEscolhido}`;
+    }
+}
+
+function adicionarAlternativaCardGerada(qIdx) {
+    const container = document.getElementById(`lista_alts_${qIdx}`);
+    if (!container) return;
+    const qtdAtual = container.querySelectorAll('.linha-alt-gerada').length;
+    if (qtdAtual >= LETRAS_PADRAO.length) return;
+
+    const div = document.createElement('div');
+    div.className = 'd-flex align-items-center gap-2 linha-alt-gerada';
+    div.innerHTML = `
+        <button type="button" class="btn btn-sm rounded-circle fw-bold btn-letra-alt flex-shrink-0" style="width: 34px; height: 34px;">A</button>
+        <input type="text" name="pergunta_${qIdx}_alternativa_item[]" value="" class="form-control form-control-sm input-alt-gerada">
+        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removerAlternativaCardGerada(this, ${qIdx})">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(div);
+    renumerarAlternativasCard(qIdx);
+}
+
+function removerAlternativaCardGerada(btn, qIdx) {
+    const container = document.getElementById(`lista_alts_${qIdx}`);
+    if (!container || container.querySelectorAll('.linha-alt-gerada').length <= 2) return;
+    btn.closest('.linha-alt-gerada').remove();
+    renumerarAlternativasCard(qIdx);
+}
+
+function alternarModoQuestaoGerada(qIdx, novoModo) {
+    const inputModo = document.getElementById(`input_modo_${qIdx}`);
+    const blocoAlts = document.getElementById(`bloco_alternativas_${qIdx}`);
+    const badge = document.getElementById(`badge_modo_${qIdx}`);
+    const btnObj = document.getElementById(`btn_toggle_obj_${qIdx}`);
+    const btnDiss = document.getElementById(`btn_toggle_diss_${qIdx}`);
+
+    if (inputModo) inputModo.value = novoModo;
+    if (novoModo === 'objetiva') {
+        blocoAlts?.classList.remove('d-none');
+        if (badge) {
+            badge.className = 'badge bg-success';
+            badge.textContent = 'Objetiva (Com Alternativas)';
+        }
+        if (btnObj) btnObj.className = 'btn btn-primary py-0 px-2';
+        if (btnDiss) btnDiss.className = 'btn btn-outline-primary py-0 px-2';
+    } else {
+        blocoAlts?.classList.add('d-none');
+        if (badge) {
+            badge.className = 'badge bg-warning text-dark';
+            badge.textContent = 'Dissertativa (Aberta)';
+        }
+        if (btnDiss) btnDiss.className = 'btn btn-primary py-0 px-2';
+        if (btnObj) btnObj.className = 'btn btn-outline-primary py-0 px-2';
+    }
+}
+
+function aoMudarTipoSelectGerada(qIdx, selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+    const nome = opt.getAttribute('data-nome') || opt.text;
+    const isObj = opt.getAttribute('data-is-obj') === '1';
+    const inpNome = document.getElementById(`input_tipo_nome_${qIdx}`);
+    if (inpNome) inpNome.value = nome;
+    alternarModoQuestaoGerada(qIdx, isObj ? 'objetiva' : 'dissertativa');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pergunta-card').forEach(card => {
+        const qIdx = card.getAttribute('data-qidx');
+        if (qIdx) renumerarAlternativasCard(qIdx);
+    });
+
+    const selectAll = document.getElementById('selectAll');
+    function atualizarContador() {
+        const selecionadas = document.querySelectorAll('.pergunta-checkbox:checked:not(:disabled)').length;
+        const badge = document.getElementById('contador-selecionadas');
+        if (badge) badge.textContent = `${selecionadas} selecionada(s)`;
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.pergunta-checkbox:not(:disabled)').forEach(cb => {
+                cb.checked = this.checked;
+            });
+            atualizarContador();
+        });
+    }
+
+    document.querySelectorAll('.pergunta-checkbox').forEach(cb => {
+        cb.addEventListener('change', atualizarContador);
+    });
+    atualizarContador();
 });
 </script>
-
-<style>
-.pergunta-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.pergunta-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.pergunta-preview {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.modal-body .bg-light {
-    background-color: #f8f9fa !important;
-}
-</style>
 {% endblock %}

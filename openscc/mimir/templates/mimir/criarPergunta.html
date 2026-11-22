@@ -58,14 +58,25 @@
                     </div>
                     
                     <div class="col-md-6">
-                        <label for="{{ form.tipoDePergunta.id_for_label }}" class="form-label">
-                            <strong>{{ form.tipoDePergunta.label }}</strong> <span class="text-danger">*</span>
-                        </label>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label for="{{ form.tipoDePergunta.id_for_label }}" class="form-label mb-0">
+                                <strong>{{ form.tipoDePergunta.label }}</strong> <span class="text-danger">*</span>
+                            </label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2"
+                                        data-bs-toggle="modal" data-bs-target="#modalNovoTipoPerguntaRapido">
+                                    <i class="fas fa-plus me-1"></i>Novo Tipo
+                                </button>
+                                <a href="{% url 'mimir:gerenciarTiposPergunta' %}" class="small text-decoration-none">
+                                    Gerenciar Tipos
+                                </a>
+                            </div>
+                        </div>
                         {{ form.tipoDePergunta }}
                         {% if form.tipoDePergunta.errors %}
                         <div class="text-danger small">{{ form.tipoDePergunta.errors }}</div>
                         {% endif %}
-                        <div class="form-text">Selecionar um tipo objetivo ativa o construtor de alternativas abaixo</div>
+                        <div class="form-text" id="resumo_tipo_selecionado">Selecionar um tipo objetivo ativa o construtor de alternativas abaixo</div>
                     </div>
                 </div>
 
@@ -413,7 +424,12 @@ function toggleUploadResposta() {
     }
 }
 
-function isTextoTipoObjetivo(nomeTipo) {
+window.TIPOS_META_MAP = {{ tipos_meta_json|default:"{}"|safe }};
+
+function isTextoTipoObjetivo(nomeTipo, tipoId = null) {
+    if (tipoId && window.TIPOS_META_MAP && window.TIPOS_META_MAP[String(tipoId)]) {
+        return Boolean(window.TIPOS_META_MAP[String(tipoId)].is_objetiva);
+    }
     const t = (nomeTipo || '').toLowerCase();
     if (t.includes('dissertativa') || t.includes('discursiva') || t.includes('aberta')) {
         return false;
@@ -424,6 +440,9 @@ function isTextoTipoObjetivo(nomeTipo) {
         t.includes('objetiva') ||
         t.includes('alternativa') ||
         t.includes('escolha') ||
+        t.includes('asserção') ||
+        t.includes('assercao') ||
+        t.includes('afirmativa') ||
         t.includes('verdadeiro') ||
         t.includes('sensação') ||
         t.includes('sensacao')
@@ -433,20 +452,21 @@ function isTextoTipoObjetivo(nomeTipo) {
 function sincronizarSelectTipoComModo(modo) {
     const selectTipo = document.getElementById('{{ form.tipoDePergunta.id_for_label }}');
     if (!selectTipo) return;
-    const textoAtual = selectTipo.options[selectTipo.selectedIndex]?.text || '';
-    const atualEhObj = isTextoTipoObjetivo(textoAtual);
+    const optAtual = selectTipo.options[selectTipo.selectedIndex];
+    const atualEhObj = isTextoTipoObjetivo(optAtual?.text || '', optAtual?.value);
 
     if (modo === 'objetiva' && !atualEhObj) {
         for (let i = 0; i < selectTipo.options.length; i++) {
-            if (isTextoTipoObjetivo(selectTipo.options[i].text)) {
+            const opt = selectTipo.options[i];
+            if (isTextoTipoObjetivo(opt.text, opt.value)) {
                 selectTipo.selectedIndex = i;
                 break;
             }
         }
     } else if (modo === 'dissertativa' && atualEhObj) {
         for (let i = 0; i < selectTipo.options.length; i++) {
-            const tx = (selectTipo.options[i].text || '').toLowerCase();
-            if (tx.includes('dissertativa') || tx.includes('discursiva') || tx.includes('aberta')) {
+            const opt = selectTipo.options[i];
+            if (!isTextoTipoObjetivo(opt.text, opt.value)) {
                 selectTipo.selectedIndex = i;
                 break;
             }
@@ -956,13 +976,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Detecta o modo inicial pelo tipo selecionado no dropdown
     if (selectTipo) {
-        const textoSelecionado = selectTipo.options[selectTipo.selectedIndex]?.text || '';
-        const modoInicial = isTextoTipoObjetivo(textoSelecionado) ? 'objetiva' : 'dissertativa';
-        definirModoQuestao(modoInicial, false);
-
+        const aplicarMetaTipo = (sel) => {
+            const opt = sel.options[sel.selectedIndex];
+            const ehObj = isTextoTipoObjetivo(opt?.text || '', opt?.value);
+            const meta = (window.TIPOS_META_MAP && opt) ? window.TIPOS_META_MAP[String(opt.value)] : null;
+            const resumoEl = document.getElementById('resumo_tipo_selecionado');
+            if (resumoEl && meta) {
+                resumoEl.innerHTML = `<span class="badge ${meta.is_objetiva ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle'} me-1">${meta.resumo_formato}</span> ${meta.instrucoes_limpas || ''}`;
+            }
+            if (ehObj && meta && meta.qtd_alternativas >= 2) {
+                const temTextoPreenchido = alternativasState.some(a => (a.texto || '').trim().length > 0);
+                if (!temTextoPreenchido) {
+                    aplicarPresetAlternativas(meta.qtd_alternativas);
+                }
+            }
+            definirModoQuestao(ehObj ? 'objetiva' : 'dissertativa', false);
+        };
+        aplicarMetaTipo(selectTipo);
         selectTipo.addEventListener('change', function() {
-            const tx = this.options[this.selectedIndex]?.text || '';
-            definirModoQuestao(isTextoTipoObjetivo(tx) ? 'objetiva' : 'dissertativa', false);
+            aplicarMetaTipo(this);
         });
     } else {
         definirModoQuestao('objetiva', false);
@@ -1065,4 +1097,5 @@ document.addEventListener('DOMContentLoaded', function() {
 .alternativa-row { transition: all 0.15s ease-in-out; }
 .alternativa-row:hover { border-color: #198754 !important; }
 </style>
+{% include "mimir/partials_modal_tipo_pergunta.html" %}
 {% endblock %}
