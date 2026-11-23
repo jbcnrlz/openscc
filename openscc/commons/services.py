@@ -611,13 +611,21 @@ def chamarApiLLM(prompt, user=None, endpoint='chamarApiLLM'):
 
 def fazerCorrecaoComModelo(enunciado, gabarito, resposta_aluno, user=None):
     try:
-        parser = JsonOutputParser()
-        chain = correcao_template | get_llm() | parser
-        inputs = { "enunciado": enunciado, "gabarito": gabarito, "resposta_aluno": resposta_aluno }
-        response = invoke_chain(chain, inputs, endpoint='fazerCorrecaoComModelo', user=user)
-        return json.dumps(response, ensure_ascii=False)
+        chain = correcao_template | get_llm(temperature_override=0.2)
+        inputs = {"enunciado": enunciado, "gabarito": gabarito, "resposta_aluno": resposta_aluno}
+        raw_resp = invoke_chain(chain, inputs, endpoint='fazerCorrecaoComModelo', user=user)
+        texto = extrair_texto_puro(raw_resp.content if hasattr(raw_resp, 'content') else raw_resp)
+        texto_limpo = re.sub(r'^\s*```(?:json)?\s*|\s*```\s*$', '', texto.strip(), flags=re.IGNORECASE)
+        for cand in (texto_limpo, _reparar_json_string_llm(texto_limpo)):
+            try:
+                obj = json.loads(cand)
+                if isinstance(obj, dict) and ('nota' in obj or 'justificativa' in obj):
+                    return json.dumps(obj, ensure_ascii=False)
+            except Exception:
+                pass
+        return texto_limpo
     except Exception as e:
-        return json.dumps({ "nota": 0, "justificativa": f"Erro na correção: {str(e)}" })
+        return json.dumps({"nota": 0, "justificativa": f"Erro na correção: {str(e)}"}, ensure_ascii=False)
 
 def corrigirRespostaMultimodal(enunciado, gabarito, resposta_aluno, imagens_pergunta=None, user=None):
     start_time = time.time()
