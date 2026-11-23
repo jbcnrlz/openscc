@@ -31,7 +31,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="formSalvarCorrecaoUnificada">
+    <form method="post" action="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" enctype="multipart/form-data" id="formSalvarCorrecaoUnificada">
         {% csrf_token %}
         <input type="hidden" name="acao" value="salvar_correcao_unificada">
 
@@ -40,15 +40,20 @@
             <div class="col-lg-4">
                 <!-- 1. Seleção do Aluno -->
                 <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white py-3 border-bottom">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 fw-bold text-dark">
                             <i class="fas fa-user-graduate text-primary me-2"></i>1. Aluno(a) Avaliado(a)
                         </h6>
+                        {% if aluno_selecionado %}
+                        <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-xs btn-outline-secondary py-0 px-2 small">
+                            <i class="fas fa-user-plus me-1"></i>Novo Aluno / Limpar
+                        </a>
+                        {% endif %}
                     </div>
                     <div class="card-body p-3">
                         <label class="form-label small fw-semibold">Selecionar Aluno Cadastrado</label>
                         <select name="aluno_id" id="selectAlunoId" class="form-select mb-2"
-                                onchange="if(this.value) window.location.href='?aluno_id=' + this.value;">
+                                onchange="irParaAlunoSelecionado(this.value);">
                             <option value="">-- Selecione um aluno ou cadastre abaixo --</option>
                             {% for al in todos_alunos %}
                             <option value="{{ al.id }}" {% if aluno_selecionado and aluno_selecionado.id == al.id %}selected{% endif %}>
@@ -59,10 +64,11 @@
 
                         <div class="mt-2 pt-2 border-top">
                             <label class="form-label small fw-semibold text-muted mb-1">
-                                Ou digite o nome do aluno (detectado na foto ou avulso):
+                                Ou digite o nome de outro aluno (detectado na foto ou avulso):
                             </label>
                             <input type="text" name="novo_aluno_nome" id="inputNovoAlunoNome" class="form-control form-control-sm"
-                                   placeholder="Ex: Maria Clara Souza">
+                                   placeholder="Ex: Maria Clara Souza"
+                                   oninput="if(this.value.trim()){ document.getElementById('selectAlunoId').value = ''; }">
                         </div>
                     </div>
                 </div>
@@ -441,7 +447,16 @@
 <script>
 let streamWebcam = null;
 let filaPaginasProva = []; // Array de { file: File|Blob, previewUrl: string, nome: string }
-let ultimoTimestampSyncCelular = 0;
+let ultimoTimestampSyncCelular = {{ ultimo_scan_timestamp_inicial|default:0 }};
+
+function irParaAlunoSelecionado(alunoId) {
+    const baseUrl = "{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}";
+    if (alunoId) {
+        window.location.href = `${baseUrl}?aluno_id=${encodeURIComponent(alunoId)}`;
+    } else {
+        window.location.href = baseUrl;
+    }
+}
 
 function sincronizarRespostaCard(qid, valor) {
     const hidden = document.getElementById(`input_resp_${qid}`);

@@ -5057,13 +5057,21 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
     if not todos_alunos.exists():
         todos_alunos = User.objects.filter(is_active=True).order_by('first_name', 'username')
 
-    aluno_selecionado_id = request.GET.get('aluno_id') or request.POST.get('aluno_id')
+    sessao_scanner_id = f"p{prova.id}_u{request.user.id}"
+
+    # No POST, prioriza estritamente os campos enviados no formulário (POST),
+    # ignorando eventual ?aluno_id= antigo que estivesse na barra de endereços (GET)!
+    if request.method == 'POST':
+        aluno_selecionado_id = (request.POST.get('aluno_id') or '').strip()
+    else:
+        aluno_selecionado_id = (request.GET.get('aluno_id') or '').strip()
+
     aluno_selecionado = None
     prova_aluno = None
 
-    if aluno_selecionado_id:
-        aluno_selecionado = User.objects.filter(id=aluno_selecionado_id).first()
-        if aluno_selecionado:
+    if aluno_selecionado_id and aluno_selecionado_id.isdigit():
+        aluno_selecionado = User.objects.filter(id=int(aluno_selecionado_id)).first()
+        if aluno_selecionado and request.method != 'POST':
             prova_aluno, _ = ProvaAluno.objects.get_or_create(
                 aplicacao_prova=aplicacao,
                 aluno=aluno_selecionado,
@@ -5071,13 +5079,12 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
             )
 
     if request.method == 'POST' and request.POST.get('acao') == 'salvar_correcao_unificada':
-        # Caso o professor tenha informado um novo nome de aluno rápido sem cadastro prévio
+        # Caso o professor tenha digitado um nome de novo aluno, prioriza o nome digitado
         novo_aluno_nome = (request.POST.get('novo_aluno_nome') or '').strip()
-        if not aluno_selecionado and novo_aluno_nome:
+        if novo_aluno_nome:
             partes_nome = novo_aluno_nome.split(' ', 1)
             p_nome = partes_nome[0]
             s_nome = partes_nome[1] if len(partes_nome) > 1 else ''
-            # Verifica primeiro se já existe um aluno com o mesmo nome ou username
             aluno_selecionado = (
                 User.objects.filter(first_name__iexact=p_nome, last_name__iexact=s_nome).first()
                 or User.objects.filter(username__iexact=novo_aluno_nome).first()
@@ -5154,6 +5161,9 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
                 prova_aluno.data_conclusao = timezone.now()
             prova_aluno.save()
 
+            # Limpa o último estado pendente do scanner mobile para não sobrescrever o próximo aluno selecionado
+            salvar_estado_sessao_scanner(sessao_scanner_id, {})
+
             label_tipo_prova = "Avaliação Unificada" if estrutura.get('is_unificada') else "Prova"
             messages.success(
                 request,
@@ -5193,9 +5203,10 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
     # Configuração do Scanner Mobile (Pareamento Celular <-> Computador via QR Code)
     diagramacao = construir_diagramacao_unificada(prova, estrutura)
     omr_pages_configuradas = int(diagramacao['config'].get('omr_pages') or 1)
-    sessao_scanner_id = f"p{prova.id}_u{request.user.id}"
     token_scanner = gerar_token_scanner_mobile(prova.id, request.user.id, sessao_scanner_id)
     path_scanner_mobile = reverse('mimir:scannerMobileProvaFoto', args=[prova.id, token_scanner])
+    estado_scanner_atual = ler_estado_sessao_scanner(sessao_scanner_id) or {}
+    ultimo_scan_timestamp_inicial = int(estado_scanner_atual.get('scan_timestamp') or 0)
 
     host_atual = request.get_host()
     scheme_atual = 'https' if request.is_secure() else 'http'
@@ -5221,6 +5232,7 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
         'diagnostico_aluno': diagnostico_aluno,
         'historico_correcoes': historico_correcoes,
         'sessao_scanner_id': sessao_scanner_id,
+        'ultimo_scan_timestamp_inicial': ultimo_scan_timestamp_inicial,
         'token_scanner': token_scanner,
         'path_scanner_mobile': path_scanner_mobile,
         'host_sugerido_scanner': f"{scheme_atual}://{host_sugerido}",
