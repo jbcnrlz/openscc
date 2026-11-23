@@ -2586,69 +2586,85 @@ def corrigirComIA(request):
     try:
         data = json.loads(request.body)
         pergunta_id = data.get('pergunta_id')
-        enunciado = data.get('enunciado')
-        gabarito = data.get('gabarito')
-        resposta_aluno = data.get('resposta_aluno')
+        resposta_aluno = (data.get('resposta_aluno') or '').strip()
         tipo_resposta = data.get('tipo_resposta', 'texto')  # 'texto' ou 'arquivo'
-        
-        # Buscar a pergunta para obter informações das imagens
-        pergunta = Pergunta.objects.get(id=pergunta_id)
-        
+        usar_texto_transcrito = bool(data.get('usar_texto_transcrito', False))
+
+        pergunta = get_object_or_404(Pergunta, id=pergunta_id)
+        enunciado = (data.get('enunciado') or '').strip() or pergunta.get_texto_com_feedback()
+        gabarito = (data.get('gabarito') or '').strip() or pergunta.get_gabarito_com_feedback()
+
+        if usar_texto_transcrito and not resposta_aluno:
+            return JsonResponse({
+                'success': False,
+                'message': 'O campo de resposta manuscrita/texto do aluno está vazio. Transcreva ou digite a resposta antes de recorrigir.'
+            }, status=400)
+
         # Preparar informações sobre imagens da pergunta
         imagens_pergunta = []
         for imagem in pergunta.imagens.all():
-            imagens_pergunta.append({
-                'url': imagem.imagem.url,
-                'nome': imagem.imagem.name,
-                'caminho_absoluto': imagem.imagem.path
-            })
-        
-        # Buscar a resposta do aluno para verificar se tem arquivo
-        resposta = RespostaAluno.objects.filter(pergunta_id=pergunta_id).first()
+            try:
+                imagens_pergunta.append({
+                    'url': imagem.imagem.url,
+                    'nome': imagem.imagem.name,
+                    'caminho_absoluto': imagem.imagem.path
+                })
+            except Exception:
+                continue
+
         arquivo_resposta = None
-        
-        if resposta and resposta.arquivo_resposta:
-            arquivo_resposta = {
-                'url': resposta.arquivo_resposta.url,
-                'nome': resposta.arquivo_resposta.name,
-                'caminho_absoluto': resposta.arquivo_resposta.path,
-                'tipo': resposta.arquivo_resposta.name.split('.')[-1].lower()
-            }
-            tipo_resposta = 'arquivo'
-        
-        # Se a resposta for um arquivo de imagem, processar com a função multimodal
-        if tipo_resposta == 'arquivo' and arquivo_resposta and arquivo_resposta['tipo'] in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
+        if not usar_texto_transcrito:
+            resposta = RespostaAluno.objects.filter(pergunta_id=pergunta_id).order_by('-id').first()
+            if resposta and resposta.arquivo_resposta:
+                try:
+                    arquivo_resposta = {
+                        'url': resposta.arquivo_resposta.url,
+                        'nome': resposta.arquivo_resposta.name,
+                        'caminho_absoluto': resposta.arquivo_resposta.path,
+                        'tipo': resposta.arquivo_resposta.name.split('.')[-1].lower()
+                    }
+                    tipo_resposta = 'arquivo'
+                except Exception:
+                    arquivo_resposta = None
+
+        user_log = request.user if getattr(request, 'user', None) and request.user.is_authenticated else None
+
+        # Se for recorreção pelo texto manuscrito transcrito (ou resposta textual), avalia direto o texto do aluno
+        if not usar_texto_transcrito and tipo_resposta == 'arquivo' and arquivo_resposta and arquivo_resposta['tipo'] in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
             resultado = corrigirRespostaMultimodal(
                 enunciado=enunciado,
                 gabarito=gabarito,
-                resposta_aluno=arquivo_resposta['caminho_absoluto'],  # Caminho do arquivo
-                imagens_pergunta=imagens_pergunta
+                resposta_aluno=arquivo_resposta['caminho_absoluto'],
+                imagens_pergunta=imagens_pergunta,
+                user=user_log,
             )
         else:
-            # Para respostas em texto ou outros tipos de arquivo
             resultado = fazerCorrecaoComModelo(
                 enunciado=enunciado,
                 gabarito=gabarito,
-                resposta_aluno=resposta_aluno
+                resposta_aluno=resposta_aluno,
+                user=user_log,
             )
-        
-        # Processar o retorno do modelo
-        print(resultado)
+
         nota, feedback = parse_gemini_response(resultado)
-            
+        try:
+            nota_float = round(max(0.0, min(10.0, float(nota))), 1)
+        except (ValueError, TypeError):
+            nota_float = 0.0
+
         return JsonResponse({
             'success': True,
-            'nota': nota,
+            'nota': nota_float,
             'feedback': feedback,
             'pergunta_id': pergunta_id,
-            'tipo_processamento': 'multimodal' if tipo_resposta == 'arquivo' else 'textual'
+            'tipo_processamento': 'textual' if usar_texto_transcrito else ('multimodal' if tipo_resposta == 'arquivo' else 'textual')
         })
-        
-    except Exception as e:        
+
+    except Exception as e:
         return JsonResponse({
             'success': False,
             'message': f'Erro na correção automática: {str(e)}'
-        })
+        }, status=500)
     
 @login_required
 @acesso_mimir_requerido

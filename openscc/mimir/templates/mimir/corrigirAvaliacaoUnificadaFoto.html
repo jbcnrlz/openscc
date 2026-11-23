@@ -295,9 +295,16 @@
                                 Clique nas bolhas (A-E) para marcar manualmente ou revise os dados preenchidos automaticamente pela foto.
                             </small>
                         </div>
-                        <button type="submit" class="btn btn-primary fw-bold">
-                            <i class="fas fa-save me-1"></i> Salvar Correção
-                        </button>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" id="btnRecorrigirTodasDiss" class="btn btn-outline-primary btn-sm fw-bold"
+                                    onclick="recorrigirTodasDissertativasIA()"
+                                    title="Reavaliar todas as questões dissertativas usando o texto manuscrito transcrito de cada questão">
+                                <i class="fas fa-robot me-1"></i> Recorrigir Todas as Dissertativas
+                            </button>
+                            <button type="submit" class="btn btn-primary fw-bold">
+                                <i class="fas fa-save me-1"></i> Salvar Correção
+                            </button>
+                        </div>
                     </div>
 
                     <div class="card-body p-3">
@@ -393,9 +400,18 @@
 
                             <!-- Painel 2: Caixa de Transcrição da Resposta Dissertativa -->
                             <div id="box_corr_diss_{{ item.pergunta.id }}" class="mb-2 {% if not item.is_dissertativa %}d-none{% endif %}">
-                                <label class="form-label small fw-bold text-dark mb-1">
-                                    <i class="fas fa-pen-nib text-primary me-1"></i>Resposta Manuscrita Transcrita / Texto do Aluno:
-                                </label>
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                                    <label class="form-label small fw-bold text-dark mb-0" for="input_resp_diss_vis_{{ item.pergunta.id }}">
+                                        <i class="fas fa-pen-nib text-primary me-1"></i>Resposta Manuscrita Transcrita / Texto do Aluno:
+                                    </label>
+                                    <button type="button"
+                                            id="btn_recorrigir_diss_{{ item.pergunta.id }}"
+                                            class="btn btn-xs btn-outline-primary fw-bold py-1 px-2"
+                                            onclick="recorrigirQuestaoDissertativaIA({{ item.pergunta.id }})"
+                                            title="Recalcular nota (0 a 10) e feedback usando o texto da resposta do aluno abaixo">
+                                        <i class="fas fa-sync-alt me-1"></i> Recorrigir com IA (Usar Texto do Aluno)
+                                    </button>
+                                </div>
                                 <textarea id="input_resp_diss_vis_{{ item.pergunta.id }}"
                                           rows="3" class="form-control form-control-sm"
                                           placeholder="A transcrição da foto ou resposta dissertativa do aluno aparecerá aqui..."
@@ -457,6 +473,124 @@ function alternarModoCorrecaoCard(qid) {
         if (lbl) lbl.textContent = 'Objetiva (A–E)';
     }
     recalcularNotaPainel();
+}
+
+async function recorrigirQuestaoDissertativaIA(qid, silencioso = false) {
+    const textareaDiss = document.getElementById(`input_resp_diss_vis_${qid}`);
+    const inputHidden = document.getElementById(`input_resp_${qid}`);
+    const inputNota = document.getElementById(`input_nota_${qid}`);
+    const inputFeedback = document.getElementById(`input_feedback_${qid}`);
+    const badgeStatus = document.getElementById(`badge_status_${qid}`);
+    const btn = document.getElementById(`btn_recorrigir_diss_${qid}`);
+
+    const textoAluno = (textareaDiss ? textareaDiss.value : (inputHidden ? inputHidden.value : '')).trim();
+    if (!textoAluno) {
+        if (!silencioso) {
+            alert('Digite ou transcreva o texto da resposta manuscrita do aluno antes de clicar em Recorrigir.');
+            textareaDiss?.focus();
+        }
+        return false;
+    }
+
+    sincronizarRespostaCard(qid, textoAluno);
+
+    const htmlOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Recorrigindo...';
+    }
+    if (badgeStatus) {
+        badgeStatus.className = 'badge bg-info text-dark';
+        badgeStatus.textContent = 'Avaliando texto...';
+    }
+
+    try {
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        const resp = await fetch("{% url 'mimir:corrigirComIA' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrf
+            },
+            body: JSON.stringify({
+                pergunta_id: qid,
+                resposta_aluno: textoAluno,
+                usar_texto_transcrito: true
+            })
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            if (!silencioso) {
+                alert(data.message || 'Não foi possível recorrigir a questão com a IA.');
+            }
+            if (badgeStatus) {
+                badgeStatus.className = 'badge bg-danger';
+                badgeStatus.textContent = 'Erro ao recorrigir';
+            }
+            return false;
+        }
+
+        const novaNota = parseFloat(data.nota ?? 0);
+        if (inputNota && !isNaN(novaNota)) {
+            inputNota.value = novaNota.toFixed(1);
+        }
+        if (inputFeedback && data.feedback) {
+            inputFeedback.value = data.feedback;
+        }
+        if (badgeStatus) {
+            badgeStatus.className = novaNota >= 6.0 ? 'badge bg-success' : 'badge bg-warning text-dark';
+            badgeStatus.textContent = `Recorrigida IA: ${novaNota.toFixed(1)}/10`;
+        }
+        recalcularNotaPainel();
+        return true;
+    } catch (err) {
+        if (!silencioso) {
+            alert('Erro de comunicação ao recorrigir: ' + err);
+        }
+        return false;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal || '<i class="fas fa-sync-alt me-1"></i> Recorrigir com IA (Usar Texto do Aluno)';
+        }
+    }
+}
+
+async function recorrigirTodasDissertativasIA() {
+    const cardsDiss = Array.from(document.querySelectorAll('.item-correcao-card')).filter(
+        c => c.getAttribute('data-is-dissertativa') === '1'
+    );
+    if (cardsDiss.length === 0) {
+        alert('Não há questões em modo dissertativo nesta prova.');
+        return;
+    }
+
+    const btnTodas = document.getElementById('btnRecorrigirTodasDiss');
+    const htmlOrig = btnTodas ? btnTodas.innerHTML : '';
+    if (btnTodas) {
+        btnTodas.disabled = true;
+        btnTodas.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Recorrigindo Dissertativas...';
+    }
+
+    let qtdCorrigidas = 0;
+    for (const card of cardsDiss) {
+        const qid = card.getAttribute('data-qid');
+        const txt = (document.getElementById(`input_resp_diss_vis_${qid}`)?.value || '').trim();
+        if (txt) {
+            const ok = await recorrigirQuestaoDissertativaIA(qid, true);
+            if (ok) qtdCorrigidas += 1;
+        }
+    }
+
+    if (btnTodas) {
+        btnTodas.disabled = false;
+        btnTodas.innerHTML = htmlOrig;
+    }
+
+    if (qtdCorrigidas === 0) {
+        alert('Preencha ou transcreva o texto de pelo menos uma questão dissertativa para recorrigir.');
+    }
 }
 
 function selecionarBolhaOMR(qid, letra, gabaritoOficial, secao) {
