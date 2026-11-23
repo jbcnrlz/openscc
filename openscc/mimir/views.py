@@ -4494,11 +4494,21 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
                 prova.perguntas.add(pergunta)
                 ids_adicionadas.append(pergunta.id)
 
+                # Se a questão é dissertativa e o botão clicado foi o explorador geral ('materia_objetivas'),
+                # direciona automaticamente para a seção dissertativa adequada
+                secao_efetiva = secao_destino
+                if not is_pergunta_objetiva(pergunta) and secao_destino == 'materia_objetivas':
+                    nome_ass_p = (pergunta.assunto.nome if pergunta.assunto_id else '').strip().lower()
+                    if meta.get('is_unificada') and 'conhecimento' in nome_ass_p and 'gera' in nome_ass_p:
+                        secao_efetiva = 'cg_dissertativa'
+                    else:
+                        secao_efetiva = 'dissertativa_tecnica'
+
                 # Resolve o assunto_id de destino (suporta modo 'auto' para vincular ao assunto correspondente do módulo)
                 target_aid = pergunta.assunto_id
                 if assunto_destino_id and str(assunto_destino_id).isdigit():
                     target_aid = int(assunto_destino_id)
-                elif secao_destino == 'materia_objetivas':
+                elif secao_efetiva == 'materia_objetivas':
                     if pergunta.assunto_id in assuntos_modulo_ids:
                         target_aid = pergunta.assunto_id
                     else:
@@ -4509,7 +4519,7 @@ def gerenciarAvaliacaoUnificada(request, prova_id):
                             target_aid = assuntos_modulo_ids[0]
 
                 q_map[str(pergunta.id)] = {
-                    'secao': secao_destino,
+                    'secao': secao_efetiva,
                     'assunto_id': target_aid,
                 }
 
