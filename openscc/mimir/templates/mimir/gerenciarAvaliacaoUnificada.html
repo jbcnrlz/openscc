@@ -56,6 +56,9 @@
                     <a href="{% url 'mimir:corrigirAvaliacaoUnificadaFoto' prova.id %}" class="btn btn-success fw-bold shadow-sm">
                         <i class="fas fa-camera me-1"></i> Corrigir por Foto / OMR
                     </a>
+                    <a href="{% url 'mimir:fechamentoPsicometricoUnificada' prova.id %}" class="btn btn-dark fw-bold shadow-sm">
+                        <i class="fas fa-calculator me-1"></i> Correção Final (ENADE)
+                    </a>
 
                     <div class="btn-group shadow-sm">
                         <a href="{% url 'mimir:imprimirAvaliacaoUnificada' prova.id %}?tipo=prova" target="_blank" class="btn btn-primary fw-semibold">

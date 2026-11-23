@@ -137,13 +137,113 @@
                 <strong>Status:</strong> {{ prova_aluno.status|title }}
             </td>
             <td style="width: 30%;" align="right">
-                <div class="nota-box">
+                <div class="nota-box" style="width: 185px;">
+                    {% if explicacao_enade %}
+                    <span style="font-size: 9pt; text-transform: uppercase;">Nota Geral (NT_Ger 0 a 1)</span>
+                    <span class="nota-valor">{{ explicacao_enade.aluno.nt_ger|floatformat:4 }}</span>
+                    <span style="font-size: 9pt; color: #555;">Equiv. 0–10: <strong>{{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }}</strong></span>
+                    {% else %}
                     <span style="font-size: 10pt; text-transform: uppercase;">Nota Final</span>
                     <span class="nota-valor">{{ prova_aluno.nota_final|floatformat:1 }}</span>
+                    {% endif %}
                 </div>
             </td>
         </tr>
     </table>
+
+    {% if explicacao_enade %}
+    <div style="border: 1px solid #2c5aa0; border-radius: 8px; padding: 14px; margin-bottom: 22px; background-color: #f8fbff;">
+        <h3 style="color: #2c5aa0; margin: 0 0 8px 0; font-size: 13pt; border-bottom: 1px solid #cfe2ff; padding-bottom: 5px;">
+            Memória de Cálculo e Explicação da Nota Final (Modelo ENADE — Escala 0 a 1)
+        </h3>
+        <p style="font-size: 9.5pt; margin: 0 0 10px 0; color: #333;">
+            <strong>1. Análise Psicométrica das Objetivas (Correlação Ponto-Bisserial r_pb &gt; 0,19):</strong><br>
+            Calculada separadamente para Formação Geral (FG) e Componente Específico (CE) sobre {{ explicacao_enade.fechamento.total_presentes }} estudante(s) presente(s) pela fórmula
+            <code>r_pb = ((X1_barra - X_barra) / S_X) * sqrt(p / q)</code>.
+            Questões com <code>r_pb &gt; 0,19</code> são mantidas como válidas; questões com <code>r_pb &le; 0,19</code> (ou sem variância, <code>p = 0</code> ou <code>p = 1</code>) são desconsideradas.
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 9.5pt;">
+            <thead>
+                <tr style="background-color: #2c5aa0; color: #fff;">
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: left;">Componente</th>
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">Acertos Válidos</th>
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">Nota Objetiva (NO)</th>
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">Nota Discursiva (ND)</th>
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">Fórmula do Componente</th>
+                    <th style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">Nota Total (NT)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 6px; border: 1px solid #ccc;"><strong>Formação Geral (FG — 25%)</strong></td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.acertos_validos_fg }} / {{ explicacao_enade.aluno.v_fg }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.nd_fg|floatformat:4 }} ({{ explicacao_enade.aluno.nd_fg_10|floatformat:1 }}/10)</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">0,65 × {{ explicacao_enade.aluno.no_fg|floatformat:4 }} + 0,35 × {{ explicacao_enade.aluno.nd_fg|floatformat:4 }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.nt_fg|floatformat:4 }}</strong></td>
+                </tr>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 6px; border: 1px solid #ccc;"><strong>Componente Específico (CE — 75%)</strong></td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.acertos_validos_ce }} / {{ explicacao_enade.aluno.v_ce }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.nd_ce|floatformat:4 }} ({{ explicacao_enade.aluno.nd_ce_10|floatformat:1 }}/10)</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">0,90 × {{ explicacao_enade.aluno.no_ce|floatformat:4 }} + 0,10 × {{ explicacao_enade.aluno.nd_ce|floatformat:4 }}</td>
+                    <td style="padding: 6px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.nt_ce|floatformat:4 }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+            <thead>
+                <tr style="background-color: #e9ecef; color: #222;">
+                    <th style="padding: 5px; border: 1px solid #ccc; text-align: left;">Parcela da Prova</th>
+                    <th style="padding: 5px; border: 1px solid #ccc; text-align: center;">Peso Relativo</th>
+                    <th style="padding: 5px; border: 1px solid #ccc; text-align: center;">Contribuição Máxima</th>
+                    <th style="padding: 5px; border: 1px solid #ccc; text-align: center;">Nota na Parcela</th>
+                    <th style="padding: 5px; border: 1px solid #ccc; text-align: center;">Pontos Somados na Nota Final</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 5px; border: 1px solid #ccc;">Objetivas de Formação Geral (NO_FG)</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">25% × 65% = 16,25%</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">0,1625</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.contrib_fg_obj|floatformat:4 }}</strong></td>
+                </tr>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 5px; border: 1px solid #ccc;">Discursiva de Formação Geral (ND_FG)</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">25% × 35% = 8,75%</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">0,0875</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.nd_fg|floatformat:4 }}</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.contrib_fg_diss|floatformat:4 }}</strong></td>
+                </tr>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 5px; border: 1px solid #ccc;">Objetivas de Componente Específico (NO_CE)</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">75% × 90% = 67,50%</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">0,6750</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.contrib_ce_obj|floatformat:4 }}</strong></td>
+                </tr>
+                <tr style="background-color: #fff;">
+                    <td style="padding: 5px; border: 1px solid #ccc;">Discursiva de Componente Específico (ND_CE)</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">75% × 10% = 7,50%</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">0,0750</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;">{{ explicacao_enade.aluno.nd_ce|floatformat:4 }}</td>
+                    <td style="padding: 5px; border: 1px solid #ccc; text-align: center;"><strong>{{ explicacao_enade.aluno.contrib_ce_diss|floatformat:4 }}</strong></td>
+                </tr>
+                <tr style="background-color: #cfe2ff; font-weight: bold;">
+                    <td style="padding: 6px; border: 1px solid #2c5aa0;">Total — Nota Geral (NT_Ger = 0,25 × NT_FG + 0,75 × NT_CE)</td>
+                    <td style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">100%</td>
+                    <td style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">1,0000</td>
+                    <td style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">{{ explicacao_enade.aluno.nt_ger_pct }}%</td>
+                    <td style="padding: 6px; border: 1px solid #2c5aa0; text-align: center;">{{ explicacao_enade.aluno.nt_ger|floatformat:4 }} ({{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }}/10)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 
     <h3 style="color: #444; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Detalhamento das Questões</h3>
 
