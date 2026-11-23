@@ -327,6 +327,14 @@
                                 </div>
 
                                 <div class="d-flex align-items-center gap-2">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2 small"
+                                            id="btn_toggle_modo_corr_{{ item.pergunta.id }}"
+                                            onclick="alternarModoCorrecaoCard({{ item.pergunta.id }})"
+                                            title="Alternar entre Correção Dissertativa (Texto) e Objetiva (Bolhas A-E)">
+                                        <i class="fas fa-exchange-alt me-1"></i>
+                                        <span id="lbl_toggle_modo_corr_{{ item.pergunta.id }}">{% if item.is_dissertativa %}Dissertativa{% else %}Objetiva (A–E){% endif %}</span>
+                                    </button>
                                     <span id="badge_status_{{ item.pergunta.id }}" class="badge d-none"></span>
                                     <div class="input-group input-group-sm" style="width: 135px;">
                                         <span class="input-group-text fw-semibold">Nota</span>
@@ -353,9 +361,14 @@
                             <!-- Enunciado resumido expansível -->
                             <div class="small text-secondary mb-2" style="white-space: pre-line;">{{ item.pergunta.get_texto_com_feedback|truncatechars:280 }}</div>
 
-                            {% if not item.is_dissertativa %}
-                            <!-- Seletor de Bolhas OMR Interativo (A, B, C, D, E) -->
-                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 rounded bg-light border mb-2">
+                            <!-- Campo oculto unificado de resposta submetido ao servidor -->
+                            <input type="hidden" name="resposta_texto_{{ item.pergunta.id }}"
+                                   id="input_resp_{{ item.pergunta.id }}"
+                                   value="{{ item.resposta_texto_atual }}">
+
+                            <!-- Painel 1: Seletor de Bolhas OMR Interativo (A, B, C, D, E) -->
+                            <div id="box_corr_obj_{{ item.pergunta.id }}"
+                                 class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 rounded bg-light border mb-2 {% if item.is_dissertativa %}d-none{% endif %}">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="small fw-bold text-dark me-1">Marcação do Aluno:</span>
                                     {% for letra in "ABCDE" %}
@@ -369,28 +382,28 @@
                                     {% endfor %}
                                 </div>
                                 <div style="min-width: 180px;">
-                                    <input type="text" name="resposta_texto_{{ item.pergunta.id }}"
-                                           id="input_resp_{{ item.pergunta.id }}"
+                                    <input type="text"
+                                           id="input_resp_obj_vis_{{ item.pergunta.id }}"
                                            value="{{ item.resposta_texto_atual }}"
                                            class="form-control form-control-sm"
-                                           placeholder="Alternativa lida (A-E)">
+                                           placeholder="Alternativa lida (A-E)"
+                                           oninput="sincronizarRespostaCard({{ item.pergunta.id }}, this.value)">
                                 </div>
                             </div>
-                            {% else %}
-                            <!-- Caixa de Transcrição da Resposta Dissertativa -->
-                            <div class="mb-2">
+
+                            <!-- Painel 2: Caixa de Transcrição da Resposta Dissertativa -->
+                            <div id="box_corr_diss_{{ item.pergunta.id }}" class="mb-2 {% if not item.is_dissertativa %}d-none{% endif %}">
                                 <label class="form-label small fw-bold text-dark mb-1">
                                     <i class="fas fa-pen-nib text-primary me-1"></i>Resposta Manuscrita Transcrita / Texto do Aluno:
                                 </label>
-                                <textarea name="resposta_texto_{{ item.pergunta.id }}"
-                                          id="input_resp_{{ item.pergunta.id }}"
+                                <textarea id="input_resp_diss_vis_{{ item.pergunta.id }}"
                                           rows="3" class="form-control form-control-sm"
-                                          placeholder="A transcrição da foto ou resposta dissertativa do aluno aparecerá aqui...">{{ item.resposta_texto_atual }}</textarea>
+                                          placeholder="A transcrição da foto ou resposta dissertativa do aluno aparecerá aqui..."
+                                          oninput="sincronizarRespostaCard({{ item.pergunta.id }}, this.value)">{{ item.resposta_texto_atual }}</textarea>
                                 <div class="small text-muted mt-1">
                                     <strong>Padrão de Resposta Esperado:</strong> {{ item.pergunta.get_gabarito_com_feedback|truncatechars:220 }}
                                 </div>
                             </div>
-                            {% endif %}
 
                             <!-- Feedback / Justificativa da Correção -->
                             <div>
@@ -414,13 +427,45 @@ let streamWebcam = null;
 let filaPaginasProva = []; // Array de { file: File|Blob, previewUrl: string, nome: string }
 let ultimoTimestampSyncCelular = 0;
 
+function sincronizarRespostaCard(qid, valor) {
+    const hidden = document.getElementById(`input_resp_${qid}`);
+    const objVis = document.getElementById(`input_resp_obj_vis_${qid}`);
+    const dissVis = document.getElementById(`input_resp_diss_vis_${qid}`);
+    if (hidden) hidden.value = valor;
+    if (objVis && objVis.value !== valor) objVis.value = valor;
+    if (dissVis && dissVis.value !== valor) dissVis.value = valor;
+}
+
+function alternarModoCorrecaoCard(qid) {
+    const card = document.getElementById(`card_questao_${qid}`);
+    if (!card) return;
+    const atualDiss = card.getAttribute('data-is-dissertativa') === '1';
+    const novoDiss = !atualDiss;
+    card.setAttribute('data-is-dissertativa', novoDiss ? '1' : '0');
+
+    const boxObj = document.getElementById(`box_corr_obj_${qid}`);
+    const boxDiss = document.getElementById(`box_corr_diss_${qid}`);
+    const lbl = document.getElementById(`lbl_toggle_modo_corr_${qid}`);
+
+    if (novoDiss) {
+        boxObj?.classList.add('d-none');
+        boxDiss?.classList.remove('d-none');
+        if (lbl) lbl.textContent = 'Dissertativa';
+    } else {
+        boxDiss?.classList.add('d-none');
+        boxObj?.classList.remove('d-none');
+        if (lbl) lbl.textContent = 'Objetiva (A–E)';
+    }
+    recalcularNotaPainel();
+}
+
 function selecionarBolhaOMR(qid, letra, gabaritoOficial, secao) {
     const inputResp = document.getElementById(`input_resp_${qid}`);
     const inputNota = document.getElementById(`input_nota_${qid}`);
     const inputFeedback = document.getElementById(`input_feedback_${qid}`);
     const badgeStatus = document.getElementById(`badge_status_${qid}`);
 
-    inputResp.value = letra;
+    sincronizarRespostaCard(qid, letra);
 
     document.querySelectorAll(`.btn-bolha-${qid}`).forEach(btn => {
         if (btn.getAttribute('data-letra') === letra) {
@@ -669,7 +714,7 @@ function aplicarResultadoLeituraNoEspelho(data, modoMesclar = true) {
         atualizadasAgora += 1;
         const tagPagina = item.pagina_foto ? ` • Pág. ${item.pagina_foto}` : '';
 
-        if (inputResp) inputResp.value = item.resposta_lida || '';
+        if (inputResp) sincronizarRespostaCard(qid, item.resposta_lida || '');
         if (inputNota && item.nota_sugerida !== null && item.nota_sugerida !== undefined) {
             inputNota.value = parseFloat(item.nota_sugerida).toFixed(1);
         }

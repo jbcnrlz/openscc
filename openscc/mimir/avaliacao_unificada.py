@@ -191,20 +191,68 @@ def _extrair_letra_gabarito(gabarito_texto: str) -> str:
     return ""
 
 
+def tem_alternativas_no_texto(texto: str) -> bool:
+    """
+    Verifica se o texto da questão realmente contém alternativas de múltipla escolha
+    (pelo menos as opções A e B em início de linha, fora de blocos de código ```).
+    Evita falsos positivos com subitens dissertativos '(a) ... (b) ...' no meio de parágrafos.
+    """
+    if not texto:
+        return False
+    sem_codigo = re.sub(r"```[\s\S]*?```", "", texto)
+    tem_a = bool(re.search(r"(?m)^\s*(?:A[\)\.\-:]|\(A\))\s+\S", sem_codigo))
+    tem_b = bool(re.search(r"(?m)^\s*(?:B[\)\.\-:]|\(B\))\s+\S", sem_codigo))
+    return tem_a and tem_b
+
+
 def is_pergunta_objetiva(pergunta) -> bool:
     """
-    Identifica se uma instância de Pergunta é objetiva (Múltipla Escolha / V ou F / Asserção-Razão)
-    pelo tipo cadastrado (`tipoDePergunta.is_objetiva`) ou pela presença de alternativas A) B) C) no enunciado.
+    Identifica com precisão se uma instância de Pergunta é Objetiva (Múltipla Escolha / V ou F)
+    ou Dissertativa (Aberta):
+      1. Se o enunciado possui alternativas explícitas A) e B) em linhas próprias -> Objetiva (True).
+      2. Se o título/texto ou o Tipo de Pergunta indica 'Dissertativa'/'Discursiva'/'Aberta'
+         e NÃO há alternativas A) e B) no texto -> Dissertativa (False).
+      3. Se NÃO há alternativas A) e B) no texto da questão e o gabarito não é uma letra isolada (A-E),
+         trata como Dissertativa (False) mesmo que o tipoDePergunta tenha ficado no default=1.
     """
-    texto = pergunta.get_texto_com_feedback() if hasattr(pergunta, "get_texto_com_feedback") else (pergunta.pergunta or "")
-    if re.search(r"(?m)^\s*\(?[A-Ha-h][\)\.\-]\s+", texto):
+    texto = (
+        pergunta.get_texto_com_feedback()
+        if hasattr(pergunta, "get_texto_com_feedback")
+        else (getattr(pergunta, "pergunta", "") or "")
+    )
+    gabarito = (
+        pergunta.get_gabarito_com_feedback()
+        if hasattr(pergunta, "get_gabarito_com_feedback")
+        else (getattr(pergunta, "gabarito", "") or "")
+    ).strip()
+
+    # 1. Se o texto contém claramente o bloco de alternativas A) e B) em início de linha, é objetiva
+    if tem_alternativas_no_texto(texto):
         return True
+
+    # 2. Se não tem alternativas A) e B) no enunciado, verifica marcadores dissertativos no texto ou tipo
+    texto_low = texto.lower()
+    if any(m in texto_low[:120] for m in ["[questão dissertativa", "questão dissertativa", "dissertativa técnica", "dissertativa de conhecimento"]):
+        return False
+
+    desc = ""
+    if getattr(pergunta, "tipoDePergunta_id", None) and getattr(pergunta, "tipoDePergunta", None):
+        desc = (pergunta.tipoDePergunta.descricao or "").lower()
+        if any(k in desc for k in ["dissertativa", "discursiva", "aberta", "técnica", "tecnica", "redação", "redacao"]):
+            return False
+
+    # 3. Se o enunciado NÃO possui alternativas A) e B), só pode ser objetiva se o gabarito
+    # for estritamente uma alternativa curta (ex: "A", "B", "Letra C")
+    gabarito_eh_apenas_letra = bool(
+        re.match(r"^\s*(?:letra|alternativa|opção|gabarito)?\s*[:\-]?\s*\(?[A-Ea-e]\)?\s*\.?\s*$", gabarito, re.IGNORECASE)
+    )
+    if not gabarito_eh_apenas_letra:
+        return False
+
     if getattr(pergunta, "tipoDePergunta_id", None) and getattr(pergunta, "tipoDePergunta", None):
         if hasattr(pergunta.tipoDePergunta, "is_objetiva"):
             return bool(pergunta.tipoDePergunta.is_objetiva)
-    desc = (pergunta.tipoDePergunta.descricao or "").lower() if getattr(pergunta, "tipoDePergunta_id", None) else ""
-    if any(k in desc for k in ["dissertativa", "discursiva", "aberta", "técnica", "tecnica"]):
-        return False
+
     if any(k in desc for k in ["múltipla", "multipla", "objetiva", "multiple", "verdadeiro", "alternativa", "asserção", "assercao", "afirmativa", "escolha"]):
         return True
     return False
@@ -272,15 +320,30 @@ def inferir_secao_pergunta(pergunta, meta: dict) -> Tuple[str, Optional[int]]:
     """
     Determina a qual seção da prova pertence uma pergunta,
     usando `question_map` (ou `mapa_questoes`) salvo nos metadados ou inferindo pelo assunto/texto/tipo.
+    Corrige automaticamente caso uma questão dissertativa tenha sido mapeada por engano em seção objetiva.
     """
     q_map = (meta or {}).get("question_map") or (meta or {}).get("mapa_questoes") or {}
     pid_str = str(pergunta.id)
-    if pid_str in q_map:
-        info = q_map[pid_str]
-        return info.get("secao", "materia_objetivas"), info.get("assunto_id", pergunta.assunto_id)
-
     texto_lower = (pergunta.pergunta or "").lower()
     assunto_nome_lower = (pergunta.assunto.nome or "").lower() if pergunta.assunto_id else ""
+    objetiva = is_pergunta_objetiva(pergunta)
+    is_unificada_flag = bool((meta or {}).get("is_unificada", False))
+    is_cg = any(
+        k in assunto_nome_lower or k in texto_lower[:90]
+        for k in ["conhecimento geral", "conhecimentos gerais", "atualidades"]
+    )
+
+    if pid_str in q_map:
+        info = q_map[pid_str]
+        sec_salva = info.get("secao", "materia_objetivas")
+        aid_salvo = info.get("assunto_id", pergunta.assunto_id)
+        # Se a questão é claramente dissertativa (sem alternativas A-E) mas foi vinculada
+        # pelo explorador geral com 'materia_objetivas' ou 'cg_objetivas', redireciona para a seção dissertativa!
+        if not objetiva and sec_salva in ("materia_objetivas", "cg_objetivas"):
+            if is_unificada_flag and (sec_salva == "cg_objetivas" or is_cg):
+                return "cg_dissertativa", aid_salvo
+            return "dissertativa_tecnica", aid_salvo
+        return sec_salva, aid_salvo
 
     if (
         "sensação" in texto_lower
@@ -290,17 +353,10 @@ def inferir_secao_pergunta(pergunta, meta: dict) -> Tuple[str, Optional[int]]:
     ):
         return "sensacao_aluno", pergunta.assunto_id
 
-    objetiva = is_pergunta_objetiva(pergunta)
-
-    if not bool((meta or {}).get("is_unificada", False)):
+    if not is_unificada_flag:
         if not objetiva:
             return "dissertativa_tecnica", pergunta.assunto_id
         return "materia_objetivas", pergunta.assunto_id
-
-    is_cg = any(
-        k in assunto_nome_lower or k in texto_lower[:90]
-        for k in ["conhecimento geral", "conhecimentos gerais", "atualidades"]
-    )
 
     if is_cg:
         return ("cg_objetivas" if objetiva else "cg_dissertativa"), pergunta.assunto_id
@@ -402,7 +458,12 @@ def construir_estrutura_unificada(prova) -> dict:
             meta_qtd = int(quotas.get(cod, DEFAULT_QUOTAS[cod]))
             itens_sec = []
             for p in lista_p:
-                obj_flag = is_pergunta_objetiva(p)
+                # Se a questão está em uma seção dissertativa (Parte II ou Parte IV),
+                # ela é SEMPRE tratada como dissertativa (exceto se tiver alternativas A) e B) explícitas)
+                if cod in ("cg_dissertativa", "dissertativa_tecnica"):
+                    obj_flag = False
+                else:
+                    obj_flag = is_pergunta_objetiva(p)
                 peso_sugerido = 0 if cod == "sensacao_aluno" else (2 if not obj_flag else 1)
                 letra_gab = _extrair_letra_gabarito(p.get_gabarito_com_feedback()) if obj_flag else ""
                 item = {
