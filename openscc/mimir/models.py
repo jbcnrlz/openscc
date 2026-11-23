@@ -183,19 +183,25 @@ class TiposDePergunta(models.Model):
         # Inferência inteligente caso o tipo tenha sido cadastrado no formato antigo
         formato = (meta.get("formato") or "").strip().lower()
         if formato not in ("objetiva", "dissertativa"):
-            texto_busca = f"{self.descricao or ''} {instrucoes}".lower()
-            palavras_dissertativa = ["dissertativa", "discursiva", "aberta", "redação", "redacao"]
+            desc_lower = (self.descricao or "").lower()
+            instr_lower = instrucoes.lower()
+            palavras_dissertativa = [
+                "dissertativa", "discursiva", "aberta", "redação", "redacao",
+                "estudo de caso", "resolução", "resolucao", "técnica", "tecnica",
+            ]
             palavras_objetiva = [
-                "múltipla", "multipla", "objetiva", "alternativa", "escolha",
+                "múltipla", "multipla", "objetiva", "alternativas",
                 "asserção", "assercao", "afirmativa", "verdadeiro", "falso",
-                "certo ou errado", "enade", "poscomp", "a)", "5 opções", "5 opcoes",
+                "certo ou errado", "enade", "poscomp", "5 opções", "5 opcoes",
                 "4 alternativas", "5 alternativas",
             ]
-            if any(p in (self.descricao or "").lower() for p in palavras_objetiva):
-                formato = "objetiva"
-            elif any(p in (self.descricao or "").lower() for p in palavras_dissertativa):
+            if any(p in desc_lower for p in palavras_dissertativa) and not any(p in desc_lower for p in ["múltipla", "multipla", "objetiva"]):
                 formato = "dissertativa"
-            elif any(p in texto_busca for p in palavras_objetiva):
+            elif any(p in desc_lower for p in palavras_objetiva):
+                formato = "objetiva"
+            elif any(p in instr_lower for p in ["padrão de resposta", "padrao de resposta", "questão aberta", "questao aberta", "dissertativa", "discursiva"]):
+                formato = "dissertativa"
+            elif any(p in instr_lower for p in palavras_objetiva):
                 formato = "objetiva"
             else:
                 formato = "dissertativa"
