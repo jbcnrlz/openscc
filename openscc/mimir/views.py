@@ -16,7 +16,7 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from django.db.models import Count, Avg, Q
 from .decorators import acesso_mimir_requerido, grupo_requerido
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.utils.text import slugify
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from langchain_core.prompts import ChatPromptTemplate
@@ -5048,20 +5048,28 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
         # Caso o professor tenha informado um novo nome de aluno rápido sem cadastro prévio
         novo_aluno_nome = (request.POST.get('novo_aluno_nome') or '').strip()
         if not aluno_selecionado and novo_aluno_nome:
-            username_base = slugify(novo_aluno_nome).replace('-', '.')[:25] or f"aluno.{timezone.now().strftime('%H%M%S')}"
-            username_final = username_base
-            idx = 1
-            while User.objects.filter(username=username_final).exists():
-                idx += 1
-                username_final = f"{username_base}{idx}"
             partes_nome = novo_aluno_nome.split(' ', 1)
-            aluno_selecionado = User.objects.create(
-                username=username_final,
-                first_name=partes_nome[0],
-                last_name=partes_nome[1] if len(partes_nome) > 1 else '',
+            p_nome = partes_nome[0]
+            s_nome = partes_nome[1] if len(partes_nome) > 1 else ''
+            # Verifica primeiro se já existe um aluno com o mesmo nome ou username
+            aluno_selecionado = (
+                User.objects.filter(first_name__iexact=p_nome, last_name__iexact=s_nome).first()
+                or User.objects.filter(username__iexact=novo_aluno_nome).first()
             )
-            grupo_aluno, _ = Group.objects.get_or_create(name='Aluno')
-            aluno_selecionado.groups.add(grupo_aluno)
+            if not aluno_selecionado:
+                username_base = slugify(novo_aluno_nome).replace('-', '.')[:25] or f"aluno.{timezone.now().strftime('%H%M%S')}"
+                username_final = username_base
+                idx = 1
+                while User.objects.filter(username=username_final).exists():
+                    idx += 1
+                    username_final = f"{username_base}{idx}"
+                aluno_selecionado = User.objects.create(
+                    username=username_final,
+                    first_name=p_nome,
+                    last_name=s_nome,
+                )
+                grupo_aluno, _ = Group.objects.get_or_create(name='Aluno')
+                aluno_selecionado.groups.add(grupo_aluno)
 
         if not aluno_selecionado:
             messages.error(request, 'Selecione um aluno ou informe o nome do aluno para salvar a correção.')
