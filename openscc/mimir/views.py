@@ -2043,9 +2043,16 @@ def finalizarProva(request, prova_aluno_id):
 
 @login_required
 @acesso_mimir_requerido
-@grupo_requerido('Aluno')
 def verResultadoProva(request, prova_aluno_id):
-    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
+    # Permite que o próprio aluno ou um professor visualize o resultado e a explicação detalhada da nota
+    is_professor = hasattr(request.user, 'isProfessor') and (
+        request.user.isProfessor() if callable(request.user.isProfessor) else bool(request.user.isProfessor)
+    ) or request.user.groups.filter(name='Professor').exists()
+
+    if is_professor:
+        prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id)
+    else:
+        prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aluno=request.user)
     
     # Buscar todas as perguntas da prova
     perguntas = prova_aluno.aplicacao_prova.prova.perguntas.all()
@@ -2086,6 +2093,12 @@ def verResultadoProva(request, prova_aluno_id):
                     notas_entre_5_7 += 1
                 else:
                     notas_abaixo_5 += 1
+
+    # Memória de cálculo e explicação psicométrica (Modelo ENADE) para Avaliação Unificada
+    explicacao_enade = None
+    prova_obj = prova_aluno.aplicacao_prova.prova
+    if prova_aluno.status == 'corrigida' and (prova_obj.is_unificada or bool(prova_obj.unificada_meta.get('fechamento_psicometrico'))):
+        explicacao_enade = obter_explicacao_nota_unificada_aluno(prova_aluno)
     
     context = {
         'prova_aluno': prova_aluno,
@@ -2098,6 +2111,8 @@ def verResultadoProva(request, prova_aluno_id):
         'notas_acima_7': notas_acima_7,
         'notas_entre_5_7': notas_entre_5_7,
         'notas_abaixo_5': notas_abaixo_5,
+        'explicacao_enade': explicacao_enade,
+        'is_professor_viewer': is_professor,
     }
     
     return render(request, 'mimir/resultadoProva.html', context)
@@ -3917,9 +3932,15 @@ def exportarCorrecaoPDF(request, prova_aluno_id):
         })
     
     # 4. Monta o contexto para o template
+    explicacao_enade = None
+    prova_obj = prova_aluno.aplicacao_prova.prova
+    if prova_aluno.status == 'corrigida' and (prova_obj.is_unificada or bool(prova_obj.unificada_meta.get('fechamento_psicometrico'))):
+        explicacao_enade = obter_explicacao_nota_unificada_aluno(prova_aluno)
+
     context = {
         'prova_aluno': prova_aluno,
         'perguntas_com_respostas': perguntas_com_respostas,
+        'explicacao_enade': explicacao_enade,
     }
     
     # 5. Renderiza o HTML limpo
@@ -4198,6 +4219,8 @@ from .avaliacao_unificada import (
     gerar_questoes_faltantes_unificada,
     analisar_foto_prova_unificada_ia,
     calcular_diagnostico_prova_aluno_unificada,
+    calcular_fechamento_psicometrico_unificada,
+    obter_explicacao_nota_unificada_aluno,
     garantir_tipos_pergunta_unificada,
     garantir_assunto_auxiliar,
     is_pergunta_objetiva,
@@ -5240,6 +5263,168 @@ def corrigirAvaliacaoUnificadaFoto(request, prova_id):
         'qrcode_scanner_b64': qrcode_scanner_b64,
     }
     return render(request, 'mimir/corrigirAvaliacaoUnificadaFoto.html', context)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+@require_POST
+def excluirCorrecaoProvaAluno(request, prova_id, prova_aluno_id):
+    """
+    Exclui a correção (`ProvaAluno` e suas `RespostaAluno`) de um estudante específico
+    em uma prova/avaliação unificada, recalculando automaticamente a análise psicométrica.
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    prova_aluno = get_object_or_404(ProvaAluno, id=prova_aluno_id, aplicacao_prova__prova=prova)
+    nome_aluno = prova_aluno.aluno.get_full_name() or prova_aluno.aluno.username
+
+    # Remove as respostas e o registro da prova corrigida daquele aluno
+    RespostaAluno.objects.filter(prova_aluno=prova_aluno).delete()
+    prova_aluno.delete()
+
+    # Se a prova já tinha fechamento psicométrico consolidado, atualiza automaticamente as notas restantes
+    _, meta = extrair_meta_unificada(prova.descricao)
+    meta = meta or {}
+    fechamento_meta = meta.get('fechamento_psicometrico') if isinstance(meta.get('fechamento_psicometrico'), dict) else {}
+    if fechamento_meta.get('consolidado'):
+        calcular_fechamento_psicometrico_unificada(
+            prova,
+            aplicar_notas=True,
+            escala_nota_final=fechamento_meta.get('escala_nota_final', '0_1'),
+        )
+
+    messages.success(
+        request,
+        f"Correção do(a) estudante {nome_aluno} excluída com sucesso! "
+        f"A análise psicométrica (Correlação Ponto-Bisserial) e as notas foram atualizadas."
+    )
+
+    next_url = (request.POST.get('next') or '').strip()
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('mimir:fechamentoPsicometricoUnificada', prova_id=prova.id)
+
+
+@login_required(login_url='/login')
+@acesso_mimir_requerido
+@grupo_requerido('Professor')
+def fechamentoPsicometricoUnificada(request, prova_id):
+    """
+    Painel de Correção Final da Avaliação Unificada (Modelo ENADE):
+      1. Lista todas as provas corrigidas permitindo inspecionar, editar ou excluir qualquer correção.
+      2. Executa a Análise Psicométrica das Objetivas (Correlação Ponto-Bisserial r_pb > 0,19)
+         separadamente para Formação Geral (FG) e Componente Específico (CE).
+      3. Executa a Etapa 5: Cálculo das Notas por Componente (NO_FG, ND_FG, NT_FG, NO_CE, ND_CE, NT_CE)
+         e Nota Geral do Estudante (NT_Ger na escala 0 a 1 e equivalente 0 a 10).
+      4. Permite consolidar/publicar as notas finais e visualizar a Memória de Cálculo completa de cada aluno.
+    """
+    prova = get_object_or_404(Prova, id=prova_id)
+    estrutura = construir_estrutura_unificada(prova)
+    descricao_humana, meta = extrair_meta_unificada(prova.descricao)
+    meta = meta or {}
+    fechamento_meta = meta.get('fechamento_psicometrico') if isinstance(meta.get('fechamento_psicometrico'), dict) else {}
+    overrides_atuais = (
+        dict(fechamento_meta.get('overrides_validade'))
+        if isinstance(fechamento_meta.get('overrides_validade'), dict)
+        else {}
+    )
+    escala_atual = fechamento_meta.get('escala_nota_final') or '0_1'
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip()
+
+        if acao == 'salvar_overrides_psicometricos':
+            novos_overrides = {}
+            for item in estrutura.get('questoes_numeradas', []):
+                if not item.get('is_objetiva') or item.get('secao') == 'sensacao_aluno':
+                    continue
+                pid_str = str(item['pergunta'].id)
+                val_modo = (request.POST.get(f'override_q_{pid_str}') or 'auto').strip()
+                if val_modo in ('manter', 'desconsiderar', 'anulada_gabarito'):
+                    novos_overrides[pid_str] = val_modo
+            overrides_atuais = novos_overrides
+            fechamento_meta['overrides_validade'] = overrides_atuais
+            meta['fechamento_psicometrico'] = fechamento_meta
+            prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+            prova.save(update_fields=['descricao'])
+
+            if fechamento_meta.get('consolidado'):
+                calcular_fechamento_psicometrico_unificada(
+                    prova,
+                    aplicar_notas=True,
+                    escala_nota_final=escala_atual,
+                    overrides_validade=overrides_atuais,
+                )
+            messages.success(
+                request,
+                'Regras de validade das questões objetivas atualizadas e análise psicométrica recalculada!'
+            )
+            return redirect('mimir:fechamentoPsicometricoUnificada', prova_id=prova.id)
+
+        elif acao == 'resetar_overrides_auto':
+            overrides_atuais = {}
+            fechamento_meta['overrides_validade'] = {}
+            meta['fechamento_psicometrico'] = fechamento_meta
+            prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+            prova.save(update_fields=['descricao'])
+            if fechamento_meta.get('consolidado'):
+                calcular_fechamento_psicometrico_unificada(
+                    prova,
+                    aplicar_notas=True,
+                    escala_nota_final=escala_atual,
+                    overrides_validade={},
+                )
+            messages.info(
+                request,
+                'Todas as questões objetivas voltaram ao critério automático estrito do ponto de corte (r_pb > 0,19).'
+            )
+            return redirect('mimir:fechamentoPsicometricoUnificada', prova_id=prova.id)
+
+        elif acao == 'consolidar_notas_finais':
+            escala_escolhida = (request.POST.get('escala_nota_final') or '0_1').strip()
+            if escala_escolhida not in ('0_1', '0_10'):
+                escala_escolhida = '0_1'
+
+            # Também lê eventuais overrides enviados no mesmo formulário
+            for item in estrutura.get('questoes_numeradas', []):
+                if not item.get('is_objetiva') or item.get('secao') == 'sensacao_aluno':
+                    continue
+                pid_str = str(item['pergunta'].id)
+                if f'override_q_{pid_str}' in request.POST:
+                    val_modo = (request.POST.get(f'override_q_{pid_str}') or 'auto').strip()
+                    if val_modo in ('manter', 'desconsiderar', 'anulada_gabarito'):
+                        overrides_atuais[pid_str] = val_modo
+                    else:
+                        overrides_atuais.pop(pid_str, None)
+
+            fechamento = calcular_fechamento_psicometrico_unificada(
+                prova,
+                aplicar_notas=True,
+                escala_nota_final=escala_escolhida,
+                overrides_validade=overrides_atuais,
+            )
+            lbl_escala = "0 a 1 (Padrão ENADE)" if escala_escolhida == '0_1' else "0 a 10"
+            messages.success(
+                request,
+                f"Correção Final Consolidada com sucesso para {fechamento['total_presentes']} estudante(s) "
+                f"na escala {lbl_escala}! Os alunos já podem visualizar a explicação completa de sua nota final."
+            )
+            return redirect('mimir:fechamentoPsicometricoUnificada', prova_id=prova.id)
+
+    fechamento = calcular_fechamento_psicometrico_unificada(
+        prova,
+        aplicar_notas=False,
+        escala_nota_final=escala_atual,
+        overrides_validade=overrides_atuais,
+        estrutura_override=estrutura,
+    )
+
+    context = {
+        'prova': prova,
+        'estrutura': estrutura,
+        'fechamento': fechamento,
+    }
+    return render(request, 'mimir/fechamentoPsicometricoUnificada.html', context)
 
 
 @login_required
