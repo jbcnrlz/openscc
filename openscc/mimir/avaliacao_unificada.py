@@ -3,7 +3,7 @@ import datetime
 import io
 import json
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from django.conf import settings
 from django.utils import timezone
@@ -1423,6 +1423,692 @@ def calcular_diagnostico_prova_aluno_unificada(prova_aluno) -> dict:
         "por_secao": por_secao,
         "por_materia": por_materia,
         "sensacao_respostas": sensacao_respostas,
+    }
+
+
+# ==============================================================================
+# FECHAMENTO PSICOMÉTRICO E NOTA FINAL DA AVALIAÇÃO UNIFICADA (MODELO ENADE)
+# ==============================================================================
+
+PONTO_CORTE_RPB_ENADE = 0.19
+
+
+def _avaliar_acerto_questao_objetiva(item_questao: dict, resp_obj) -> Tuple[bool, str]:
+    """
+    Determina se o aluno acertou uma questão objetiva e qual alternativa marcou.
+    Considera tanto a letra registrada em `resposta_texto` comparada com `letra_gabarito`
+    quanto a nota atribuída na questão (`nota >= 6.0`).
+    """
+    letra_gab = (item_questao.get("letra_gabarito") or "").strip().upper()
+    resp_txt = ((resp_obj.resposta_texto or "") if resp_obj else "").strip()
+    letra_aluno = ""
+    if resp_txt:
+        m = re.match(r"^\s*\(?([A-Ha-h])\b", resp_txt)
+        if m:
+            letra_aluno = m.group(1).upper()
+        elif len(resp_txt) == 1 and resp_txt.upper() in "ABCDEFGH":
+            letra_aluno = resp_txt.upper()
+
+    nota_val = None
+    if resp_obj and getattr(resp_obj, "nota", None) is not None:
+        try:
+            nota_val = float(resp_obj.nota)
+        except (ValueError, TypeError):
+            nota_val = None
+
+    if letra_aluno and letra_gab:
+        if nota_val is not None:
+            acertou = (nota_val >= 6.0) or (letra_aluno == letra_gab and nota_val > 0.0)
+        else:
+            acertou = (letra_aluno == letra_gab)
+    elif nota_val is not None:
+        acertou = (nota_val >= 6.0)
+    else:
+        acertou = False
+
+    exibicao_resp = letra_aluno or (resp_txt[:15] if resp_txt else "--")
+    return acertou, exibicao_resp
+
+
+def _calcular_bloco_psicometrico_ponto_bisserial(
+    codigo_bloco: str,
+    titulo_bloco: str,
+    questoes_bloco: List[dict],
+    provas_alunos: List[Any],
+    respostas_por_pa: Dict[int, Dict[int, Any]],
+    overrides_validade: Optional[Dict[str, str]] = None,
+) -> dict:
+    """
+    Executa a Análise Psicométrica das Objetivas (Correlação Ponto-Bisserial r_pb)
+    separadamente para um componente (FG ou CE):
+      1. Calcula o escore bruto preliminar (X) de cada aluno presente no componente
+         (soma de acertos nas questões não anuladas preliminarmente daquele bloco).
+      2. Para cada questão i, extrai:
+         - X1_barra: média dos escores brutos apenas dos alunos que acertaram a questão i.
+         - X_barra: média dos escores brutos de todos os alunos presentes.
+         - S_X: desvio-padrão populacional dos escores brutos de todos os alunos presentes.
+         - p: proporção de acerto da questão (total de acertos / total de presentes).
+         - q = 1 - p: proporção de erro.
+      3. Calcula o índice de discriminação:
+         r_pb = ((X1_barra - X_barra) / S_X) * sqrt(p / q)
+      4. Aplica o ponto de corte:
+         - Se r_pb > 0.19: mantém a questão como válida.
+         - Se r_pb <= 0.19 (ou se p = 0 / p = 1 / S_X = 0, onde não há variância):
+           desconsidera a questão por baixo poder de discriminação.
+    """
+    import math
+
+    overrides = overrides_validade or {}
+    n_presentes = len(provas_alunos)
+
+    # Identifica questões anuladas preliminarmente no gabarito (se o professor marcou 'anulada_gabarito')
+    pids_anuladas_preliminar = {
+        q["pergunta"].id
+        for q in questoes_bloco
+        if overrides.get(str(q["pergunta"].id)) == "anulada_gabarito"
+    }
+
+    # Matriz de acertos [pa_id][pergunta_id] -> {'acertou': bool, 'resposta': str}
+    matriz_acertos: Dict[int, Dict[int, dict]] = {}
+    escores_brutos: Dict[int, int] = {}
+
+    for pa in provas_alunos:
+        mapa_resp = respostas_por_pa.get(pa.id, {})
+        matriz_acertos[pa.id] = {}
+        soma_acertos_prelim = 0
+        for q in questoes_bloco:
+            pid = q["pergunta"].id
+            resp_obj = mapa_resp.get(pid)
+            acertou, resp_exib = _avaliar_acerto_questao_objetiva(q, resp_obj)
+            matriz_acertos[pa.id][pid] = {
+                "acertou": acertou,
+                "resposta": resp_exib,
+            }
+            if pid not in pids_anuladas_preliminar and acertou:
+                soma_acertos_prelim += 1
+        escores_brutos[pa.id] = soma_acertos_prelim
+
+    # Estatísticas populacionais dos escores brutos preliminares (X_barra e S_X)
+    if n_presentes > 0:
+        lista_x = [float(escores_brutos[pa.id]) for pa in provas_alunos]
+        x_barra = sum(lista_x) / float(n_presentes)
+        variancia_pop = sum((x - x_barra) ** 2 for x in lista_x) / float(n_presentes)
+        s_x = math.sqrt(variancia_pop)
+    else:
+        x_barra = 0.0
+        s_x = 0.0
+
+    questoes_analisadas = []
+    total_validas = 0
+    total_desconsideradas = 0
+
+    for q in questoes_bloco:
+        p_obj = q["pergunta"]
+        pid = p_obj.id
+        modo_override = overrides.get(str(pid), "auto")
+
+        escores_acertadores = [
+            float(escores_brutos[pa.id])
+            for pa in provas_alunos
+            if matriz_acertos[pa.id][pid]["acertou"]
+        ]
+        n_acertos = len(escores_acertadores)
+        n_erros = max(0, n_presentes - n_acertos)
+
+        p_prop = (float(n_acertos) / float(n_presentes)) if n_presentes > 0 else 0.0
+        q_prop = 1.0 - p_prop
+        x1_barra = (sum(escores_acertadores) / float(n_acertos)) if n_acertos > 0 else 0.0
+
+        sem_variancia = False
+        r_pb = None
+        valida_auto = False
+
+        if pid in pids_anuladas_preliminar:
+            sem_variancia = True
+            valida_auto = False
+            motivo_auto = "Anulada preliminarmente no gabarito (excluída do escore bruto)"
+        elif n_presentes == 0:
+            sem_variancia = True
+            valida_auto = False
+            motivo_auto = "Nenhuma prova corrigida até o momento"
+        elif p_prop <= 1e-9:
+            sem_variancia = True
+            valida_auto = False
+            motivo_auto = "Desconsiderada: p = 0,0000 (nenhum aluno acertou — sem variância)"
+        elif p_prop >= 1.0 - 1e-9 or q_prop <= 1e-9:
+            sem_variancia = True
+            valida_auto = False
+            motivo_auto = "Desconsiderada: p = 1,0000 (100% dos presentes acertaram — sem variância)"
+        elif s_x <= 1e-9:
+            sem_variancia = True
+            valida_auto = False
+            motivo_auto = "Desconsiderada: Sx = 0,0000 (todos os alunos obtiveram o mesmo escore bruto — sem variância)"
+        else:
+            r_pb = ((x1_barra - x_barra) / s_x) * math.sqrt(p_prop / q_prop)
+            valida_auto = bool(r_pb > PONTO_CORTE_RPB_ENADE)
+            if valida_auto:
+                motivo_auto = f"Mantida como válida (r_pb = {r_pb:.4f} > 0,19)"
+            else:
+                motivo_auto = f"Desconsiderada por baixo poder de discriminação (r_pb = {r_pb:.4f} ≤ 0,19)"
+
+        if modo_override == "manter":
+            valida = True
+            motivo_final = f"Mantida manualmente pelo professor • [Cálculo r_pb: {motivo_auto}]"
+        elif modo_override in ("desconsiderar", "anulada_gabarito"):
+            valida = False
+            if modo_override == "anulada_gabarito":
+                motivo_final = "Anulada preliminarmente no gabarito pelo professor"
+            else:
+                motivo_final = f"Desconsiderada manualmente pelo professor • [Cálculo r_pb: {motivo_auto}]"
+        else:
+            modo_override = "auto"
+            valida = valida_auto
+            motivo_final = motivo_auto
+
+        if valida:
+            total_validas += 1
+        else:
+            total_desconsideradas += 1
+
+        for pa in provas_alunos:
+            matriz_acertos[pa.id][pid]["valida"] = valida
+
+        texto_limpo = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", p_obj.get_texto_com_feedback() or "")).strip()
+        resumo_enunciado = texto_limpo[:140] + ("..." if len(texto_limpo) > 140 else "")
+
+        questoes_analisadas.append({
+            "numero": q["numero"],
+            "numero_fmt": q["numero_fmt"],
+            "pergunta_id": pid,
+            "assunto_nome": q["assunto_nome"],
+            "secao": q["secao"],
+            "secao_titulo": q["secao_titulo_curto"],
+            "letra_gabarito": q.get("letra_gabarito") or "--",
+            "resumo_enunciado": resumo_enunciado,
+            "total_presentes": n_presentes,
+            "total_acertos": n_acertos,
+            "total_erros": n_erros,
+            "x1_barra": round(x1_barra, 4),
+            "x_barra": round(x_barra, 4),
+            "s_x": round(s_x, 4),
+            "p": round(p_prop, 4),
+            "p_pct": round(p_prop * 100.0, 1),
+            "q": round(q_prop, 4),
+            "q_pct": round(q_prop * 100.0, 1),
+            "r_pb": round(r_pb, 4) if r_pb is not None else None,
+            "sem_variancia": sem_variancia,
+            "valida_auto": valida_auto,
+            "valida": valida,
+            "modo_override": modo_override,
+            "motivo": motivo_final,
+        })
+
+    return {
+        "codigo": codigo_bloco,
+        "titulo": titulo_bloco,
+        "ponto_corte_rpb": PONTO_CORTE_RPB_ENADE,
+        "total_presentes": n_presentes,
+        "total_questoes": len(questoes_bloco),
+        "total_questoes_nao_anuladas_prelim": len(questoes_bloco) - len(pids_anuladas_preliminar),
+        "total_validas": total_validas,
+        "total_desconsideradas": total_desconsideradas,
+        "x_barra": round(x_barra, 4),
+        "s_x": round(s_x, 4),
+        "escores_brutos": escores_brutos,
+        "matriz_acertos": matriz_acertos,
+        "questoes": questoes_analisadas,
+    }
+
+
+def calcular_fechamento_psicometrico_unificada(
+    prova,
+    aplicar_notas: bool = False,
+    escala_nota_final: Optional[str] = None,
+    overrides_validade: Optional[Dict[str, str]] = None,
+    provas_alunos_override: Optional[List[Any]] = None,
+    estrutura_override: Optional[dict] = None,
+) -> dict:
+    """
+    Executa todo o processo de Correção Final da Avaliação Unificada (Modelo ENADE):
+      1. Lista todas as provas corrigidas (ProvaAluno).
+      2. Executa a Análise Psicométrica das Objetivas (Correlação Ponto-Bisserial r_pb > 0,19)
+         separadamente para:
+           - Objetivas de Formação Geral (FG: `cg_objetivas`)
+           - Objetivas de Componente Específico (CE: `materia_objetivas`)
+      3. Executa a Etapa 5 — Cálculo das Notas por Componente e Nota Final (Escala 0 a 1):
+           - NO_FG = (Acertos válidos em FG) / V_FG
+           - NT_FG = (0,65 * NO_FG) + (0,35 * ND_FG)
+           - NO_CE = (Acertos válidos em CE) / V_CE
+           - NT_CE = (0,90 * NO_CE) + (0,10 * ND_CE)
+           - NT_Ger = (0,25 * NT_FG) + (0,75 * NT_CE)
+         Com detalhamento das 4 parcelas de peso direto na composição final de 1,0000 ponto:
+           - Objetivas FG: 25% * 65% = 0,1625
+           - Discursiva FG: 25% * 35% = 0,0875
+           - Objetivas CE: 75% * 90% = 0,6750
+           - Discursiva CE: 75% * 10% = 0,0750
+      4. Se `aplicar_notas=True`, consolida as notas finais em `ProvaAluno.nota_final`
+         e salva o snapshot da memória de cálculo nos metadados da `Prova`.
+    """
+    from django.utils import timezone
+
+    estrutura = estrutura_override or construir_estrutura_unificada(prova)
+    descricao_humana, meta = extrair_meta_unificada(getattr(prova, "descricao", "") or "")
+    meta = meta or {}
+    fechamento_meta = meta.get("fechamento_psicometrico") if isinstance(meta.get("fechamento_psicometrico"), dict) else {}
+
+    if overrides_validade is None:
+        overrides_validade = (
+            fechamento_meta.get("overrides_validade")
+            if isinstance(fechamento_meta.get("overrides_validade"), dict)
+            else {}
+        )
+    if not escala_nota_final:
+        escala_nota_final = fechamento_meta.get("escala_nota_final") or "0_1"
+
+    # Carrega provas corrigidas/concluídas dos alunos
+    if provas_alunos_override is not None:
+        provas_alunos = list(provas_alunos_override)
+    else:
+        from .models import ProvaAluno
+        qs_pa = (
+            ProvaAluno.objects.filter(aplicacao_prova__prova=prova)
+            .select_related("aluno", "aplicacao_prova")
+            .prefetch_related("respostas")
+            .order_by("aluno__first_name", "aluno__last_name", "aluno__username", "-id")
+        )
+        provas_alunos = [
+            pa for pa in qs_pa
+            if pa.status in ("corrigida", "concluida") or pa.respostas.exists()
+        ]
+
+    respostas_por_pa: Dict[int, Dict[int, Any]] = {}
+    for pa in provas_alunos:
+        try:
+            resps = list(pa.respostas.all())
+        except Exception:
+            resps = getattr(pa, "respostas_list", [])
+        respostas_por_pa[pa.id] = {r.pergunta_id: r for r in resps}
+
+    # Separa as questões da estrutura nos 4 blocos acadêmicos (FG Obj, FG Diss, CE Obj, CE Diss)
+    questoes_fg_obj = []
+    questoes_fg_diss = []
+    questoes_ce_obj = []
+    questoes_ce_diss = []
+
+    for q in estrutura.get("questoes_numeradas", []):
+        sec = q.get("secao")
+        if sec == "sensacao_aluno":
+            continue
+        is_obj = bool(q.get("is_objetiva"))
+        if sec == "cg_objetivas" or (sec == "cg_dissertativa" and is_obj):
+            questoes_fg_obj.append(q)
+        elif sec == "cg_dissertativa":
+            questoes_fg_diss.append(q)
+        elif sec == "materia_objetivas" or (sec == "dissertativa_tecnica" and is_obj):
+            questoes_ce_obj.append(q)
+        elif sec == "dissertativa_tecnica":
+            questoes_ce_diss.append(q)
+        else:
+            if is_obj:
+                questoes_ce_obj.append(q)
+            else:
+                questoes_ce_diss.append(q)
+
+    # Passo 1: Análise Psicométrica das Objetivas (Correlação Ponto-Bisserial) separada para FG e CE
+    bloco_fg = _calcular_bloco_psicometrico_ponto_bisserial(
+        codigo_bloco="FG",
+        titulo_bloco="Objetivas de Formação Geral (FG)",
+        questoes_bloco=questoes_fg_obj,
+        provas_alunos=provas_alunos,
+        respostas_por_pa=respostas_por_pa,
+        overrides_validade=overrides_validade,
+    )
+    bloco_ce = _calcular_bloco_psicometrico_ponto_bisserial(
+        codigo_bloco="CE",
+        titulo_bloco="Objetivas de Componente Específico (CE)",
+        questoes_bloco=questoes_ce_obj,
+        provas_alunos=provas_alunos,
+        respostas_por_pa=respostas_por_pa,
+        overrides_validade=overrides_validade,
+    )
+
+    v_fg = bloco_fg["total_validas"]
+    v_ce = bloco_ce["total_validas"]
+    tem_bloco_fg = (len(questoes_fg_obj) + len(questoes_fg_diss)) > 0
+
+    mapa_psico_fg = {q["pergunta_id"]: q for q in bloco_fg["questoes"]}
+    mapa_psico_ce = {q["pergunta_id"]: q for q in bloco_ce["questoes"]}
+
+    # Passo 2 (Etapa 5): Cálculo das Notas por Componente e Nota Final (Escala 0 a 1) por estudante
+    resultados_alunos = []
+    resultados_por_pa_id = {}
+
+    for pa in provas_alunos:
+        mapa_resp = respostas_por_pa.get(pa.id, {})
+        mat_fg_aluno = bloco_fg["matriz_acertos"].get(pa.id, {})
+        mat_ce_aluno = bloco_ce["matriz_acertos"].get(pa.id, {})
+
+        # 1. Nota Objetiva de FG (NO_FG in [0, 1])
+        escore_bruto_fg = bloco_fg["escores_brutos"].get(pa.id, 0)
+        acertos_validos_fg = sum(
+            1 for q in questoes_fg_obj
+            if mat_fg_aluno.get(q["pergunta"].id, {}).get("valida")
+            and mat_fg_aluno.get(q["pergunta"].id, {}).get("acertou")
+        )
+        no_fg = (float(acertos_validos_fg) / float(v_fg)) if v_fg > 0 else 0.0
+
+        # 2. Nota Discursiva de FG (ND_FG in [0, 1])
+        detalhes_diss_fg = []
+        notas_diss_fg_01 = []
+        for q in questoes_fg_diss:
+            pid = q["pergunta"].id
+            r_obj = mapa_resp.get(pid)
+            nota_10 = 0.0
+            if r_obj and getattr(r_obj, "nota", None) is not None:
+                try:
+                    nota_10 = max(0.0, min(10.0, float(r_obj.nota)))
+                except (ValueError, TypeError):
+                    nota_10 = 0.0
+            # Se a nota foi salva diretamente em [0, 1] ou em [0, 10], normalizamos dividindo por 10
+            nota_01 = nota_10 / 10.0
+            notas_diss_fg_01.append(nota_01)
+            detalhes_diss_fg.append({
+                "numero": q["numero"],
+                "numero_fmt": q["numero_fmt"],
+                "pergunta_id": pid,
+                "assunto_nome": q["assunto_nome"],
+                "nota_0_10": round(nota_10, 2),
+                "nota_0_1": round(nota_01, 4),
+                "feedback": (r_obj.feedback_professor or "") if r_obj else "",
+                "respondida": bool(r_obj and ((r_obj.resposta_texto or "").strip() or getattr(r_obj, "arquivo_resposta", None))),
+            })
+        nd_fg = (sum(notas_diss_fg_01) / float(len(notas_diss_fg_01))) if notas_diss_fg_01 else 0.0
+        nd_fg_10 = nd_fg * 10.0
+
+        # 3. Nota Total de Formação Geral: NT_FG = (0,65 * NO_FG) + (0,35 * ND_FG)
+        nt_fg_parcela_obj = 0.65 * no_fg
+        nt_fg_parcela_diss = 0.35 * nd_fg
+        nt_fg = nt_fg_parcela_obj + nt_fg_parcela_diss
+
+        # 4. Nota Objetiva de CE (NO_CE in [0, 1])
+        escore_bruto_ce = bloco_ce["escores_brutos"].get(pa.id, 0)
+        acertos_validos_ce = sum(
+            1 for q in questoes_ce_obj
+            if mat_ce_aluno.get(q["pergunta"].id, {}).get("valida")
+            and mat_ce_aluno.get(q["pergunta"].id, {}).get("acertou")
+        )
+        no_ce = (float(acertos_validos_ce) / float(v_ce)) if v_ce > 0 else 0.0
+
+        # 5. Nota Discursiva de CE (ND_CE in [0, 1])
+        detalhes_diss_ce = []
+        notas_diss_ce_01 = []
+        for q in questoes_ce_diss:
+            pid = q["pergunta"].id
+            r_obj = mapa_resp.get(pid)
+            nota_10 = 0.0
+            if r_obj and getattr(r_obj, "nota", None) is not None:
+                try:
+                    nota_10 = max(0.0, min(10.0, float(r_obj.nota)))
+                except (ValueError, TypeError):
+                    nota_10 = 0.0
+            nota_01 = nota_10 / 10.0
+            notas_diss_ce_01.append(nota_01)
+            detalhes_diss_ce.append({
+                "numero": q["numero"],
+                "numero_fmt": q["numero_fmt"],
+                "pergunta_id": pid,
+                "assunto_nome": q["assunto_nome"],
+                "nota_0_10": round(nota_10, 2),
+                "nota_0_1": round(nota_01, 4),
+                "feedback": (r_obj.feedback_professor or "") if r_obj else "",
+                "respondida": bool(r_obj and ((r_obj.resposta_texto or "").strip() or getattr(r_obj, "arquivo_resposta", None))),
+            })
+        nd_ce = (sum(notas_diss_ce_01) / float(len(notas_diss_ce_01))) if notas_diss_ce_01 else 0.0
+        nd_ce_10 = nd_ce * 10.0
+
+        # 6. Nota Total de Componente Específico: NT_CE = (0,90 * NO_CE) + (0,10 * ND_CE)
+        nt_ce_parcela_obj = 0.90 * no_ce
+        nt_ce_parcela_diss = 0.10 * nd_ce
+        nt_ce = nt_ce_parcela_obj + nt_ce_parcela_diss
+
+        # 7. Nota Geral do Estudante: NT_Ger = (0,25 * NT_FG) + (0,75 * NT_CE)
+        parcela_ger_fg = 0.25 * nt_fg
+        parcela_ger_ce = 0.75 * nt_ce
+        nt_ger = parcela_ger_fg + parcela_ger_ce
+        nt_ger_10 = nt_ger * 10.0
+
+        # Contribuições diretas das 4 parcelas na Nota Final (soma máxima = 1,0000)
+        contrib_fg_obj = 0.1625 * no_fg   # 25% * 65% = 0,1625
+        contrib_fg_diss = 0.0875 * nd_fg  # 25% * 35% = 0,0875
+        contrib_ce_obj = 0.6750 * no_ce   # 75% * 90% = 0,6750
+        contrib_ce_diss = 0.0750 * nd_ce  # 75% * 10% = 0,0750
+
+        # Detalhamento questão a questão das objetivas para o aluno entender cada item
+        questoes_fg_detalhe_aluno = []
+        for q in questoes_fg_obj:
+            pid = q["pergunta"].id
+            info_q = mapa_psico_fg.get(pid, {})
+            info_a = mat_fg_aluno.get(pid, {})
+            acertou_bruto = bool(info_a.get("acertou"))
+            valida_q = bool(info_q.get("valida"))
+            questoes_fg_detalhe_aluno.append({
+                **info_q,
+                "resposta_aluno": info_a.get("resposta", "--"),
+                "acertou_preliminar": acertou_bruto,
+                "contou_acerto_valido": bool(acertou_bruto and valida_q),
+            })
+
+        questoes_ce_detalhe_aluno = []
+        for q in questoes_ce_obj:
+            pid = q["pergunta"].id
+            info_q = mapa_psico_ce.get(pid, {})
+            info_a = mat_ce_aluno.get(pid, {})
+            acertou_bruto = bool(info_a.get("acertou"))
+            valida_q = bool(info_q.get("valida"))
+            questoes_ce_detalhe_aluno.append({
+                **info_q,
+                "resposta_aluno": info_a.get("resposta", "--"),
+                "acertou_preliminar": acertou_bruto,
+                "contou_acerto_valido": bool(acertou_bruto and valida_q),
+            })
+
+        aluno_user = pa.aluno
+        aluno_nome = (
+            (aluno_user.get_full_name() or aluno_user.username)
+            if hasattr(aluno_user, "get_full_name")
+            else getattr(aluno_user, "username", f"Aluno #{pa.id}")
+        )
+
+        dados_aluno = {
+            "prova_aluno_id": pa.id,
+            "prova_aluno": pa,
+            "aluno_id": getattr(aluno_user, "id", None),
+            "aluno_nome": aluno_nome,
+            "aluno_username": getattr(aluno_user, "username", ""),
+            "status": getattr(pa, "status", "corrigida"),
+            "data_conclusao": getattr(pa, "data_conclusao", None),
+            "nota_salva_atual": float(pa.nota_final) if getattr(pa, "nota_final", None) is not None else None,
+            # Bloco FG
+            "total_fg_obj": len(questoes_fg_obj),
+            "v_fg": v_fg,
+            "escore_bruto_fg": escore_bruto_fg,
+            "acertos_validos_fg": acertos_validos_fg,
+            "no_fg": round(no_fg, 4),
+            "no_fg_pct": round(no_fg * 100.0, 2),
+            "nd_fg": round(nd_fg, 4),
+            "nd_fg_10": round(nd_fg_10, 2),
+            "nd_fg_pct": round(nd_fg * 100.0, 2),
+            "nt_fg_parcela_obj": round(nt_fg_parcela_obj, 4),
+            "nt_fg_parcela_diss": round(nt_fg_parcela_diss, 4),
+            "nt_fg": round(nt_fg, 4),
+            "nt_fg_10": round(nt_fg * 10.0, 2),
+            "nt_fg_pct": round(nt_fg * 100.0, 2),
+            # Bloco CE
+            "total_ce_obj": len(questoes_ce_obj),
+            "v_ce": v_ce,
+            "escore_bruto_ce": escore_bruto_ce,
+            "acertos_validos_ce": acertos_validos_ce,
+            "no_ce": round(no_ce, 4),
+            "no_ce_pct": round(no_ce * 100.0, 2),
+            "nd_ce": round(nd_ce, 4),
+            "nd_ce_10": round(nd_ce_10, 2),
+            "nd_ce_pct": round(nd_ce * 100.0, 2),
+            "nt_ce_parcela_obj": round(nt_ce_parcela_obj, 4),
+            "nt_ce_parcela_diss": round(nt_ce_parcela_diss, 4),
+            "nt_ce": round(nt_ce, 4),
+            "nt_ce_10": round(nt_ce * 10.0, 2),
+            "nt_ce_pct": round(nt_ce * 100.0, 2),
+            # Nota Geral e Parcelas Diretas (0 a 1)
+            "parcela_ger_fg": round(parcela_ger_fg, 4),
+            "parcela_ger_ce": round(parcela_ger_ce, 4),
+            "contrib_fg_obj": round(contrib_fg_obj, 4),
+            "contrib_fg_diss": round(contrib_fg_diss, 4),
+            "contrib_ce_obj": round(contrib_ce_obj, 4),
+            "contrib_ce_diss": round(contrib_ce_diss, 4),
+            "nt_ger": round(nt_ger, 4),
+            "nt_ger_10": round(nt_ger_10, 2),
+            "nt_ger_pct": round(nt_ger * 100.0, 2),
+            # Listas detalhadas para a Memória de Cálculo Individual
+            "questoes_fg_detalhe": questoes_fg_detalhe_aluno,
+            "questoes_ce_detalhe": questoes_ce_detalhe_aluno,
+            "dissertativas_fg_detalhe": detalhes_diss_fg,
+            "dissertativas_ce_detalhe": detalhes_diss_ce,
+        }
+        resultados_alunos.append(dados_aluno)
+        resultados_por_pa_id[pa.id] = dados_aluno
+
+    # Médias gerais da turma na Etapa 5
+    n_alunos = len(resultados_alunos)
+    if n_alunos > 0:
+        media_turma_nt_fg = round(sum(r["nt_fg"] for r in resultados_alunos) / n_alunos, 4)
+        media_turma_nt_ce = round(sum(r["nt_ce"] for r in resultados_alunos) / n_alunos, 4)
+        media_turma_nt_ger = round(sum(r["nt_ger"] for r in resultados_alunos) / n_alunos, 4)
+        media_turma_nt_ger_10 = round(media_turma_nt_ger * 10.0, 2)
+    else:
+        media_turma_nt_fg = 0.0
+        media_turma_nt_ce = 0.0
+        media_turma_nt_ger = 0.0
+        media_turma_nt_ger_10 = 0.0
+
+    # Se solicitado, aplica e salva as notas finais consolidadas no banco de dados
+    consolidado_em = fechamento_meta.get("consolidado_em")
+    if aplicar_notas and hasattr(prova, "save"):
+        agora_iso = timezone.now().isoformat()
+        consolidado_em = agora_iso
+        notas_snapshot = {}
+        for r in resultados_alunos:
+            pa_obj = r["prova_aluno"]
+            if escala_nota_final == "0_10":
+                pa_obj.nota_final = round(r["nt_ger_10"], 2)
+            else:
+                pa_obj.nota_final = round(r["nt_ger"], 2)
+            pa_obj.status = "corrigida"
+            if not getattr(pa_obj, "data_conclusao", None):
+                pa_obj.data_conclusao = timezone.now()
+            pa_obj.save()
+            r["nota_salva_atual"] = float(pa_obj.nota_final)
+            notas_snapshot[str(pa_obj.id)] = {
+                "no_fg": r["no_fg"],
+                "nd_fg": r["nd_fg"],
+                "nt_fg": r["nt_fg"],
+                "no_ce": r["no_ce"],
+                "nd_ce": r["nd_ce"],
+                "nt_ce": r["nt_ce"],
+                "nt_ger": r["nt_ger"],
+                "nt_ger_10": r["nt_ger_10"],
+                "contrib_fg_obj": r["contrib_fg_obj"],
+                "contrib_fg_diss": r["contrib_fg_diss"],
+                "contrib_ce_obj": r["contrib_ce_obj"],
+                "contrib_ce_diss": r["contrib_ce_diss"],
+            }
+
+        meta["fechamento_psicometrico"] = {
+            "consolidado": True,
+            "consolidado_em": agora_iso,
+            "escala_nota_final": escala_nota_final,
+            "overrides_validade": overrides_validade,
+            "v_fg": v_fg,
+            "v_ce": v_ce,
+            "total_presentes": n_alunos,
+            "notas_por_prova_aluno": notas_snapshot,
+        }
+        prova.descricao = empacotar_meta_unificada(descricao_humana, meta)
+        prova.save(update_fields=["descricao"])
+
+    pesos_efetivos_tabela = [
+        {
+            "parcela": "Objetivas de Formação Geral (NO_FG)",
+            "formula_peso": "25% × 65%",
+            "peso_percentual": "16,25%",
+            "contribuicao_maxima": 0.1625,
+            "codigo": "fg_obj",
+        },
+        {
+            "parcela": "Discursiva de Formação Geral (ND_FG)",
+            "formula_peso": "25% × 35%",
+            "peso_percentual": "8,75%",
+            "contribuicao_maxima": 0.0875,
+            "codigo": "fg_diss",
+        },
+        {
+            "parcela": "Objetivas de Componente Específico (NO_CE)",
+            "formula_peso": "75% × 90%",
+            "peso_percentual": "67,50%",
+            "contribuicao_maxima": 0.6750,
+            "codigo": "ce_obj",
+        },
+        {
+            "parcela": "Discursiva de Componente Específico (ND_CE)",
+            "formula_peso": "75% × 10%",
+            "peso_percentual": "7,50%",
+            "contribuicao_maxima": 0.0750,
+            "codigo": "ce_diss",
+        },
+    ]
+
+    return {
+        "prova_id": getattr(prova, "id", None),
+        "is_unificada": bool(estrutura.get("is_unificada", False)),
+        "tem_bloco_fg": tem_bloco_fg,
+        "consolidado": bool(fechamento_meta.get("consolidado") or aplicar_notas),
+        "consolidado_em": consolidado_em,
+        "escala_nota_final": escala_nota_final,
+        "ponto_corte_rpb": PONTO_CORTE_RPB_ENADE,
+        "total_presentes": n_alunos,
+        "bloco_fg": bloco_fg,
+        "bloco_ce": bloco_ce,
+        "v_fg": v_fg,
+        "v_ce": v_ce,
+        "total_fg_obj": len(questoes_fg_obj),
+        "total_fg_diss": len(questoes_fg_diss),
+        "total_ce_obj": len(questoes_ce_obj),
+        "total_ce_diss": len(questoes_ce_diss),
+        "media_turma_nt_fg": media_turma_nt_fg,
+        "media_turma_nt_ce": media_turma_nt_ce,
+        "media_turma_nt_ger": media_turma_nt_ger,
+        "media_turma_nt_ger_10": media_turma_nt_ger_10,
+        "pesos_efetivos_tabela": pesos_efetivos_tabela,
+        "resultados_alunos": resultados_alunos,
+        "resultados_por_pa_id": resultados_por_pa_id,
+        "overrides_validade": overrides_validade,
+    }
+
+
+def obter_explicacao_nota_unificada_aluno(prova_aluno) -> Optional[dict]:
+    """
+    Retorna o dicionário completo de explicação passo a passo da nota final (Modelo ENADE)
+    para exibição ao aluno em `verResultadoProva` e no PDF `exportarCorrecaoPDF`.
+    """
+    if not prova_aluno or not getattr(prova_aluno, "aplicacao_prova", None):
+        return None
+    prova = prova_aluno.aplicacao_prova.prova
+    fechamento = calcular_fechamento_psicometrico_unificada(prova, aplicar_notas=False)
+    dados_aluno = fechamento["resultados_por_pa_id"].get(prova_aluno.id)
+    if not dados_aluno:
+        return None
+    return {
+        "fechamento": fechamento,
+        "aluno": dados_aluno,
     }
 
 
