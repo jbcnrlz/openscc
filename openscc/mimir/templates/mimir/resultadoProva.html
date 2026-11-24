@@ -14,7 +14,7 @@
                 <div class="col-md-4 text-end">
                     {% if explicacao_enade %}
                     <div class="display-5 fw-bold">{{ explicacao_enade.aluno.nt_ger|floatformat:4 }}</div>
-                    <small class="d-block">Nota Geral \(NT_{Ger}\) (Escala 0 a 1)</small>
+                    <small class="d-block">Nota Geral <span class="math-var">NT<sub>Ger</sub></span> (Escala 0 a 1)</small>
                     <span class="badge bg-light text-success mt-1">Equivalente 0–10: {{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }}</span>
                     {% elif prova_aluno.nota_final is not None %}
                     <div class="display-4 fw-bold">{{ prova_aluno.nota_final|floatformat:2 }}</div>
@@ -44,6 +44,70 @@
     </div>
 
     {% if explicacao_enade %}
+    <style>
+        .math-var {
+            font-family: "Cambria Math", "Times New Roman", Georgia, serif;
+            font-style: italic;
+            font-weight: 600;
+        }
+        .math-var sub, .math-var sup {
+            font-style: normal;
+            font-weight: 700;
+            font-size: 0.74em;
+        }
+        .math-bar {
+            text-decoration: overline;
+            display: inline-block;
+            line-height: 1.05;
+        }
+        .math-eq {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            gap: 5px;
+            font-family: "Cambria Math", "Times New Roman", Georgia, serif;
+            font-size: 1.06em;
+        }
+        .math-frac {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            text-align: center;
+            margin: 0 3px;
+            line-height: 1.15;
+        }
+        .math-frac > .num {
+            border-bottom: 1.5px solid currentColor;
+            padding: 0 6px 2px 6px;
+            display: block;
+            font-size: 0.92em;
+        }
+        .math-frac > .den {
+            padding: 2px 6px 0 6px;
+            display: block;
+            font-size: 0.92em;
+        }
+        .math-sqrt {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+        .math-sqrt-symbol {
+            font-size: 1.4em;
+            line-height: 1;
+            margin-right: 1px;
+            font-family: "Cambria Math", serif;
+        }
+        .math-sqrt-body {
+            border-top: 1.5px solid currentColor;
+            padding-top: 1px;
+            display: inline-flex;
+            align-items: center;
+        }
+    </style>
+
     <!-- ====================================================================== -->
     <!-- EXPLICAÇÃO COMPLETA DA NOTA FINAL E MEMÓRIA DE CÁLCULO (MODELO ENADE)  -->
     <!-- ====================================================================== -->
@@ -64,33 +128,33 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary text-center h-100">
-                        <div class="small fw-bold text-uppercase text-primary">Sua Nota Geral (\(NT_{Ger}\))</div>
+                        <div class="small fw-bold text-uppercase text-primary">Sua Nota Geral (<span class="math-var">NT<sub>Ger</sub></span>)</div>
                         <div class="display-5 fw-bold text-dark my-1">{{ explicacao_enade.aluno.nt_ger|floatformat:4 }}</div>
                         <div class="small text-muted">
-                            Escala de \(0\) a \(1\) • Equivalente em \(0\) a \(10\): <strong>{{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }} / 10,00</strong>
+                            Escala de 0 a 1 &bull; Equivalente em 0 a 10: <strong>{{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }} / 10,00</strong>
                         </div>
                         <div class="small fw-semibold text-primary mt-1 font-monospace">
-                            NT_Ger = (0,25 × {{ explicacao_enade.aluno.nt_fg|floatformat:4 }}) + (0,75 × {{ explicacao_enade.aluno.nt_ce|floatformat:4 }})
+                            <span class="math-var">NT<sub>Ger</sub></span> = (0,25 &times; {{ explicacao_enade.aluno.nt_fg|floatformat:4 }}) + (0,75 &times; {{ explicacao_enade.aluno.nt_ce|floatformat:4 }})
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="p-3 rounded-3 bg-info bg-opacity-10 border border-info-subtle text-center h-100">
-                        <div class="small fw-bold text-uppercase text-dark">Formação Geral (\(NT_{FG}\) — Peso 25%)</div>
+                        <div class="small fw-bold text-uppercase text-dark">Formação Geral (<span class="math-var">NT<sub>FG</sub></span> — Peso 25%)</div>
                         <div class="h2 fw-bold text-dark my-1">{{ explicacao_enade.aluno.nt_fg|floatformat:4 }}</div>
                         <div class="small text-muted">
-                            Objetivas Válidas (\(NO_{FG}\)): <strong>{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.acertos_validos_fg }}/{{ explicacao_enade.aluno.v_fg }})<br>
-                            Discursiva (\(ND_{FG}\)): <strong>{{ explicacao_enade.aluno.nd_fg|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.nd_fg_10|floatformat:1 }}/10)
+                            Objetivas Válidas (<span class="math-var">NO<sub>FG</sub></span>): <strong>{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.acertos_validos_fg }}/{{ explicacao_enade.aluno.v_fg }})<br>
+                            Discursiva (<span class="math-var">ND<sub>FG</sub></span>): <strong>{{ explicacao_enade.aluno.nd_fg|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.nd_fg_10|floatformat:1 }}/10)
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success-subtle text-center h-100">
-                        <div class="small fw-bold text-uppercase text-success">Componente Específico (\(NT_{CE}\) — Peso 75%)</div>
+                        <div class="small fw-bold text-uppercase text-success">Componente Específico (<span class="math-var">NT<sub>CE</sub></span> — Peso 75%)</div>
                         <div class="h2 fw-bold text-dark my-1">{{ explicacao_enade.aluno.nt_ce|floatformat:4 }}</div>
                         <div class="small text-muted">
-                            Objetivas Válidas (\(NO_{CE}\)): <strong>{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.acertos_validos_ce }}/{{ explicacao_enade.aluno.v_ce }})<br>
-                            Discursiva (\(ND_{CE}\)): <strong>{{ explicacao_enade.aluno.nd_ce|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.nd_ce_10|floatformat:1 }}/10)
+                            Objetivas Válidas (<span class="math-var">NO<sub>CE</sub></span>): <strong>{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.acertos_validos_ce }}/{{ explicacao_enade.aluno.v_ce }})<br>
+                            Discursiva (<span class="math-var">ND<sub>CE</sub></span>): <strong>{{ explicacao_enade.aluno.nd_ce|floatformat:4 }}</strong> ({{ explicacao_enade.aluno.nd_ce_10|floatformat:1 }}/10)
                         </div>
                     </div>
                 </div>
@@ -103,13 +167,33 @@
                     Passo 1: Por que algumas questões objetivas são mantidas e outras desconsideradas? (Análise Psicométrica Ponto-Bisserial)
                 </h6>
                 <p class="mb-2">
-                    Seguindo a metodologia psicométrica do ENADE, as questões objetivas de <strong>Formação Geral (FG)</strong> e de <strong>Componente Específico (CE)</strong> passam separadamente pelo cálculo do <strong>Índice de Discriminação Ponto-Bisserial (\(r_{pb}\))</strong>:
-                    \[r_{pb} = \frac{\bar{X}_1 - \bar{X}}{S_X} \sqrt{\frac{p}{q}}\]
-                    onde \(\bar{X}_1\) é a média de acertos brutos no bloco dos alunos que acertaram a questão, \(\bar{X}\) é a média geral de acertos brutos de todos os {{ explicacao_enade.fechamento.total_presentes }} alunos presentes, \(S_X\) é o desvio-padrão populacional, \(p\) é a proporção de acertos e \(q = 1 - p\) é a proporção de erros.
+                    Seguindo a metodologia psicométrica do ENADE, as questões objetivas de <strong>Formação Geral (FG)</strong> e de <strong>Componente Específico (CE)</strong> passam separadamente pelo cálculo do <strong>Índice de Discriminação Ponto-Bisserial (<span class="math-var">r<sub>pb</sub></span>)</strong>:
+                </p>
+                <div class="text-center my-3 p-3 bg-white border rounded-3">
+                    <span class="math-eq fs-5 text-dark">
+                        <span class="math-var">r<sub>pb</sub></span> =
+                        <span class="math-frac">
+                            <span class="num"><span class="math-var"><span class="math-bar">X</span><sub>1</sub></span> &minus; <span class="math-var"><span class="math-bar">X</span></span></span>
+                            <span class="den"><span class="math-var">S<sub>X</sub></span></span>
+                        </span>
+                        &times;
+                        <span class="math-sqrt">
+                            <span class="math-sqrt-symbol">&radic;</span>
+                            <span class="math-sqrt-body">
+                                <span class="math-frac">
+                                    <span class="num"><span class="math-var">p</span></span>
+                                    <span class="den"><span class="math-var">q</span></span>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <p class="mb-2">
+                    onde <span class="math-var"><span class="math-bar">X</span><sub>1</sub></span> é a média de acertos brutos no bloco dos alunos que acertaram a questão, <span class="math-var"><span class="math-bar">X</span></span> é a média geral de acertos brutos de todos os {{ explicacao_enade.fechamento.total_presentes }} alunos presentes, <span class="math-var">S<sub>X</sub></span> é o desvio-padrão populacional, <span class="math-var">p</span> é a proporção de acertos e <span class="math-var">q</span> = 1 &minus; <span class="math-var">p</span> é a proporção de erros.
                 </p>
                 <ul class="mb-0">
-                    <li><strong>Se \(r_{pb} > 0,19\):</strong> a questão discrimina positivamente o domínio do conteúdo e é <strong>mantida como Válida</strong>.</li>
-                    <li><strong>Se \(r_{pb} \le 0,19\) (ou se \(p = 0\) / \(p = 1\), onde não há variância):</strong> a questão é <strong>desconsiderada</strong> por baixo poder de discriminação e não prejudica o cálculo da sua proporção de acertos válidos (\(NO_{FG}\) e \(NO_{CE}\)).</li>
+                    <li><strong>Se <span class="math-var">r<sub>pb</sub></span> &gt; 0,19:</strong> a questão discrimina positivamente o domínio do conteúdo e é <strong>mantida como Válida</strong>.</li>
+                    <li><strong>Se <span class="math-var">r<sub>pb</sub></span> &le; 0,19 (ou se <span class="math-var">p</span> = 0 / <span class="math-var">p</span> = 1, onde não há variância):</strong> a questão é <strong>desconsiderada</strong> por baixo poder de discriminação e não prejudica o cálculo da sua proporção de acertos válidos (<span class="math-var">NO<sub>FG</sub></span> e <span class="math-var">NO<sub>CE</sub></span>).</li>
                 </ul>
             </div>
 
@@ -118,25 +202,37 @@
                 <div class="col-md-6">
                     <div class="p-3 rounded-3 border bg-light h-100">
                         <h6 class="fw-bold text-primary mb-2">
-                            <i class="fas fa-globe-americas me-1"></i> Passo 2.A — Cálculo da Formação Geral (\(NT_{FG}\))
+                            <i class="fas fa-globe-americas me-1"></i> Passo 2.A — Cálculo da Formação Geral (<span class="math-var">NT<sub>FG</sub></span>)
                         </h6>
                         <p class="mb-1">
-                            <strong>1) Nota Objetiva de FG (\(NO_{FG} \in [0, 1]\)):</strong><br>
-                            Das {{ explicacao_enade.aluno.total_fg_obj }} questões objetivas de FG, <strong>\(V_{FG} = {{ explicacao_enade.aluno.v_fg }}\)</strong> foram mantidas como válidas pela análise psicométrica. Você acertou <strong>{{ explicacao_enade.aluno.acertos_validos_fg }}</strong> questão(ões) válida(s) (seu escore bruto preliminar foi {{ explicacao_enade.aluno.escore_bruto_fg }}/{{ explicacao_enade.aluno.total_fg_obj }}):
+                            <strong>1) Nota Objetiva de FG (<span class="math-var">NO<sub>FG</sub></span> &isin; [0, 1]):</strong><br>
+                            Das {{ explicacao_enade.aluno.total_fg_obj }} questões objetivas de FG, <strong><span class="math-var">V<sub>FG</sub></span> = {{ explicacao_enade.aluno.v_fg }}</strong> foram mantidas como válidas pela análise psicométrica. Você acertou <strong>{{ explicacao_enade.aluno.acertos_validos_fg }}</strong> questão(ões) válida(s) (seu escore bruto preliminar foi {{ explicacao_enade.aluno.escore_bruto_fg }}/{{ explicacao_enade.aluno.total_fg_obj }}):
                         </p>
-                        <div class="p-2 bg-white rounded border font-monospace mb-2">
-                            NO_FG = Acertos válidos em FG / V_FG = {{ explicacao_enade.aluno.acertos_validos_fg }} / {{ explicacao_enade.aluno.v_fg }} = <strong>{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</strong>
+                        <div class="p-2 bg-white rounded border mb-2">
+                            <span class="math-eq">
+                                <span class="math-var">NO<sub>FG</sub></span> =
+                                <span class="math-frac">
+                                    <span class="num">Acertos válidos em FG</span>
+                                    <span class="den"><span class="math-var">V<sub>FG</sub></span></span>
+                                </span>
+                                =
+                                <span class="math-frac">
+                                    <span class="num">{{ explicacao_enade.aluno.acertos_validos_fg }}</span>
+                                    <span class="den">{{ explicacao_enade.aluno.v_fg }}</span>
+                                </span>
+                                = <strong>{{ explicacao_enade.aluno.no_fg|floatformat:4 }}</strong>
+                            </span>
                         </div>
                         <p class="mb-1">
-                            <strong>2) Nota Discursiva de FG (\(ND_{FG} \in [0, 1]\)):</strong><br>
-                            Sua nota na parte discursiva de FG foi <strong>{{ explicacao_enade.aluno.nd_fg_10|floatformat:2 }} / 10,00</strong>, o que equivale na escala \([0, 1]\) a <strong>\(ND_{FG} = {{ explicacao_enade.aluno.nd_fg|floatformat:4 }}\)</strong>.
+                            <strong>2) Nota Discursiva de FG (<span class="math-var">ND<sub>FG</sub></span> &isin; [0, 1]):</strong><br>
+                            Sua nota na parte discursiva de FG foi <strong>{{ explicacao_enade.aluno.nd_fg_10|floatformat:2 }} / 10,00</strong>, o que equivale na escala [0, 1] a <strong><span class="math-var">ND<sub>FG</sub></span> = {{ explicacao_enade.aluno.nd_fg|floatformat:4 }}</strong>.
                         </p>
                         <p class="mb-1">
-                            <strong>3) Nota Total de Formação Geral (\(NT_{FG} = 0,65 \times NO_{FG} + 0,35 \times ND_{FG}\)):</strong>
+                            <strong>3) Nota Total de Formação Geral (<span class="math-var">NT<sub>FG</sub></span> = 0,65 &times; <span class="math-var">NO<sub>FG</sub></span> + 0,35 &times; <span class="math-var">ND<sub>FG</sub></span>):</strong>
                         </p>
                         <div class="p-2 bg-info bg-opacity-10 rounded border border-info-subtle font-monospace">
-                            NT_FG = (0,65 × {{ explicacao_enade.aluno.no_fg|floatformat:4 }}) + (0,35 × {{ explicacao_enade.aluno.nd_fg|floatformat:4 }})<br>
-                            NT_FG = {{ explicacao_enade.aluno.nt_fg_parcela_obj|floatformat:4 }} + {{ explicacao_enade.aluno.nt_fg_parcela_diss|floatformat:4 }} = <strong>{{ explicacao_enade.aluno.nt_fg|floatformat:4 }}</strong>
+                            <span class="math-var">NT<sub>FG</sub></span> = (0,65 &times; {{ explicacao_enade.aluno.no_fg|floatformat:4 }}) + (0,35 &times; {{ explicacao_enade.aluno.nd_fg|floatformat:4 }})<br>
+                            <span class="math-var">NT<sub>FG</sub></span> = {{ explicacao_enade.aluno.nt_fg_parcela_obj|floatformat:4 }} + {{ explicacao_enade.aluno.nt_fg_parcela_diss|floatformat:4 }} = <strong>{{ explicacao_enade.aluno.nt_fg|floatformat:4 }}</strong>
                         </div>
                     </div>
                 </div>
@@ -144,25 +240,37 @@
                 <div class="col-md-6">
                     <div class="p-3 rounded-3 border bg-light h-100">
                         <h6 class="fw-bold text-success mb-2">
-                            <i class="fas fa-microchip me-1"></i> Passo 2.B — Cálculo do Componente Específico (\(NT_{CE}\))
+                            <i class="fas fa-microchip me-1"></i> Passo 2.B — Cálculo do Componente Específico (<span class="math-var">NT<sub>CE</sub></span>)
                         </h6>
                         <p class="mb-1">
-                            <strong>1) Nota Objetiva de CE (\(NO_{CE} \in [0, 1]\)):</strong><br>
-                            Das {{ explicacao_enade.aluno.total_ce_obj }} questões objetivas de CE, <strong>\(V_{CE} = {{ explicacao_enade.aluno.v_ce }}\)</strong> foram mantidas como válidas pela análise psicométrica. Você acertou <strong>{{ explicacao_enade.aluno.acertos_validos_ce }}</strong> questão(ões) válida(s) (seu escore bruto preliminar foi {{ explicacao_enade.aluno.escore_bruto_ce }}/{{ explicacao_enade.aluno.total_ce_obj }}):
+                            <strong>1) Nota Objetiva de CE (<span class="math-var">NO<sub>CE</sub></span> &isin; [0, 1]):</strong><br>
+                            Das {{ explicacao_enade.aluno.total_ce_obj }} questões objetivas de CE, <strong><span class="math-var">V<sub>CE</sub></span> = {{ explicacao_enade.aluno.v_ce }}</strong> foram mantidas como válidas pela análise psicométrica. Você acertou <strong>{{ explicacao_enade.aluno.acertos_validos_ce }}</strong> questão(ões) válida(s) (seu escore bruto preliminar foi {{ explicacao_enade.aluno.escore_bruto_ce }}/{{ explicacao_enade.aluno.total_ce_obj }}):
                         </p>
-                        <div class="p-2 bg-white rounded border font-monospace mb-2">
-                            NO_CE = Acertos válidos em CE / V_CE = {{ explicacao_enade.aluno.acertos_validos_ce }} / {{ explicacao_enade.aluno.v_ce }} = <strong>{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</strong>
+                        <div class="p-2 bg-white rounded border mb-2">
+                            <span class="math-eq">
+                                <span class="math-var">NO<sub>CE</sub></span> =
+                                <span class="math-frac">
+                                    <span class="num">Acertos válidos em CE</span>
+                                    <span class="den"><span class="math-var">V<sub>CE</sub></span></span>
+                                </span>
+                                =
+                                <span class="math-frac">
+                                    <span class="num">{{ explicacao_enade.aluno.acertos_validos_ce }}</span>
+                                    <span class="den">{{ explicacao_enade.aluno.v_ce }}</span>
+                                </span>
+                                = <strong>{{ explicacao_enade.aluno.no_ce|floatformat:4 }}</strong>
+                            </span>
                         </div>
                         <p class="mb-1">
-                            <strong>2) Nota Discursiva de CE (\(ND_{CE} \in [0, 1]\)):</strong><br>
-                            Sua nota na parte discursiva de CE foi <strong>{{ explicacao_enade.aluno.nd_ce_10|floatformat:2 }} / 10,00</strong>, o que equivale na escala \([0, 1]\) a <strong>\(ND_{CE} = {{ explicacao_enade.aluno.nd_ce|floatformat:4 }}\)</strong>.
+                            <strong>2) Nota Discursiva de CE (<span class="math-var">ND<sub>CE</sub></span> &isin; [0, 1]):</strong><br>
+                            Sua nota na parte discursiva de CE foi <strong>{{ explicacao_enade.aluno.nd_ce_10|floatformat:2 }} / 10,00</strong>, o que equivale na escala [0, 1] a <strong><span class="math-var">ND<sub>CE</sub></span> = {{ explicacao_enade.aluno.nd_ce|floatformat:4 }}</strong>.
                         </p>
                         <p class="mb-1">
-                            <strong>3) Nota Total de Componente Específico (\(NT_{CE} = 0,90 \times NO_{CE} + 0,10 \times ND_{CE}\)):</strong>
+                            <strong>3) Nota Total de Componente Específico (<span class="math-var">NT<sub>CE</sub></span> = 0,90 &times; <span class="math-var">NO<sub>CE</sub></span> + 0,10 &times; <span class="math-var">ND<sub>CE</sub></span>):</strong>
                         </p>
                         <div class="p-2 bg-success bg-opacity-10 rounded border border-success-subtle font-monospace">
-                            NT_CE = (0,90 × {{ explicacao_enade.aluno.no_ce|floatformat:4 }}) + (0,10 × {{ explicacao_enade.aluno.nd_ce|floatformat:4 }})<br>
-                            NT_CE = {{ explicacao_enade.aluno.nt_ce_parcela_obj|floatformat:4 }} + {{ explicacao_enade.aluno.nt_ce_parcela_diss|floatformat:4 }} = <strong>{{ explicacao_enade.aluno.nt_ce|floatformat:4 }}</strong>
+                            <span class="math-var">NT<sub>CE</sub></span> = (0,90 &times; {{ explicacao_enade.aluno.no_ce|floatformat:4 }}) + (0,10 &times; {{ explicacao_enade.aluno.nd_ce|floatformat:4 }})<br>
+                            <span class="math-var">NT<sub>CE</sub></span> = {{ explicacao_enade.aluno.nt_ce_parcela_obj|floatformat:4 }} + {{ explicacao_enade.aluno.nt_ce_parcela_diss|floatformat:4 }} = <strong>{{ explicacao_enade.aluno.nt_ce|floatformat:4 }}</strong>
                         </div>
                     </div>
                 </div>
@@ -172,7 +280,7 @@
             <div class="mb-4">
                 <h6 class="fw-bold text-dark mb-2">
                     <i class="fas fa-balance-scale text-primary me-1"></i>
-                    Passo 3: Resumo dos Pesos Efetivos e Contribuição de Cada Parte na Sua Nota Final (\(0\) a \(1\))
+                    Passo 3: Resumo dos Pesos Efetivos e Contribuição de Cada Parte na Sua Nota Final (0 a 1)
                 </h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle mb-0 small">
@@ -187,35 +295,35 @@
                         </thead>
                         <tbody class="text-center">
                             <tr>
-                                <td class="text-start"><strong>Objetivas de Formação Geral</strong> (\(NO_{FG}\))</td>
-                                <td>\(25\% \times 65\% = 16,25\%\)</td>
+                                <td class="text-start"><strong>Objetivas de Formação Geral</strong> (<span class="math-var">NO<sub>FG</sub></span>)</td>
+                                <td>25% &times; 65% = 16,25%</td>
                                 <td class="font-monospace">0,1625</td>
                                 <td class="font-monospace">{{ explicacao_enade.aluno.no_fg|floatformat:4 }} ({{ explicacao_enade.aluno.acertos_validos_fg }}/{{ explicacao_enade.aluno.v_fg }})</td>
-                                <td class="font-monospace fw-bold text-primary">0,1625 × {{ explicacao_enade.aluno.no_fg|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_fg_obj|floatformat:4 }}</td>
+                                <td class="font-monospace fw-bold text-primary">0,1625 &times; {{ explicacao_enade.aluno.no_fg|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_fg_obj|floatformat:4 }}</td>
                             </tr>
                             <tr>
-                                <td class="text-start"><strong>Discursiva de Formação Geral</strong> (\(ND_{FG}\))</td>
-                                <td>\(25\% \times 35\% = 8,75\%\)</td>
+                                <td class="text-start"><strong>Discursiva de Formação Geral</strong> (<span class="math-var">ND<sub>FG</sub></span>)</td>
+                                <td>25% &times; 35% = 8,75%</td>
                                 <td class="font-monospace">0,0875</td>
                                 <td class="font-monospace">{{ explicacao_enade.aluno.nd_fg|floatformat:4 }} ({{ explicacao_enade.aluno.nd_fg_10|floatformat:1 }}/10)</td>
-                                <td class="font-monospace fw-bold text-primary">0,0875 × {{ explicacao_enade.aluno.nd_fg|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_fg_diss|floatformat:4 }}</td>
+                                <td class="font-monospace fw-bold text-primary">0,0875 &times; {{ explicacao_enade.aluno.nd_fg|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_fg_diss|floatformat:4 }}</td>
                             </tr>
                             <tr>
-                                <td class="text-start"><strong>Objetivas de Componente Específico</strong> (\(NO_{CE}\))</td>
-                                <td>\(75\% \times 90\% = 67,50\%\)</td>
+                                <td class="text-start"><strong>Objetivas de Componente Específico</strong> (<span class="math-var">NO<sub>CE</sub></span>)</td>
+                                <td>75% &times; 90% = 67,50%</td>
                                 <td class="font-monospace">0,6750</td>
                                 <td class="font-monospace">{{ explicacao_enade.aluno.no_ce|floatformat:4 }} ({{ explicacao_enade.aluno.acertos_validos_ce }}/{{ explicacao_enade.aluno.v_ce }})</td>
-                                <td class="font-monospace fw-bold text-success">0,6750 × {{ explicacao_enade.aluno.no_ce|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_ce_obj|floatformat:4 }}</td>
+                                <td class="font-monospace fw-bold text-success">0,6750 &times; {{ explicacao_enade.aluno.no_ce|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_ce_obj|floatformat:4 }}</td>
                             </tr>
                             <tr>
-                                <td class="text-start"><strong>Discursiva de Componente Específico</strong> (\(ND_{CE}\))</td>
-                                <td>\(75\% \times 10\% = 7,50\%\)</td>
+                                <td class="text-start"><strong>Discursiva de Componente Específico</strong> (<span class="math-var">ND<sub>CE</sub></span>)</td>
+                                <td>75% &times; 10% = 7,50%</td>
                                 <td class="font-monospace">0,0750</td>
                                 <td class="font-monospace">{{ explicacao_enade.aluno.nd_ce|floatformat:4 }} ({{ explicacao_enade.aluno.nd_ce_10|floatformat:1 }}/10)</td>
-                                <td class="font-monospace fw-bold text-success">0,0750 × {{ explicacao_enade.aluno.nd_ce|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_ce_diss|floatformat:4 }}</td>
+                                <td class="font-monospace fw-bold text-success">0,0750 &times; {{ explicacao_enade.aluno.nd_ce|floatformat:4 }} = {{ explicacao_enade.aluno.contrib_ce_diss|floatformat:4 }}</td>
                             </tr>
                             <tr class="table-primary fw-bold">
-                                <td class="text-start">Total — Nota Geral do Estudante (\(NT_{Ger} = 0,25 \times NT_{FG} + 0,75 \times NT_{CE}\))</td>
+                                <td class="text-start">Total — Nota Geral do Estudante (<span class="math-var">NT<sub>Ger</sub></span> = 0,25 &times; <span class="math-var">NT<sub>FG</sub></span> + 0,75 &times; <span class="math-var">NT<sub>CE</sub></span>)</td>
                                 <td>100%</td>
                                 <td class="font-monospace">1,0000</td>
                                 <td class="font-monospace">{{ explicacao_enade.aluno.nt_ger_pct }}%</td>
@@ -242,11 +350,11 @@
                                 <th>Sua Resposta</th>
                                 <th>Gabarito</th>
                                 <th>Resultado Bruto</th>
-                                <th>\(\bar{X}_1\)</th>
-                                <th>\(\bar{X}\)</th>
-                                <th>\(S_X\)</th>
-                                <th>\(p\)</th>
-                                <th>Índice \(r_{pb}\)</th>
+                                <th><span class="math-var"><span class="math-bar">X</span><sub>1</sub></span></th>
+                                <th><span class="math-var"><span class="math-bar">X</span></span></th>
+                                <th><span class="math-var">S<sub>X</sub></span></th>
+                                <th><span class="math-var">p</span></th>
+                                <th>Índice <span class="math-var">r<sub>pb</sub></span></th>
                                 <th>Status Psicométrico</th>
                                 <th>Contou no Cálculo?</th>
                             </tr>
@@ -275,9 +383,9 @@
                                 </td>
                                 <td>
                                     {% if qd.valida %}
-                                    <span class="badge bg-success">Válida (\(r_{pb} > 0,19\))</span>
+                                    <span class="badge bg-success">Válida (<span class="math-var">r<sub>pb</sub></span> &gt; 0,19)</span>
                                     {% else %}
-                                    <span class="badge bg-secondary" title="{{ qd.motivo }}">Desconsiderada (\(r_{pb} \le 0,19\))</span>
+                                    <span class="badge bg-secondary" title="{{ qd.motivo }}">Desconsiderada (<span class="math-var">r<sub>pb</sub></span> &le; 0,19)</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -314,9 +422,9 @@
                                 </td>
                                 <td>
                                     {% if qd.valida %}
-                                    <span class="badge bg-success">Válida (\(r_{pb} > 0,19\))</span>
+                                    <span class="badge bg-success">Válida (<span class="math-var">r<sub>pb</sub></span> &gt; 0,19)</span>
                                     {% else %}
-                                    <span class="badge bg-secondary" title="{{ qd.motivo }}">Desconsiderada (\(r_{pb} \le 0,19\))</span>
+                                    <span class="badge bg-secondary" title="{{ qd.motivo }}">Desconsiderada (<span class="math-var">r<sub>pb</sub></span> &le; 0,19)</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -578,7 +686,7 @@
                     <div class="border rounded p-3">
                         {% if explicacao_enade %}
                         <h3 class="text-warning mb-1">{{ explicacao_enade.aluno.nt_ger|floatformat:4 }}</h3>
-                        <small class="text-muted">Nota Geral \(NT_{Ger}\) ({{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }}/10)</small>
+                        <small class="text-muted">Nota Geral <span class="math-var">NT<sub>Ger</sub></span> ({{ explicacao_enade.aluno.nt_ger_10|floatformat:2 }}/10)</small>
                         {% else %}
                         <h3 class="text-warning mb-1">{{ prova_aluno.nota_final|floatformat:1 }}</h3>
                         <small class="text-muted">Nota Final</small>
